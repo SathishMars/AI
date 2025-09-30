@@ -20,11 +20,14 @@ import {
   Code as CodeIcon,
   Chat as ChatIcon,
   AccountTree as VisualizationIcon,
-  DragIndicator as DragIcon
+  DragIndicator as DragIcon,
+  History as HistoryIcon
 } from '@mui/icons-material';
 import { WorkflowJSON, ValidationResult } from '@/app/types/workflow';
 import WorkflowCreationPane from './WorkflowCreationPane';
 import VisualizationPane from './VisualizationPane';
+import HistoryPanel from './HistoryPanel';
+import EditModeIndicator from './EditModeIndicator';
 
 interface ConversationState {
   activeConversationId: string;
@@ -64,6 +67,7 @@ export default function ResponsiveWorkflowConfigurator({
   // Layout state
   const [showFullVisualization, setShowFullVisualization] = useState(false);
   const [showRawJSON, setShowRawJSON] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [activeTab, setActiveTab] = useState(0); // For mobile tab navigation
   const [conversationPaneWidth, setConversationPaneWidth] = useState(400); // Default 400px
   const [isDragging, setIsDragging] = useState(false);
@@ -172,11 +176,18 @@ export default function ResponsiveWorkflowConfigurator({
         justifyContent: 'space-between', 
         alignItems: 'center',
         flexDirection: { xs: 'column', sm: 'row' },
-        gap: { xs: 2, sm: 0 }
+        gap: { xs: 2, sm: 1 }
       }}>
-        <Typography variant="h6" component="h1" sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
-          Workflow Configurator
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+          <Typography variant="h6" component="h1" sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
+            Workflow Configurator
+          </Typography>
+          
+          <EditModeIndicator 
+            workflow={workflow}
+            hasUnsavedChanges={false} // TODO: Implement unsaved changes detection
+          />
+        </Box>
         
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
           <Button
@@ -199,6 +210,14 @@ export default function ResponsiveWorkflowConfigurator({
           >
             Publish
           </Button>
+          
+          <IconButton
+            size="small"
+            onClick={() => setShowHistory(!showHistory)}
+            title="View History"
+          >
+            <HistoryIcon />
+          </IconButton>
           
           <IconButton
             size="small"
@@ -240,6 +259,11 @@ export default function ResponsiveWorkflowConfigurator({
           label="Workflow" 
           sx={{ minWidth: 0, fontSize: '0.875rem' }}
         />
+        <Tab 
+          icon={<HistoryIcon />} 
+          label="History" 
+          sx={{ minWidth: 0, fontSize: '0.875rem' }}
+        />
       </Tabs>
     </AppBar>
   );
@@ -270,6 +294,21 @@ export default function ResponsiveWorkflowConfigurator({
   );
   
   // Main layout content
+  if (showHistory) {
+    return (
+      <Container maxWidth={false} sx={{ height: '100vh', p: 0 }}>
+        {renderToolbar()}
+        <Box sx={{ flex: 1, overflow: 'hidden' }}>
+          <HistoryPanel
+            workflowId={workflow.metadata.id}
+            isOpen={true}
+            onToggle={() => setShowHistory(false)}
+          />
+        </Box>
+      </Container>
+    );
+  }
+  
   if (showFullVisualization) {
     return (
       <Container maxWidth={false} sx={{ height: '100vh', p: 0 }}>
@@ -336,11 +375,17 @@ export default function ResponsiveWorkflowConfigurator({
                 isNewWorkflow={isNewWorkflow}
                 mrfData={undefined}
               />
-            ) : (
+            ) : activeTab === 1 ? (
               <VisualizationPane
                 workflow={workflow}
                 validationResult={validationResult}
                 onWorkflowChange={onWorkflowChange}
+              />
+            ) : (
+              <HistoryPanel
+                workflowId={workflow.metadata.id}
+                isOpen={true}
+                onToggle={() => setActiveTab(0)}
               />
             )}
           </Box>
