@@ -128,7 +128,7 @@ export class LLMWorkflowGenerator {
     
     // Build conversational prompts that encourage parameter collection
     const systemPrompt = this.buildConversationalSystemPrompt(context, currentWorkflow);
-    const userPrompt = this.buildConversationalUserPrompt(userInput, context);
+    const userPrompt = this.buildConversationalUserPrompt(userInput);
     
     if (this.config.provider === 'openai') {
       return await this.generateConversationalWithOpenAI(systemPrompt, userPrompt);
@@ -583,7 +583,8 @@ CONVERSATIONAL GUIDELINES:
 4. For onMRFSubmit triggers, ask "Which MRF form should trigger this workflow?"
 5. For approval steps, ask "Who should receive the approval request?"
 6. Set parameterCollectionNeeded: true when params are empty
-7. Be friendly and helpful - you're guiding them through workflow creation
+7. Keep responses professional and avoid excessive emojis or icons
+8. Focus on clear, actionable questions rather than decorative elements
 
 USER CONTEXT:
 - User: ${context.user.name} (${context.user.role} in ${context.user.department})
@@ -608,7 +609,7 @@ Remember: Create workflows with empty params for functions that need configurati
   /**
    * Build conversational user prompt that requests both workflow and questions
    */
-  private buildConversationalUserPrompt(userInput: string, context: WorkflowGenerationContext): string {
+  private buildConversationalUserPrompt(userInput: string): string {
     return `User request: "${userInput}"
 
 Please generate:
@@ -617,7 +618,7 @@ Please generate:
 3. Follow-up questions to collect missing parameters
 4. Set parameterCollectionNeeded: true if any steps have empty params
 
-Focus on parameter collection - if you create trigger/action steps, leave their params empty and ask specific questions about configuration.
+Focus on parameter collection - if you create trigger/action steps, leave their params empty and ask specific questions about configuration. Keep responses professional and avoid excessive icons or emojis.
 
 Respond with the JSON structure specified in the system prompt.`;
   }

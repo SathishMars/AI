@@ -138,18 +138,14 @@ export default function WorkflowCreationPane({
         );
         const manager = new ConversationStateManager(conversationState);
         
-        // Add welcome message based on creation context
+        // Add combined welcome and guidance message
         const welcomeMessage = mrfData 
           ? `Hi! I'm aime, your AI workflow assistant. I see you want to create a workflow for "${mrfData.title}". Let's build this together step by step! Just describe what you want the workflow to do.`
-          : `Hi! I'm aime, your AI workflow assistant. I'm here to help you ${isNewWorkflow ? 'create a new workflow from scratch' : 'edit your existing workflow'}. What would you like to build or modify?`;
+          : isNewWorkflow
+            ? `Hi! I'm aime, your AI workflow assistant. I'm here to help you create a new workflow from scratch. What would you like to build or modify?\n\nTo get started, you can describe your workflow in natural language. For example: 'When an MRF is submitted, check if it needs approval based on budget or location, then either send for approval or proceed directly.'`
+            : `Hi! I'm aime, your AI workflow assistant. I'm here to help you edit your existing workflow. What would you like to build or modify?`;
         
         manager.addAimeMessage(welcomeMessage, 'text');
-        
-        // Add contextual guidance for new workflows
-        if (isNewWorkflow) {
-          const guidanceMessage = "To get started, you can describe your workflow in natural language. For example: 'When an MRF is submitted, check if it needs approval based on budget or location, then either send for approval or proceed directly.'";
-          manager.addAimeMessage(guidanceMessage, 'text');
-        }
         setConversationManager(manager);
         
         // Initialize creation session
@@ -312,7 +308,7 @@ export default function WorkflowCreationPane({
           // If parameter collection is needed, add the hint to the same message
           if (result.parameterCollectionNeeded) {
             console.log('🔧 Parameter collection needed');
-            combinedMessage += "\n\n💡 Please provide the information above so I can complete the workflow configuration with the specific details.";
+            combinedMessage += "\n\nPlease provide the information above so I can complete the workflow configuration with the specific details.";
           }
         }
         
