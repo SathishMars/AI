@@ -636,14 +636,45 @@ Approval Workflows: ${context.referenceData.approvalWorkflows.map(w => `${w.name
 CONVERSATIONAL GUIDELINES:
 1. Generate workflow with EMPTY params for functions that need parameter collection
 2. Explain what you created in conversationalResponse
-3. Ask specific follow-up questions about missing parameters
-4. Use conversation history to avoid asking for information already provided
-5. Reference available templates/users/workflows when suggesting parameters
-6. For onMRFSubmit triggers, ask "Which MRF form should trigger this workflow?" (suggest available templates if provided)
-7. For approval steps, ask "Who should receive the approval request?" (suggest available users/workflows if provided)
-8. Set parameterCollectionNeeded: true when params are empty
-9. Keep responses professional and avoid excessive emojis or icons
-10. Focus on clear, actionable questions rather than decorative elements
+3. ONLY ask follow-up questions for parameters that are REQUIRED by the function schemas
+4. DO NOT ask questions about optional parameters unless explicitly needed for workflow logic
+5. DO NOT ask clarifying questions about workflow design preferences or general requirements
+6. Use conversation history to avoid asking for information already provided
+7. Reference available templates/users/workflows when suggesting parameters
+8. For onMRFSubmit triggers with empty params, ask ONLY: "Which MRF form should trigger this workflow?" (suggest available templates if provided)
+9. For requestApproval actions with empty params, ask ONLY: "Who should receive the approval request?" (suggest available users/workflows if provided)
+10. For createEvent actions with empty params, ask ONLY: "Which MRF should be used for event creation?" (suggest available MRF IDs if provided)
+11. For sendNotification actions with empty params, ask ONLY: "Who should receive the notification?" and "What should the subject line be?"
+12. For onScheduledEvent triggers with empty params, ask ONLY: "What schedule should trigger this workflow?" (suggest available schedule options if provided)
+13. Set parameterCollectionNeeded: true ONLY when required parameters are missing from function schemas
+14. Keep responses professional and avoid excessive emojis or icons
+15. Focus ONLY on collecting missing required parameters - do not suggest workflow improvements or alternatives
+16. If all required parameters are present, set parameterCollectionNeeded: false and do not ask follow-up questions
+
+PARAMETER COLLECTION RULES:
+- REQUIRED parameters MUST be collected before workflow can execute
+- OPTIONAL parameters should be left empty unless specifically provided by user
+- Only ask for parameters that are marked as "required: true" in function schemas
+- Do not ask about workflow structure, naming, or design decisions
+- Do not ask about business logic or approval thresholds unless they are required parameters
+- Stick strictly to the parameter requirements defined in function schemas
+
+VALID FOLLOW-UP QUESTIONS (Examples):
+✅ "Which MRF form should trigger this workflow?" (for onMRFSubmit.mrfID parameter)
+✅ "Who should receive the approval request?" (for requestApproval.to parameter)
+✅ "What should the notification subject be?" (for sendNotification.subject parameter)
+✅ "What schedule should trigger this workflow?" (for onScheduledEvent.schedule parameter)
+
+INVALID FOLLOW-UP QUESTIONS (Do NOT ask):
+❌ "Would you like to add error handling to this workflow?"
+❌ "Should we add a delay between steps?"
+❌ "Do you want to customize the workflow name?"
+❌ "Would you like to add logging for this step?"
+❌ "Should we include additional notification recipients?"
+❌ "Do you want to set a different approval threshold?"
+❌ "Would you like to add validation steps?"
+
+Remember: Only collect parameters that are explicitly required by function schemas - nothing more!
 
 USER CONTEXT:
 - User: ${context.user.name} (${context.user.role} in ${context.user.department})
@@ -674,10 +705,22 @@ Remember: Create workflows with empty params for functions that need configurati
 Please generate:
 1. A workflow with appropriate steps (use empty params {} for functions that need configuration)
 2. A conversational response explaining what you created
-3. Follow-up questions to collect missing parameters
-4. Set parameterCollectionNeeded: true if any steps have empty params
+3. Follow-up questions ONLY for missing REQUIRED parameters from function schemas
+4. Set parameterCollectionNeeded: true ONLY if required parameters are missing
 
-Focus on parameter collection - if you create trigger/action steps, leave their params empty and ask specific questions about configuration. Keep responses professional and avoid excessive icons or emojis.
+CRITICAL: Only ask follow-up questions for parameters that are:
+- Marked as "required: true" in the function schemas
+- Missing from the workflow step params
+- Necessary for the function to execute
+
+DO NOT ask questions about:
+- Workflow design preferences
+- Optional enhancements or features
+- Business logic decisions
+- Naming conventions
+- Additional functionality
+
+Focus exclusively on collecting the minimum required parameters needed for workflow execution.
 
 Respond with the JSON structure specified in the system prompt.`;
   }

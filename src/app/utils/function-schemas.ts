@@ -220,6 +220,64 @@ export const DEFAULT_REFERENCE_DATA = {
 };
 
 /**
+ * Validate function schemas to ensure proper parameter requirements
+ */
+export function validateFunctionSchemas(schemas: FunctionSchema[]): { isValid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  
+  for (const schema of schemas) {
+    // Check that at least one parameter is marked as required
+    const hasRequiredParams = Object.values(schema.parameters).some(param => param.required);
+    if (!hasRequiredParams) {
+      errors.push(`Function ${schema.name} has no required parameters - at least one should be required for parameter collection`);
+    }
+    
+    // Check for proper parameter descriptions
+    for (const [paramName, paramInfo] of Object.entries(schema.parameters)) {
+      if (!paramInfo.description || paramInfo.description.length < 10) {
+        errors.push(`Parameter ${paramName} in function ${schema.name} needs a more descriptive description`);
+      }
+      
+      if (paramInfo.required && paramInfo.options && paramInfo.options.length === 0) {
+        errors.push(`Required parameter ${paramName} in function ${schema.name} has empty options array - should have available values`);
+      }
+    }
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+}
+
+/**
+ * Get only required parameters from function schemas for focused questioning
+ */
+export function getRequiredParameters(functionName: string, schemas: FunctionSchema[]): string[] {
+  const schema = schemas.find(s => s.name === functionName);
+  if (!schema) return [];
+  
+  return Object.entries(schema.parameters)
+    .filter(([, paramInfo]) => paramInfo.required)
+    .map(([paramName]) => paramName);
+}
+
+/**
+ * Check if a workflow step has all required parameters
+ */
+export function hasAllRequiredParameters(
+  stepAction: string, 
+  stepParams: Record<string, unknown>, 
+  schemas: FunctionSchema[]
+): boolean {
+  const requiredParams = getRequiredParameters(stepAction, schemas);
+  return requiredParams.every(param => 
+    stepParams[param] !== undefined && 
+    stepParams[param] !== null && 
+    stepParams[param] !== ''
+  );
+}
+/**
  * Populate function schemas with reference data options
  */
 export function populateFunctionSchemas(referenceData = DEFAULT_REFERENCE_DATA): FunctionSchema[] {
