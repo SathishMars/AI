@@ -43,12 +43,15 @@ export async function POST(request: NextRequest) {
       currentDate: new Date().toISOString()
     };
 
-    // Merge provided context with defaults
+    // Merge with default context, preserving enhanced fields
     const fullContext = {
       ...defaultContext,
-      ...context,
       user: { ...defaultContext.user, ...(context?.user || {}) },
-      mrf: { ...defaultContext.mrf, ...(context?.mrf || {}) }
+      mrf: { ...defaultContext.mrf, ...(context?.mrf || {}) },
+      // Preserve enhanced context fields
+      functionSchemas: context?.functionSchemas || [],
+      conversationHistory: context?.conversationHistory || [],
+      referenceData: context?.referenceData || undefined
     };
 
     // Get API configuration from environment variables

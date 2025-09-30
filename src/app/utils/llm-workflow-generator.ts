@@ -23,6 +23,28 @@ export interface WorkflowGenerationResult {
   parameterCollectionNeeded?: boolean; // NEW: Indicates if parameter collection is needed
 }
 
+export interface ConversationHistoryMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+}
+
+export interface FunctionSchema {
+  name: string;
+  description: string;
+  parameters: {
+    [key: string]: {
+      type: string;
+      description: string;
+      required: boolean;
+      options?: string[];
+    };
+  };
+  examples?: {
+    [key: string]: unknown;
+  };
+}
+
 export interface WorkflowGenerationContext {
   user: {
     id: string;
@@ -43,6 +65,13 @@ export interface WorkflowGenerationContext {
     budget: number;
   };
   availableFunctions: string[];
+  functionSchemas?: FunctionSchema[]; // NEW: Detailed function definitions
+  conversationHistory?: ConversationHistoryMessage[]; // NEW: Last 10 message pairs
+  referenceData?: {
+    mrfTemplates?: Array<{ id: string; name: string; category: string; }>;
+    users?: Array<{ id: string; name: string; email: string; role: string; }>;
+    approvalWorkflows?: Array<{ id: string; name: string; approvers: string[]; }>;
+  }; // NEW: Available reference data for intelligent suggestions
   currentDate: string;
 }
 
@@ -569,22 +598,52 @@ WORKFLOW SCHEMA:
 AVAILABLE FUNCTIONS:
 ${context.availableFunctions.map(fn => `- ${fn}`).join('\n')}
 
+${context.functionSchemas && context.functionSchemas.length > 0 ? `
+DETAILED FUNCTION SCHEMAS:
+${context.functionSchemas.map(schema => `
+Function: ${schema.name}
+Description: ${schema.description}
+Parameters:
+${Object.entries(schema.parameters).map(([param, info]) => `  - ${param} (${info.type}): ${info.description}${info.required ? ' [REQUIRED]' : ' [OPTIONAL]'}${info.options ? ` - Options: ${info.options.join(', ')}` : ''}`).join('\n')}
+${schema.examples ? `Examples: ${JSON.stringify(schema.examples, null, 2)}` : ''}
+`).join('\n')}
+` : `
 FUNCTIONS REQUIRING PARAMETER COLLECTION:
 - onMRFSubmit: requires mrfID (specific MRF form to monitor)
 - requestApproval: requires to (who should approve)
 - createEvent: requires mrfID (which MRF to use for event creation) 
 - sendNotification: requires to, subject (recipient and message)
 - onScheduledEvent: requires schedule (when to run)
+`}
+
+${context.conversationHistory && context.conversationHistory.length > 0 ? `
+CONVERSATION HISTORY (Last ${context.conversationHistory.length} messages):
+${context.conversationHistory.map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`).join('\n')}
+
+IMPORTANT: Consider the conversation history when making decisions about parameter collection and workflow modifications.
+` : ''}
+
+${context.referenceData ? `
+AVAILABLE REFERENCE DATA:
+${context.referenceData.mrfTemplates ? `
+MRF Templates: ${context.referenceData.mrfTemplates.map(t => `${t.name} (${t.category})`).join(', ')}` : ''}
+${context.referenceData.users ? `
+Available Users: ${context.referenceData.users.map(u => `${u.name} (${u.role})`).join(', ')}` : ''}
+${context.referenceData.approvalWorkflows ? `
+Approval Workflows: ${context.referenceData.approvalWorkflows.map(w => `${w.name} - Approvers: ${w.approvers.join(', ')}`).join(', ')}` : ''}
+` : ''}
 
 CONVERSATIONAL GUIDELINES:
-1. Generate workflow with EMPTY params for functions that need configuration
+1. Generate workflow with EMPTY params for functions that need parameter collection
 2. Explain what you created in conversationalResponse
 3. Ask specific follow-up questions about missing parameters
-4. For onMRFSubmit triggers, ask "Which MRF form should trigger this workflow?"
-5. For approval steps, ask "Who should receive the approval request?"
-6. Set parameterCollectionNeeded: true when params are empty
-7. Keep responses professional and avoid excessive emojis or icons
-8. Focus on clear, actionable questions rather than decorative elements
+4. Use conversation history to avoid asking for information already provided
+5. Reference available templates/users/workflows when suggesting parameters
+6. For onMRFSubmit triggers, ask "Which MRF form should trigger this workflow?" (suggest available templates if provided)
+7. For approval steps, ask "Who should receive the approval request?" (suggest available users/workflows if provided)
+8. Set parameterCollectionNeeded: true when params are empty
+9. Keep responses professional and avoid excessive emojis or icons
+10. Focus on clear, actionable questions rather than decorative elements
 
 USER CONTEXT:
 - User: ${context.user.name} (${context.user.role} in ${context.user.department})
@@ -767,6 +826,9 @@ export function createDefaultContext(): WorkflowGenerationContext {
       budget: 50000
     },
     availableFunctions: DEFAULT_WORKFLOW_FUNCTIONS,
+    functionSchemas: [], // Will be populated with actual schemas when provided
+    conversationHistory: [], // Will be populated with conversation history when provided
+    referenceData: undefined, // Will be populated with reference data when provided
     currentDate: new Date().toISOString()
   };
 }

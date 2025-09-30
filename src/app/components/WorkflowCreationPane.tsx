@@ -32,6 +32,8 @@ import { ConversationMessage } from '@/app/types/conversation';
 import { WorkflowCreationFlow } from '@/app/utils/workflow-creation-flow';
 import { createEmptyConversationState, ConversationStateManager } from '@/app/utils/conversation-manager';
 import { SmartAutocomplete } from './ConversationPane';
+import { populateFunctionSchemas, DEFAULT_REFERENCE_DATA } from '@/app/utils/function-schemas';
+import { ConversationHistoryMessage } from '@/app/utils/llm-workflow-generator';
 
 // Enhanced auto-save status indicator
 
@@ -185,19 +187,50 @@ export default function WorkflowCreationPane({
     return () => window.removeEventListener('autoSaveStatus', handleAutoSaveEvent as EventListener);
   }, [currentSession?.sessionId]);
   
+  // Helper function to get recent conversation history (last 10 message pairs)
+  const getConversationHistory = useCallback((): ConversationHistoryMessage[] => {
+    if (!conversationManager) return [];
+    
+    const messages = conversationManager.getMessages();
+    const history: ConversationHistoryMessage[] = [];
+    
+    // Take last 20 messages (up to 10 pairs), but skip the welcome message
+    const recentMessages = messages
+      .filter(msg => msg.content !== 'Hello! I\'m Aime, your AI workflow assistant. I\'m here to help you create and customize workflows for your team.') // Skip welcome message
+      .slice(-20); // Last 20 messages
+    
+    recentMessages.forEach(msg => {
+      history.push({
+        role: msg.sender === 'user' ? 'user' : 'assistant',
+        content: msg.content,
+        timestamp: msg.timestamp.toISOString()
+      });
+    });
+    
+    return history;
+  }, [conversationManager]);
+
   // Get current conversation context
   const getCurrentContext = useCallback((): CreationContext => {
     if (currentSession) {
       return currentSession.context;
     }
     
-    // Default context
+    // Default context with enhanced data
     return {
       workflowId: workflow.metadata?.id || 'new-workflow',
       workflowName: workflow.metadata?.name || 'New Workflow',
       userRole: 'admin',
       userDepartment: 'IT',
-      availableFunctions: [],
+      availableFunctions: [
+        'onMRFSubmit',
+        'requestApproval', 
+        'createEvent',
+        'sendNotification',
+        'onScheduledEvent',
+        'onApprovalReceived',
+        'updateMRFStatus'
+      ],
       conversationGoal: isNewWorkflow ? 'create' : 'edit',
       currentWorkflowSteps: Object.keys(workflow.steps || {}),
       mrfData
@@ -296,7 +329,19 @@ export default function WorkflowCreationPane({
         : 'Working on your request... I\'m analyzing your requirements and creating the workflow.';
       addMessage(processingMessage, 'aime');
       
-      // Call backend API for workflow generation
+      // Call backend API for workflow generation with enhanced context
+      const baseContext = getCurrentContext();
+      const conversationHistory = getConversationHistory();
+      const functionSchemas = populateFunctionSchemas(DEFAULT_REFERENCE_DATA);
+      
+      const enhancedContext = {
+        ...baseContext,
+        // Add enhanced data for LLM context
+        conversationHistory,
+        functionSchemas,
+        referenceData: DEFAULT_REFERENCE_DATA
+      };
+      
       const response = await fetch('/api/generate-workflow', {
         method: 'POST',
         headers: {
@@ -304,7 +349,7 @@ export default function WorkflowCreationPane({
         },
         body: JSON.stringify({
           userInput: messageText,
-          context: getCurrentContext(),
+          context: enhancedContext,
           currentWorkflow: workflow // Include the complete current workflow for context
         }),
       });
