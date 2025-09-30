@@ -138,21 +138,25 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Initialize LLM generator
+    // Initialize LLM generator with conversational mode enabled
     const generator = new LLMWorkflowGenerator({
       provider,
       apiKey,
-      model: provider === 'openai' ? 'gpt-4' : 'claude-3-sonnet-20240229'
+      model: provider === 'openai' ? 'gpt-4' : 'claude-3-sonnet-20240229',
+      conversationalMode: true // Enable conversational mode for parameter collection
     });
 
-    // Handle backend-only processing (no streaming to browser)
-    const workflow = await generator.generateWorkflow(userInput, fullContext, currentWorkflow);
+    // Handle backend-only processing with conversational responses
+    const result = await generator.generateWorkflow(userInput, fullContext, currentWorkflow);
     
     return NextResponse.json({
-      workflow,
+      workflow: result.workflow,
+      conversationalResponse: result.conversationalResponse,
+      followUpQuestions: result.followUpQuestions,
+      parameterCollectionNeeded: result.parameterCollectionNeeded,
       source: 'llm',
       provider,
-      message: `Workflow updated successfully based on your request: "${userInput.substring(0, 100)}${userInput.length > 100 ? '...' : ''}"`
+      message: result.conversationalResponse || `Workflow updated successfully based on your request: "${userInput.substring(0, 100)}${userInput.length > 100 ? '...' : ''}"`
     });
 
   } catch (error) {

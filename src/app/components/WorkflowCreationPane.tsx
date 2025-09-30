@@ -281,6 +281,8 @@ export default function WorkflowCreationPane({
         throw new Error(result.error || 'Failed to generate workflow');
       }
       
+      console.log('📊 API Response:', result);
+      
       // Update workflow in the right pane
       if (result.workflow && onWorkflowChange) {
         const completeWorkflow = createCompleteWorkflow(result.workflow);
@@ -293,12 +295,37 @@ export default function WorkflowCreationPane({
       // Small delay to make the interaction feel natural
       await new Promise(resolve => setTimeout(resolve, 800));
       
-      // Show success message from aime
-      const hasStepsForSuccess = workflow.steps && Object.keys(workflow.steps).length > 0;
-      const successMessage = hasStepsForSuccess
-        ? `✅ Perfect! I've modified your existing workflow to incorporate your request. The updated workflow maintains the existing structure while adding the new requirements. Check the visualization on the right to see the changes.`
-        : `✅ Excellent! I've created your new workflow based on your request. The workflow includes all the logic you described. You can see the complete workflow structure in the visualization on the right.`;
-      addMessage(successMessage, 'aime');
+      // Handle conversational response and follow-up questions
+      if (result.conversationalResponse) {
+        console.log('💬 Conversational response detected:', result.conversationalResponse);
+        
+        // Group conversational response with follow-up questions in a single message
+        let combinedMessage = result.conversationalResponse;
+        
+        // Add follow-up questions if present
+        if (result.followUpQuestions && result.followUpQuestions.length > 0) {
+          console.log('❓ Follow-up questions:', result.followUpQuestions);
+          
+          // Add the questions to the same message bubble
+          combinedMessage += `\n\nTo complete your workflow, I need some additional information:\n\n${result.followUpQuestions.map((question: string, index: number) => `${index + 1}. ${question}`).join('\n')}`;
+          
+          // If parameter collection is needed, add the hint to the same message
+          if (result.parameterCollectionNeeded) {
+            console.log('🔧 Parameter collection needed');
+            combinedMessage += "\n\n💡 Please provide the information above so I can complete the workflow configuration with the specific details.";
+          }
+        }
+        
+        // Send the combined message as a single bubble
+        addMessage(combinedMessage, 'aime');
+      } else {
+        // Show standard success message when no conversational response
+        const hasStepsForSuccess = workflow.steps && Object.keys(workflow.steps).length > 0;
+        const successMessage = hasStepsForSuccess
+          ? `✅ Perfect! I've modified your existing workflow to incorporate your request. The updated workflow maintains the existing structure while adding the new requirements. Check the visualization on the right to see the changes.`
+          : `✅ Excellent! I've created your new workflow based on your request. The workflow includes all the logic you described. You can see the complete workflow structure in the visualization on the right.`;
+        addMessage(successMessage, 'aime');
+      }
       
     } catch (error) {
       console.error('❌ Error in workflow generation:', error);

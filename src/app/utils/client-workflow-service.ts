@@ -32,12 +32,19 @@ export interface WorkflowGenerationResponse {
   source: 'llm' | 'simulation';
   provider?: string;
   message: string;
+  conversationalResponse?: string; // NEW: Conversational response from LLM
+  followUpQuestions?: string[]; // NEW: Follow-up questions for parameter collection
+  parameterCollectionNeeded?: boolean; // NEW: Indicates if parameter collection is needed
 }
 
 export interface StreamChunk {
   chunk: string;
   workflow?: Partial<WorkflowJSON>;
   error?: string;
+  // Conversational response fields from API
+  conversationalResponse?: string;
+  followUpQuestions?: string[];
+  parameterCollectionNeeded?: boolean;
 }
 
 /**

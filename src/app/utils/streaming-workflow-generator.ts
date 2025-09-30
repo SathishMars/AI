@@ -38,7 +38,9 @@ export class StreamingWorkflowGenerator {
       // Use server-side API to generate workflow
       const streamGenerator = streamWorkflowGeneration(userInput, apiContext);
       
-      for await (const { chunk, workflow, error } of streamGenerator) {
+      for await (const streamData of streamGenerator) {
+        const { chunk, workflow, error, conversationalResponse, followUpQuestions, parameterCollectionNeeded } = streamData;
+        
         if (error) {
           console.error('❌ Stream error:', error);
           yield {
@@ -56,14 +58,26 @@ export class StreamingWorkflowGenerator {
           console.log('📝 Received workflow update from API:', workflow);
           this.accumulatedWorkflow = this.mergeWorkflowUpdate(this.accumulatedWorkflow, workflow);
           this.stepCount = Object.keys(this.accumulatedWorkflow.steps || {}).length;
+          
+          // Log conversational data if present
+          if (conversationalResponse || parameterCollectionNeeded) {
+            console.log('🎯 Conversational data detected:', {
+              conversationalResponse,
+              followUpQuestions,
+              parameterCollectionNeeded
+            });
+          }
         }
         
-        // Yield the streaming chunk
+        // Yield the streaming chunk with conversational fields
         yield {
           type: 'workflow_update',
           content: chunk,
           workflowDelta: workflow,
-          currentWorkflow: this.accumulatedWorkflow
+          currentWorkflow: this.accumulatedWorkflow,
+          conversationalResponse,
+          followUpQuestions,
+          parameterCollectionNeeded
         };
       }
       

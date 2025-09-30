@@ -7,23 +7,31 @@ import {
   CreationPhase,
   StructuredGuidance,
   MRFData,
-  WorkflowGenerationChunk
+  WorkflowGenerationChunk,
+  UpdateContext
 } from '@/app/types/workflow-creation';
 import { WorkflowJSON, ValidationResult } from '@/app/types/workflow';
 import { StructuredCreationGuide } from './structured-creation-guide';
 import { StreamingWorkflowGenerator } from './streaming-workflow-generator';
 import { AIUpdateAutoSave } from './ai-update-auto-save';
+import { PostUpdateValidationSystem } from './post-update-validation';
+import { ParameterCollectionSystem } from './parameter-collection-system';
+import type { ParameterCollectionContext } from './parameter-collection-system';
 
 export class WorkflowCreationFlow {
   private creationGuide: StructuredCreationGuide;
   private workflowGenerator: StreamingWorkflowGenerator;
   private autoSave: AIUpdateAutoSave;
+  private validationSystem: PostUpdateValidationSystem;
+  private parameterCollectionSystem: ParameterCollectionSystem;
   private activeSessions: Map<string, CreationSession> = new Map();
   
   constructor() {
     this.creationGuide = new StructuredCreationGuide();
     this.workflowGenerator = new StreamingWorkflowGenerator();
     this.autoSave = new AIUpdateAutoSave();
+    this.validationSystem = new PostUpdateValidationSystem();
+    this.parameterCollectionSystem = new ParameterCollectionSystem();
   }
   
   /**
@@ -133,6 +141,17 @@ export class WorkflowCreationFlow {
           if (chunk.guidance) {
             session.structuredGuidance = chunk.guidance;
             session.context.structuredGuidance = chunk.guidance;
+          }
+          
+          // NEW: Check for conversational response and parameter collection needs
+          if (chunk.conversationalResponse || chunk.parameterCollectionNeeded) {
+            console.log('🗣️ Conversational response detected, checking for parameter collection needs');
+            await this.handleConversationalResponse(
+              sessionId,
+              chunk,
+              session,
+              onWorkflowChange
+            );
           }
         }
         
@@ -260,40 +279,52 @@ export class WorkflowCreationFlow {
   }
   
   /**
-   * Validate workflow after update
+   * Validate workflow after update with enhanced validation system
    */
-  async validateAfterUpdate(sessionId: string, _workflow: WorkflowJSON): Promise<ValidationResult> { // eslint-disable-line @typescript-eslint/no-unused-vars
+  async validateAfterUpdate(sessionId: string, workflow: WorkflowJSON): Promise<ValidationResult> {
     const session = this.activeSessions.get(sessionId);
     if (!session) {
       throw new Error(`Session ${sessionId} not found`);
     }
     
-    console.log('🔍 Validating workflow after update for session:', sessionId);
+    console.log('🔍 Enhanced validation for workflow after update for session:', sessionId);
     
     try {
-      // Basic validation (expand with actual validation logic)
-      const validation: ValidationResult = {
-        isValid: true,
-        errors: [],
-        warnings: [],
-        info: []
+      // Create update context for validation
+      const updateContext: UpdateContext = {
+        triggerType: 'ai_update',
+        phase: session.currentPhase || 'trigger_definition',
+        changes: session.draft.changesSinceLastSave,
+        conversationId: sessionId, // Use sessionId as conversation ID
+        sessionId,
+        previousValidationState: session.draft.validationResult
       };
+
+      // Use enhanced validation system
+      const postUpdateResult = await this.validationSystem.validateAfterUpdate(workflow, updateContext);
       
       // Update session with validation result
-      session.draft.validationResult = validation;
+      session.draft.validationResult = postUpdateResult;
       session.lastActivity = new Date();
       
-      return validation;
+      console.log('✅ Enhanced validation completed', {
+        isValid: postUpdateResult.isValid,
+        errorCount: postUpdateResult.errors.length,
+        warningCount: postUpdateResult.warnings.length,
+        hasConversationalRecovery: !!postUpdateResult.conversationalRecovery
+      });
+      
+      return postUpdateResult;
       
     } catch (error) {
-      console.error('❌ Error validating workflow:', error);
+      console.error('❌ Error in enhanced validation:', error);
       return {
         isValid: false,
         errors: [{
           id: 'validation_error',
           severity: 'error',
-          technicalMessage: `Validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          conversationalExplanation: 'There was an issue validating your workflow. Please try again.'
+          technicalMessage: `Enhanced validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          conversationalExplanation: 'I encountered an issue while validating your workflow with the new validation system. Please try again.'
         }],
         warnings: [],
         info: []
@@ -476,6 +507,169 @@ export class WorkflowCreationFlow {
   }
 
   /**
+   * Start parameter collection for a function (trigger or action)
+   */
+  async startParameterCollection(
+    sessionId: string,
+    stepId: string,
+    functionName: string,
+    stepType: 'trigger' | 'action',
+    conversationManager: any // eslint-disable-line @typescript-eslint/no-explicit-any
+  ) {
+    console.log('🔧 Starting parameter collection for:', functionName, 'in step:', stepId);
+    
+    const session = this.activeSessions.get(sessionId);
+    if (!session) {
+      console.error('❌ Session not found for parameter collection:', sessionId);
+      return null;
+    }
+
+    const context = {
+      conversationId: sessionId, // Use sessionId as conversationId
+      workflowId: session.workflowId,
+      stepId,
+      functionName,
+      stepType,
+      currentValues: {}
+    };
+
+    try {
+      const result = await this.parameterCollectionSystem.startParameterCollection(
+        context,
+        conversationManager
+      );
+
+      // Update session to track parameter collection
+      session.lastActivity = new Date();
+      
+      return result;
+    } catch (error) {
+      console.error('❌ Error starting parameter collection:', error);
+      conversationManager.addAimeMessage(
+        'I encountered an issue setting up parameter collection. Let me try a different approach.',
+        'error_recovery'
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Handle user response for parameter collection
+   */
+  async handleParameterResponse(
+    sessionId: string,
+    stepId: string,
+    parameterName: string,
+    value: unknown,
+    conversationManager: any // eslint-disable-line @typescript-eslint/no-explicit-any
+  ) {
+    console.log('📝 Handling parameter response:', parameterName, '=', value);
+    
+    const session = this.activeSessions.get(sessionId);
+    if (!session) {
+      console.error('❌ Session not found for parameter response:', sessionId);
+      return null;
+    }
+
+    const collectionId = `${sessionId}_${stepId}`;
+
+    try {
+      const result = await this.parameterCollectionSystem.handleParameterResponse(
+        collectionId,
+        parameterName,
+        value,
+        conversationManager
+      );
+
+      // If parameter collection is complete, update workflow step
+      if (result.success && result.missingParameters.length === 0) {
+        await this.updateWorkflowStepWithParameters(
+          sessionId,
+          stepId,
+          result.parameters,
+          conversationManager
+        );
+      }
+
+      session.lastActivity = new Date();
+      return result;
+    } catch (error) {
+      console.error('❌ Error handling parameter response:', error);
+      conversationManager.addAimeMessage(
+        'I had trouble processing that parameter. Could you try again?',
+        'error_recovery'
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Update workflow step with collected parameters
+   */
+  private async updateWorkflowStepWithParameters(
+    sessionId: string,
+    stepId: string,
+    parameters: Record<string, unknown>,
+    conversationManager: any // eslint-disable-line @typescript-eslint/no-explicit-any
+  ) {
+    const session = this.activeSessions.get(sessionId);
+    if (!session) return;
+
+    try {
+      // Update the workflow step with parameters
+      if (session.draft.workflowData.steps && session.draft.workflowData.steps[stepId]) {
+        session.draft.workflowData.steps[stepId] = {
+          ...session.draft.workflowData.steps[stepId],
+          params: parameters
+        };
+
+        conversationManager.addAimeMessage(
+          `✅ Great! I've updated the "${session.draft.workflowData.steps[stepId].name}" step with the parameters you provided. The step is now fully configured.`,
+          'text'
+        );
+
+        // Validate after parameter update (simplified)
+        if (this.isCompleteWorkflow(session.draft.workflowData)) {
+          const validationResult = await this.validationSystem.validateAfterUpdate(
+            session.draft.workflowData,
+            {
+              triggerType: 'user_input',
+              phase: 'trigger_definition',
+              changes: [{
+                changeId: `param_update_${Date.now()}`,
+                type: 'modify',
+                path: `steps.${stepId}.params`,
+                timestamp: new Date(),
+                source: 'user',
+                description: `Updated parameters for ${stepId}`
+              }],
+              conversationId: sessionId,
+              sessionId
+            }
+          );
+
+          session.draft.validationResult = validationResult;
+        }
+
+        // Update activity timestamp
+        session.lastActivity = new Date();
+        
+        conversationManager.addAimeMessage(
+          'Parameter configuration complete! What would you like to configure next?',
+          'text'
+        );
+
+      }
+    } catch (error) {
+      console.error('❌ Error updating workflow step with parameters:', error);
+      conversationManager.addAimeMessage(
+        'I had trouble updating the workflow step. Let me try to fix this.',
+        'error_recovery'
+      );
+    }
+  }
+
+  /**
    * Get creation analytics for session
    */
   getCreationAnalytics(sessionId: string) {
@@ -497,5 +691,111 @@ export class WorkflowCreationFlow {
       autoSaveCount: session.draft.changesSinceLastSave.length,
       isValid: session.draft.validationResult?.isValid || false
     };
+  }
+
+  /**
+   * Handle conversational response and trigger parameter collection if needed
+   */
+  private async handleConversationalResponse(
+    sessionId: string,
+    chunk: WorkflowGenerationChunk,
+    session: CreationSession,
+    onWorkflowChange?: (workflow: WorkflowJSON) => void
+  ): Promise<void> {
+    console.log('🎯 Processing conversational response for parameter collection');
+    
+    try {
+      // Add conversational response as a message
+      if (chunk.conversationalResponse) {
+        console.log('💬 Adding conversational response:', chunk.conversationalResponse);
+        // This would typically go to a conversation manager
+        // For now, log it - the UI should pick this up from the chunk
+      }
+      
+      // Add follow-up questions as messages
+      if (chunk.followUpQuestions && chunk.followUpQuestions.length > 0) {
+        console.log('❓ Adding follow-up questions:', chunk.followUpQuestions);
+        // This would typically go to a conversation manager
+        // For now, log them - the UI should pick this up from the chunk
+      }
+      
+      // If parameter collection is needed, find the first incomplete step and start collection
+      if (chunk.parameterCollectionNeeded && chunk.currentWorkflow?.steps) {
+        console.log('🔧 Parameter collection needed, analyzing workflow steps...');
+        
+        const incompleteSteps = this.findIncompleteSteps(chunk.currentWorkflow);
+        console.log('📋 Found incomplete steps:', incompleteSteps.map(s => s.stepId));
+        
+        if (incompleteSteps.length > 0) {
+          const firstStep = incompleteSteps[0];
+          console.log('🚀 Starting parameter collection for:', firstStep.stepId, firstStep.functionName);
+          
+          // Start parameter collection for the first incomplete step
+          const parameterContext: ParameterCollectionContext = {
+            conversationId: session.conversationId,
+            workflowId: session.workflowId,
+            stepId: firstStep.stepId,
+            functionName: firstStep.functionName,
+            stepType: firstStep.stepType,
+            currentValues: firstStep.currentParams || {}
+          };
+          
+          // This would typically use a conversation manager, but for now we'll log the start
+          console.log('🔍 Parameter collection context:', parameterContext);
+          
+          // The UI should detect this and start the parameter collection flow
+          // For now, we'll just update the session to indicate parameter collection is active
+          session.context.currentWorkflow = chunk.currentWorkflow;
+          session.lastActivity = new Date();
+          
+          // Call onWorkflowChange if provided and we have a complete workflow
+          if (onWorkflowChange && chunk.currentWorkflow?.schemaVersion) {
+            onWorkflowChange(chunk.currentWorkflow as WorkflowJSON);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error handling conversational response:', error);
+    }
+  }
+
+  /**
+   * Find incomplete steps that need parameter collection
+   */
+  private findIncompleteSteps(workflow: Partial<WorkflowJSON>): Array<{
+    stepId: string;
+    stepName: string;
+    functionName: string;
+    stepType: 'trigger' | 'action';
+    currentParams?: Record<string, unknown>;
+  }> {
+    const incompleteSteps: Array<{
+      stepId: string;
+      stepName: string;
+      functionName: string;
+      stepType: 'trigger' | 'action';
+      currentParams?: Record<string, unknown>;
+    }> = [];
+    
+    if (!workflow.steps) {
+      return incompleteSteps;
+    }
+
+    Object.entries(workflow.steps).forEach(([stepId, step]) => {
+      if ((step.type === 'trigger' || step.type === 'action') && step.action) {
+        // Check if step has empty params and requires parameters
+        if (!step.params || Object.keys(step.params).length === 0) {
+          incompleteSteps.push({
+            stepId,
+            stepName: step.name,
+            functionName: step.action,
+            stepType: step.type as 'trigger' | 'action',
+            currentParams: step.params || {}
+          });
+        }
+      }
+    });
+
+    return incompleteSteps;
   }
 }

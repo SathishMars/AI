@@ -1,5 +1,6 @@
 /**
- * LLM-based Workflow Generator - SERVER-SIDE ONLY
+ * LLM-based Workflow Generator
+ * SERVER-SIDE ONLY
  * This should only be used in server-side contexts (API routes)
  * For client-side usage, call the /api/generate-workflow endpoint
  */
@@ -7,6 +8,20 @@
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { WorkflowJSON } from '../types/workflow';
+
+export interface LLMConfig {
+  provider: 'openai' | 'anthropic';
+  apiKey: string;
+  model?: string;
+  conversationalMode?: boolean; // NEW: Enable conversational responses
+}
+
+export interface WorkflowGenerationResult {
+  workflow: Partial<WorkflowJSON>;
+  conversationalResponse?: string; // NEW: Conversational response when in conversational mode
+  followUpQuestions?: string[]; // NEW: Follow-up questions for parameter collection
+  parameterCollectionNeeded?: boolean; // NEW: Indicates if parameter collection is needed
+}
 
 export interface WorkflowGenerationContext {
   user: {
@@ -35,6 +50,7 @@ interface LLMWorkflowGeneratorConfig {
   provider: 'openai' | 'anthropic';
   apiKey: string;
   model?: string;
+  conversationalMode?: boolean;
 }
 
 export class LLMWorkflowGenerator {
@@ -71,17 +87,56 @@ export class LLMWorkflowGenerator {
     userInput: string,
     context: WorkflowGenerationContext,
     currentWorkflow?: Partial<WorkflowJSON>
-  ): Promise<Partial<WorkflowJSON>> {
-    const systemPrompt = this.buildSystemPrompt(context, currentWorkflow);
-    const userPrompt = this.buildUserPrompt(userInput, context, currentWorkflow);
-
-    if (this.config.provider === 'openai') {
-      return this.generateWithOpenAI(systemPrompt, userPrompt);
-    } else if (this.config.provider === 'anthropic') {
-      return this.generateWithAnthropic(systemPrompt, userPrompt);
+  ): Promise<WorkflowGenerationResult> {
+    console.log('🎯 Generating workflow with LLM:', { provider: this.config.provider, model: this.config.model, conversationalMode: this.config.conversationalMode });
+    
+    if (this.config.conversationalMode) {
+      // Conversational mode: Generate workflow AND conversational response with parameter collection
+      return await this.generateConversationalResponse(userInput, context, currentWorkflow);
+    } else {
+      // Traditional mode: JSON only
+      const systemPrompt = this.buildSystemPrompt(context, currentWorkflow);
+      const userPrompt = this.buildUserPrompt(userInput, context, currentWorkflow);
+      
+      const workflow = await this.generateWorkflowJSON(systemPrompt, userPrompt);
+      return { workflow };
     }
+  }
 
-    throw new Error(`Unsupported LLM provider: ${this.config.provider}`);
+  /**
+   * Generate workflow JSON only (traditional mode)
+   */
+  private async generateWorkflowJSON(systemPrompt: string, userPrompt: string): Promise<Partial<WorkflowJSON>> {
+    if (this.config.provider === 'openai') {
+      return await this.generateWithOpenAI(systemPrompt, userPrompt);
+    } else if (this.config.provider === 'anthropic') {
+      return await this.generateWithAnthropic(systemPrompt, userPrompt);
+    } else {
+      throw new Error(`Unsupported provider: ${this.config.provider}`);
+    }
+  }
+
+  /**
+   * Generate conversational response with workflow and follow-up questions
+   */
+  private async generateConversationalResponse(
+    userInput: string,
+    context: WorkflowGenerationContext,
+    currentWorkflow?: Partial<WorkflowJSON>
+  ): Promise<WorkflowGenerationResult> {
+    console.log('🗣️ Generating conversational workflow response');
+    
+    // Build conversational prompts that encourage parameter collection
+    const systemPrompt = this.buildConversationalSystemPrompt(context, currentWorkflow);
+    const userPrompt = this.buildConversationalUserPrompt(userInput, context);
+    
+    if (this.config.provider === 'openai') {
+      return await this.generateConversationalWithOpenAI(systemPrompt, userPrompt);
+    } else if (this.config.provider === 'anthropic') {
+      return await this.generateConversationalWithAnthropic(systemPrompt, userPrompt);
+    } else {
+      throw new Error(`Unsupported provider: ${this.config.provider}`);
+    }
   }
 
   /**
@@ -465,6 +520,203 @@ Return ONLY the JSON workflow - no other text.`;
 
         yield { chunk: delta, workflow };
       }
+    }
+  }
+
+  /**
+   * Build conversational system prompt that encourages parameter collection
+   */
+  private buildConversationalSystemPrompt(context: WorkflowGenerationContext, currentWorkflow?: Partial<WorkflowJSON>): string {
+    return `You are Aime, an expert workflow designer assistant. You help users create workflows through conversation.
+
+Your response should be a JSON object with this structure:
+{
+  "workflow": { /* workflow JSON */ },
+  "conversationalResponse": "your explanation to the user",
+  "followUpQuestions": ["question 1", "question 2"],
+  "parameterCollectionNeeded": true/false
+}
+
+WORKFLOW SCHEMA:
+{
+  "schemaVersion": "1.0",
+  "metadata": {
+    "id": "workflow-{timestamp}",
+    "name": "string", 
+    "description": "string",
+    "version": "1.0.0",
+    "status": "draft",
+    "createdAt": "${context.currentDate}",
+    "tags": ["ai-generated"]
+  },
+  "steps": {
+    "stepName": {
+      "name": "Display Name",
+      "type": "trigger|condition|action|end",
+      "action": "function.name", // for trigger/action steps
+      "condition": { // for condition steps - json-rules-engine format
+        "all": [{"fact": "string", "operator": "string", "value": any}],
+        "any": [{"fact": "string", "operator": "string", "value": any}]
+      },
+      "params": {}, // IMPORTANT: Leave empty for functions that need parameter collection
+      "nextSteps": ["array"], // for linear flow
+      "onSuccess": "stepName", // for conditional flow
+      "onFailure": "stepName"  // for conditional flow
+    }
+  }
+}
+
+AVAILABLE FUNCTIONS:
+${context.availableFunctions.map(fn => `- ${fn}`).join('\n')}
+
+FUNCTIONS REQUIRING PARAMETER COLLECTION:
+- onMRFSubmit: requires mrfID (specific MRF form to monitor)
+- requestApproval: requires to (who should approve)
+- createEvent: requires mrfID (which MRF to use for event creation) 
+- sendNotification: requires to, subject (recipient and message)
+- onScheduledEvent: requires schedule (when to run)
+
+CONVERSATIONAL GUIDELINES:
+1. Generate workflow with EMPTY params for functions that need configuration
+2. Explain what you created in conversationalResponse
+3. Ask specific follow-up questions about missing parameters
+4. For onMRFSubmit triggers, ask "Which MRF form should trigger this workflow?"
+5. For approval steps, ask "Who should receive the approval request?"
+6. Set parameterCollectionNeeded: true when params are empty
+7. Be friendly and helpful - you're guiding them through workflow creation
+
+USER CONTEXT:
+- User: ${context.user.name} (${context.user.role} in ${context.user.department})
+- Manager: ${context.user.manager}
+
+MRF CONTEXT:
+- Current MRF: ${context.mrf.title}
+- Max Attendees: ${context.mrf.maxAttendees}
+- Location: ${context.mrf.location}
+- Purpose: ${context.mrf.purpose}
+
+${currentWorkflow ? `
+CURRENT WORKFLOW TO MODIFY:
+${JSON.stringify(currentWorkflow, null, 2)}
+
+IMPORTANT: Modify and extend the existing workflow, don't create from scratch.
+` : ''}
+
+Remember: Create workflows with empty params for functions that need configuration, then ask conversational questions to collect those parameters!`;
+  }
+
+  /**
+   * Build conversational user prompt that requests both workflow and questions
+   */
+  private buildConversationalUserPrompt(userInput: string, context: WorkflowGenerationContext): string {
+    return `User request: "${userInput}"
+
+Please generate:
+1. A workflow with appropriate steps (use empty params {} for functions that need configuration)
+2. A conversational response explaining what you created
+3. Follow-up questions to collect missing parameters
+4. Set parameterCollectionNeeded: true if any steps have empty params
+
+Focus on parameter collection - if you create trigger/action steps, leave their params empty and ask specific questions about configuration.
+
+Respond with the JSON structure specified in the system prompt.`;
+  }
+
+  /**
+   * Generate conversational response using OpenAI
+   */
+  private async generateConversationalWithOpenAI(systemPrompt: string, userPrompt: string): Promise<WorkflowGenerationResult> {
+    if (!this.openai) {
+      throw new Error('OpenAI client not initialized');
+    }
+
+    const model = this.config.model || 'gpt-4';
+    console.log(`🤖 Generating conversational response with OpenAI model: ${model}`);
+    
+    const response = await this.openai.chat.completions.create({
+      model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: 0.1,
+      max_tokens: 3000
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      throw new Error('No response content from OpenAI');
+    }
+
+    console.log('🔍 OpenAI conversational response preview:', content.substring(0, 200) + '...');
+    
+    try {
+      const result = JSON.parse(content);
+      
+      // Validate the response structure
+      if (!result.workflow) {
+        throw new Error('Response missing workflow property');
+      }
+      
+      return {
+        workflow: result.workflow,
+        conversationalResponse: result.conversationalResponse || 'Workflow generated successfully.',
+        followUpQuestions: result.followUpQuestions || [],
+        parameterCollectionNeeded: result.parameterCollectionNeeded || false
+      };
+    } catch (parseError) {
+      console.error('❌ Failed to parse OpenAI conversational response:', parseError);
+      console.error('Raw response:', content);
+      throw new Error(`Invalid JSON response from OpenAI: ${parseError instanceof Error ? parseError.message : 'Unknown parse error'}`);
+    }
+  }
+
+  /**
+   * Generate conversational response using Anthropic
+   */
+  private async generateConversationalWithAnthropic(systemPrompt: string, userPrompt: string): Promise<WorkflowGenerationResult> {
+    if (!this.anthropic) {
+      throw new Error('Anthropic client not initialized');
+    }
+
+    const model = this.config.model || 'claude-3-sonnet-20240229';
+    console.log(`🤖 Generating conversational response with Anthropic model: ${model}`);
+    
+    const response = await this.anthropic.messages.create({
+      model,
+      max_tokens: 3000,
+      temperature: 0.1,
+      system: systemPrompt,
+      messages: [
+        { role: 'user', content: userPrompt }
+      ]
+    });
+
+    const content = response.content[0];
+    if (content.type !== 'text' || !content.text) {
+      throw new Error('No text content from Anthropic');
+    }
+
+    console.log('🔍 Anthropic conversational response preview:', content.text.substring(0, 200) + '...');
+    
+    try {
+      const result = JSON.parse(content.text);
+      
+      // Validate the response structure
+      if (!result.workflow) {
+        throw new Error('Response missing workflow property');
+      }
+      
+      return {
+        workflow: result.workflow,
+        conversationalResponse: result.conversationalResponse || 'Workflow generated successfully.',
+        followUpQuestions: result.followUpQuestions || [],
+        parameterCollectionNeeded: result.parameterCollectionNeeded || false
+      };
+    } catch (parseError) {
+      console.error('❌ Failed to parse Anthropic conversational response:', parseError);
+      console.error('Raw response:', content.text);
+      throw new Error(`Invalid JSON response from Anthropic: ${parseError instanceof Error ? parseError.message : 'Unknown parse error'}`);
     }
   }
 }

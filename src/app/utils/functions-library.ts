@@ -20,6 +20,143 @@ const ObjectSchema = z.record(z.string(), z.any());
 
 // Enhanced event planning functions with full metadata
 const EVENT_PLANNING_FUNCTIONS: Record<string, FunctionDefinition> = {
+  // Trigger Functions
+  onMRFSubmit: {
+    id: 'trigger_mrf_submit',
+    name: 'onMRFSubmit',
+    description: 'Trigger workflow when a Meeting Request Form (MRF) is submitted for approval',
+    version: '1.0.0',
+    namespace: 'functions',
+    category: 'trigger',
+    tags: ['trigger', 'mrf', 'submission', 'workflow-start'],
+    parameters: {
+      mrfID: {
+        type: 'string',
+        required: true,
+        description: 'Meeting Request Form ID to monitor for submission',
+        examples: ['MRF_2024_001', 'MRF_2024_002', 'mrf_abc123']
+      },
+      formType: {
+        type: 'string',
+        required: false,
+        description: 'Type of MRF form to trigger on (all types if not specified)',
+        examples: ['event-request', 'meeting-request', 'resource-booking'],
+        default: 'all'
+      },
+      priority: {
+        type: 'string',
+        required: false,
+        description: 'Minimum priority level to trigger workflow',
+        examples: ['low', 'medium', 'high'],
+        default: 'low'
+      }
+    },
+    returnType: 'void',
+    examples: [
+      {
+        id: 'mrf_trigger_example_1',
+        name: 'Standard Event Request Trigger',
+        description: 'Trigger on any MRF submission',
+        parameters: {
+          mrfID: 'dynamic'
+        },
+        context: 'Standard workflow trigger for event planning'
+      },
+      {
+        id: 'mrf_trigger_example_2',
+        name: 'High Priority Event Trigger',
+        description: 'Trigger only on high priority event requests',
+        parameters: {
+          mrfID: 'dynamic',
+          priority: 'high'
+        },
+        context: 'Executive or urgent event requests requiring immediate attention'
+      }
+    ],
+    documentation: {
+      description: 'Automatically start workflow when MRF forms are submitted',
+      usage: 'Used as the first step in event planning workflows to trigger on form submission',
+      aiPromptHints: [
+        'Use this to start workflows when users submit meeting requests',
+        'Perfect for automated event approval processes',
+        'Can filter by MRF type or priority level'
+      ],
+      commonUseCases: [
+        'Event approval workflows',
+        'Meeting planning automation',
+        'Resource booking requests'
+      ]
+    },
+    lifecycle: 'active',
+    compatibleVersions: ['1.0.0'],
+    createdAt: new Date('2024-01-01'),
+    updatedAt: new Date('2024-01-20')
+  },
+
+  onScheduledEvent: {
+    id: 'trigger_scheduled_event',
+    name: 'onScheduledEvent',
+    description: 'Trigger workflow at specific times or on recurring schedules',
+    version: '1.0.0',
+    namespace: 'functions',
+    category: 'trigger',
+    tags: ['trigger', 'schedule', 'time', 'recurring'],
+    parameters: {
+      schedule: {
+        type: 'string',
+        required: true,
+        description: 'Cron expression or schedule specification',
+        examples: ['0 9 * * 1', '0 0 1 * *', 'daily', 'weekly', 'monthly']
+      },
+      timezone: {
+        type: 'string',
+        required: false,
+        description: 'Timezone for schedule execution',
+        examples: ['UTC', 'America/New_York', 'Europe/London'],
+        default: 'UTC'
+      },
+      description: {
+        type: 'string',
+        required: false,
+        description: 'Human-readable description of the schedule',
+        examples: ['Weekly team meeting reminder', 'Monthly budget review']
+      }
+    },
+    returnType: 'void',
+    examples: [
+      {
+        id: 'scheduled_trigger_example_1',
+        name: 'Weekly Team Meeting',
+        description: 'Trigger every Monday at 9 AM',
+        parameters: {
+          schedule: '0 9 * * 1',
+          timezone: 'America/New_York',
+          description: 'Weekly team meeting reminder'
+        },
+        context: 'Recurring meeting workflows'
+      }
+    ],
+    documentation: {
+      description: 'Schedule workflows to run at specific times or intervals',
+      usage: 'Use for recurring workflows or time-based triggers',
+      aiPromptHints: [
+        'Use this for recurring meeting reminders',
+        'Perfect for scheduled review processes',
+        'Can trigger daily, weekly, monthly workflows'
+      ],
+      commonUseCases: [
+        'Meeting reminders',
+        'Periodic reviews',
+        'Scheduled notifications'
+      ]
+    },
+    lifecycle: 'active',
+    compatibleVersions: ['1.0.0'],
+    createdAt: new Date('2024-01-01'),
+    updatedAt: new Date('2024-01-20')
+  },
+
+  // Action Functions
   requestApproval: {
     id: 'func_request_approval',
     name: 'requestApproval',

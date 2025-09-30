@@ -130,6 +130,10 @@ export interface WorkflowGenerationChunk {
   validation?: ValidationResult;
   suggestions?: ProactiveSuggestion[];
   guidance?: StructuredGuidance;
+  // NEW: Conversational response fields
+  conversationalResponse?: string;
+  followUpQuestions?: string[];
+  parameterCollectionNeeded?: boolean;
 }
 
 // Proactive suggestions during creation
@@ -160,6 +164,25 @@ export interface NamingSuggestions {
   workflowNames: string[];
   stepNames: Map<string, string[]>;
   descriptions: string[];
+}
+
+// Validation strategy for optimizing performance
+export interface ValidationStrategy {
+  fullValidation: boolean;
+  incrementalValidation: boolean;
+  cacheablePortions: string[];
+  priorityRules: string[];
+  streamingCompatible: boolean;
+}
+
+// Update context for validation triggers  
+export interface UpdateContext {
+  triggerType: 'ai_update' | 'user_input' | 'phase_change' | 'manual';
+  phase: CreationPhase;
+  changes: WorkflowChange[];
+  conversationId: string;
+  sessionId: string;
+  previousValidationState?: ValidationResult;
 }
 
 // Post-update validation result
