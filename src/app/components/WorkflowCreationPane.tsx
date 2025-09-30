@@ -227,6 +227,44 @@ export default function WorkflowCreationPane({
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, 150);
   };
+
+  // Helper function to replace the last aime message
+  const replaceLastAimeMessage = (content: string, type: 'text' | 'workflow_generated' = 'text') => {
+    if (!conversationManager) return;
+    
+    // Get current state and messages
+    const currentState = conversationManager.getState();
+    const messages = currentState.messages;
+    
+    // Find the last aime message and replace it
+    const newMessages = [...messages];
+    for (let i = newMessages.length - 1; i >= 0; i--) {
+      if (newMessages[i].sender === 'aime') {
+        newMessages[i] = {
+          ...newMessages[i],
+          content,
+          type,
+          timestamp: new Date()
+        };
+        break;
+      }
+    }
+    
+    // Create new state with updated messages
+    const newState = {
+      ...currentState,
+      messages: newMessages
+    };
+    
+    // Create new manager and update state
+    const newManager = new ConversationStateManager(newState);
+    setConversationManager(newManager);
+    
+    // Ensure scroll to bottom
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 150);
+  };
   
   // Handle keyboard input
   const handleKeyPress = (event: React.KeyboardEvent) => {
@@ -251,11 +289,11 @@ export default function WorkflowCreationPane({
       // Add user message to conversation
       addMessage(messageText, 'user');
       
-      // Show processing indicator from aime
+      // Show processing indicator from aime (will be replaced with actual response)
       const hasExistingSteps = workflow.steps && Object.keys(workflow.steps).length > 0;
       const processingMessage = hasExistingSteps
-        ? '🤖 I see you want to modify the existing workflow. Let me understand the current structure and update it based on your request...'
-        : '🤖 Working on your request... I\'m analyzing your requirements and creating the workflow.';
+        ? 'I see you want to modify the existing workflow. Let me understand the current structure and update it based on your request...'
+        : 'Working on your request... I\'m analyzing your requirements and creating the workflow.';
       addMessage(processingMessage, 'aime');
       
       // Call backend API for workflow generation
@@ -312,23 +350,23 @@ export default function WorkflowCreationPane({
           }
         }
         
-        // Send the combined message as a single bubble
-        addMessage(combinedMessage, 'aime');
+        // Replace the processing message with the actual LLM response
+        replaceLastAimeMessage(combinedMessage);
       } else {
-        // Show standard success message when no conversational response
+        // Replace with standard success message when no conversational response
         const hasStepsForSuccess = workflow.steps && Object.keys(workflow.steps).length > 0;
         const successMessage = hasStepsForSuccess
-          ? `✅ Perfect! I've modified your existing workflow to incorporate your request. The updated workflow maintains the existing structure while adding the new requirements. Check the visualization on the right to see the changes.`
-          : `✅ Excellent! I've created your new workflow based on your request. The workflow includes all the logic you described. You can see the complete workflow structure in the visualization on the right.`;
-        addMessage(successMessage, 'aime');
+          ? `Perfect! I've modified your existing workflow to incorporate your request. The updated workflow maintains the existing structure while adding the new requirements. Check the visualization on the right to see the changes.`
+          : `Excellent! I've created your new workflow based on your request. The workflow includes all the logic you described. You can see the complete workflow structure in the visualization on the right.`;
+        replaceLastAimeMessage(successMessage);
       }
       
     } catch (error) {
       console.error('❌ Error in workflow generation:', error);
       
-      // Show error message from aime
-      const errorMessage = '❌ I apologize, but I encountered an issue while processing your request. Could you please try rephrasing your requirement or try again?';
-      addMessage(errorMessage, 'aime');
+      // Replace processing message with error message
+      const errorMessage = 'I apologize, but I encountered an issue while processing your request. Could you please try rephrasing your requirement or try again?';
+      replaceLastAimeMessage(errorMessage);
     } finally {
       setIsStreaming(false);
       setIsCreating(false);
