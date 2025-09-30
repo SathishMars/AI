@@ -64,18 +64,17 @@ const SmartAutocomplete = ({ value, onChange, onKeyPress, placeholder, disabled,
     adjustTextareaHeight();
   }, [value, adjustTextareaHeight]);
 
-  // Handle autocomplete trigger detection
-  const handleInputChange = async (newValue: string) => {
-    onChange(newValue);
+  // Handle cursor position changes and check for triggers
+  const checkTriggersAtCursor = useCallback(async () => {
+    if (!context) return;
     
-    if (!context) {
-      console.log('No context available for autocomplete');
-      return;
-    }
-
-    // Use the string length as cursor position since we're getting the full value
-    const cursorPosition = newValue.length;
-    const textBeforeCursor = newValue;
+    const textarea = textAreaRef.current;
+    if (!textarea) return;
+    
+    const cursorPosition = textarea.selectionStart || value.length;
+    const textBeforeCursor = value.substring(0, cursorPosition);
+    
+    console.log('🔍 Checking triggers at cursor position:', cursorPosition, 'Text before cursor:', textBeforeCursor);
     
     // Check for triggers: @, #, mrf., user.
     const endsWithAt = textBeforeCursor.endsWith('@');
@@ -85,17 +84,12 @@ const SmartAutocomplete = ({ value, onChange, onKeyPress, placeholder, disabled,
     if (triggerMatch || endsWithAt || endsWithHash) {
       console.log('🎯 Autocomplete triggered for:', textBeforeCursor);
       try {
-        const newSuggestions = await autocompleteManager.getSuggestions(newValue, cursorPosition, context);
+        const newSuggestions = await autocompleteManager.getSuggestions(value, cursorPosition, context);
         console.log('✅ Got', newSuggestions.length, 'suggestions');
         setSuggestions(newSuggestions);
         setShowSuggestions(newSuggestions.length > 0);
         setSelectedIndex(-1);
-        
-        // Use the text field as anchor
-        const textarea = textAreaRef.current;
-        if (textarea) {
-          setAnchorEl(textarea);
-        }
+        setAnchorEl(textarea);
       } catch (error) {
         console.error('❌ Error getting autocomplete suggestions:', error);
         setShowSuggestions(false);
@@ -103,7 +97,26 @@ const SmartAutocomplete = ({ value, onChange, onKeyPress, placeholder, disabled,
     } else {
       setShowSuggestions(false);
     }
+  }, [context, value, autocompleteManager]);
+
+  // Handle autocomplete trigger detection
+  const handleInputChange = async (newValue: string) => {
+    onChange(newValue);
+    
+    if (!context) {
+      console.log('No context available for autocomplete');
+      return;
+    }
+
+    // Use a small delay to ensure the textarea value is updated, then check triggers
+    setTimeout(checkTriggersAtCursor, 0);
   };
+
+  // Handle cursor position changes (clicks, arrow keys, etc.)
+  const handleCursorChange = useCallback(() => {
+    // Small delay to ensure cursor position is updated
+    setTimeout(checkTriggersAtCursor, 100);
+  }, [checkTriggersAtCursor]);
 
   // Handle suggestion selection
   const applySuggestion = (suggestion: AutocompleteSuggestion) => {
@@ -199,7 +212,10 @@ const SmartAutocomplete = ({ value, onChange, onKeyPress, placeholder, disabled,
         size="small"
         fullWidth
         inputProps={{
-          onKeyDown: handleKeyDown
+          onKeyDown: handleKeyDown,
+          onClick: handleCursorChange,
+          onKeyUp: handleCursorChange,
+          onSelect: handleCursorChange
         }}
         sx={{
           '& .MuiOutlinedInput-root': {
@@ -310,6 +326,9 @@ const MultiConversationTabs = ({ conversations, activeId, onConversationSelect, 
     </IconButton>
   </Box>
 );
+
+// Export SmartAutocomplete for use in other components
+export { SmartAutocomplete };
 
 interface ConversationPaneProps {
   workflow: WorkflowJSON;

@@ -16,7 +16,7 @@ import {
   Code as CodeIcon
 } from '@mui/icons-material';
 import { WorkflowJSON, ValidationResult } from '@/app/types/workflow';
-import ConversationPane from './ConversationPane';
+import WorkflowCreationPane from './WorkflowCreationPane';
 import VisualizationPane from './VisualizationPane';
 
 interface WorkflowConfiguratorProps {
@@ -140,11 +140,12 @@ export default function WorkflowConfigurator({
                 minWidth: '300px'
               }}
             >
-              <ConversationPane
+              <WorkflowCreationPane
                 workflow={workflow}
                 onWorkflowChange={onWorkflowChange}
                 validationResult={validationResult}
                 isNewWorkflow={isNewWorkflow}
+                mrfData={undefined} // Don't pass sample data - only pass real MRF context
               />
             </Box>
             

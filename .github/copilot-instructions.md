@@ -175,6 +175,19 @@ import "@fontsource/roboto/700.css";
 - **Validators**: Form validation schemas in `src/app/validators/`
 - **Types**: TypeScript type definitions in `src/app/types/`
 - **Tests**: Mirror source structure in `src/test/` (e.g., `src/test/app/components/`)
+- **API Routes**: Use `src/app/api/` for backend API routes
+- **Global Styles**: Tailwind imports and CSS variables in `src/app/globals.css`
+- **Layout**: Main layout and metadata in `src/app/layout.tsx`
+- **Pages**: Each page or route in its own folder under `src/app/` (e.g., `src/app/workflow-builder/page.tsx`)
+- **Story & Epic Management**: Store user stories and epics in `user-stories/` folder at project root (outside `src/`)
+- **AI Implementation Summaries**: Store AI implementation notes and summaries in `ai-implementation-summaries/` folder at project root (outside `src/`)
+- **Critical Files**:
+  - `src/app/layout.tsx` - Main layout with font loading and metadata
+  - `src/app/globals.css` - Tailwind imports and CSS variables
+  - `next.config.ts` - Next.js configuration (currently minimal)
+  - `package.json` - Dependencies and build scripts (CHECK BEFORE ADDING NEW PACKAGES)
+  - `user-stories/` - User stories and epics (outside src folder)
+  - `ai-implementation-summaries/` - AI implementation notes and summaries (outside src folder)
 
 
 ## Package Management
@@ -324,3 +337,4 @@ import "@fontsource/roboto/700.css";
 - `next.config.ts` - Next.js configuration (currently minimal)
 - `package.json` - Dependencies and build scripts (CHECK BEFORE ADDING NEW PACKAGES)
 - `user-stories/` - User stories and epics (outside src folder)
+- `ai-implementation-summaries/` - AI implementation notes and summaries (outside src folder)

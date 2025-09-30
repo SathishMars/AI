@@ -15,8 +15,8 @@ export default function Home() {
         />
         
         <div className="text-center sm:text-left">
-          <h1 className="text-2xl font-bold mb-4">Groupize Workflows</h1>
-          <p className="text-lg mb-6">AI-powered workflow configurator with aime assistant</p>
+          <h1 className="text-2xl font-bold mb-4">aime Workflow Builder</h1>
+          <p className="text-lg mb-6">AI-powered workflow creation with intelligent guidance and streaming generation</p>
         </div>
 
         <div className="flex gap-4 items-center flex-col sm:flex-row">
@@ -24,14 +24,14 @@ export default function Home() {
             href="/configureMyWorkflow/new"
             className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
           >
-            🚀 Create New Workflow
+            🚀 AI Workflow Creator
           </Link>
           
           <Link
-            href="/configureMyWorkflow/sample"
+            href="/configureMyWorkflow/new"
             className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
           >
-            📝 Edit Sample Workflow
+            📝 Traditional Editor
           </Link>
           
           <Link
@@ -42,12 +42,32 @@ export default function Home() {
           </Link>
         </div>
 
-        <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-lg max-w-2xl">
-          <h2 className="text-lg font-semibold mb-3">Story 1: JSON Schema Foundation ✅</h2>
-          <ul className="text-sm space-y-2">
-            <li>✅ Versioned JSON schema system with Zod v4 validation</li>
-            <li>✅ json-rules-engine v7.3.1 integration</li>
-            <li>✅ Pre-defined functions library with event planning functions</li>
+        <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-lg max-w-3xl">
+          <h2 className="text-lg font-semibold mb-3">✅ Story 6: AI Conversation Interface COMPLETE</h2>
+          <ul className="text-sm space-y-2 mb-4">
+            <li>✅ Enhanced autocomplete with @ # mrf. user. triggers</li>
+            <li>✅ Multi-provider backend integration (MRF templates, user context)</li>
+            <li>✅ Professional dropdown interface with keyboard navigation</li>
+            <li>✅ Context-aware suggestions and conversation management</li>
+          </ul>
+          
+          <h2 className="text-lg font-semibold mb-3">🚧 Story 7: Workflow Creation Flow IN PROGRESS</h2>
+          <ul className="text-sm space-y-2 mb-4">
+            <li>✅ Foundational architecture complete (2,227 lines)</li>
+            <li>✅ Phase-based structured guidance system</li>
+            <li>✅ Real-time streaming workflow generation</li>
+            <li>✅ Auto-save system with AI update correlation</li>
+            <li>✅ Complete creation flow orchestrator</li>
+            <li>🚧 UI integration with WorkflowCreationPane</li>
+            <li>⏳ End-to-end testing and validation</li>
+          </ul>
+          
+          <h2 className="text-lg font-semibold mb-3">Previous Stories Completed:</h2>
+          <ul className="text-sm space-y-1">
+            <li>✅ Story 1: JSON Schema Foundation with Zod v4</li>
+            <li>✅ Story 2: UI Components with Material-UI v7</li>
+            <li>✅ Story 3: Conversation Interface with enhanced autocomplete</li>
+            <li>✅ Story 5: Visualization & Pre-built Functions</li>
             <li>✅ Save-time validation with conversational error explanations</li>
             <li>✅ Dual-pane workflow configurator interface</li>
             <li>✅ TypeScript types and comprehensive validation</li>

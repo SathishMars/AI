@@ -12,6 +12,8 @@ import {
   ImplicitBehaviorMetrics
 } from '@/app/types/conversation';
 
+export { createEmptyConversationState } from '@/app/types/conversation';
+
 export class ConversationStateManager {
   private state: ConversationState;
   private autosaveEnabled: boolean = true;
