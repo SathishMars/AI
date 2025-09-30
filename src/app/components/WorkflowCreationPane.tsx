@@ -1,7 +1,7 @@
 // src/app/components/WorkflowCreationPane.tsx
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import {
   Box,
   Typography,
@@ -34,6 +34,39 @@ import { createEmptyConversationState, ConversationStateManager } from '@/app/ut
 import { SmartAutocomplete } from './ConversationPane';
 import { populateFunctionSchemas, DEFAULT_REFERENCE_DATA } from '@/app/utils/function-schemas';
 import { ConversationHistoryMessage } from '@/app/utils/llm-workflow-generator';
+
+// Memoized message item component to prevent unnecessary re-renders
+const MessageItem = memo(({ message, isStreaming }: { message: ConversationMessage; isStreaming: boolean }) => (
+  <ListItem key={message.id} sx={{ display: 'block', py: 1 }}>
+    <Paper
+      sx={{
+        p: 2,
+        backgroundColor: message.sender === 'user' ? 'primary.light' : 'grey.100',
+        color: message.sender === 'user' ? 'primary.contrastText' : 'text.primary',
+        borderRadius: 2,
+        maxWidth: '80%',
+        ml: message.sender === 'user' ? 'auto' : 0
+      }}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+        {message.sender === 'aime' && <AimeIcon sx={{ mr: 1, fontSize: 16 }} />}
+        <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
+          {message.sender === 'user' ? 'You' : 'aime'}
+        </Typography>
+        <Typography variant="caption" sx={{ ml: 'auto', opacity: 0.7 }}>
+          {new Date(message.timestamp).toLocaleTimeString()}
+        </Typography>
+      </Box>
+      
+      <SimpleMessageRenderer
+        message={message}
+        isStreaming={isStreaming && message.status === 'streaming'}
+      />
+    </Paper>
+  </ListItem>
+));
+
+MessageItem.displayName = 'MessageItem';
 
 // Enhanced auto-save status indicator
 
@@ -238,66 +271,59 @@ export default function WorkflowCreationPane({
   }, [currentSession, workflow, isNewWorkflow, mrfData]);
   
   // Helper function to add a message and update state properly
-  const addMessage = (content: string, sender: 'user' | 'aime', type: 'text' | 'workflow_generated' = 'text') => {
+  const addMessage = useCallback((content: string, sender: 'user' | 'aime', type: 'text' | 'workflow_generated' = 'text') => {
     if (!conversationManager) return;
     
-    // Create a new manager with the current state
-    const currentState = conversationManager.getState();
-    const newManager = new ConversationStateManager(currentState);
-    
-    // Add the new message
-    if (sender === 'user') {
-      newManager.addUserMessage(content);
-    } else {
-      newManager.addAimeMessage(content, type);
-    }
-    
-    // Update the state with the new manager
-    setConversationManager(newManager);
-    
-    // Ensure scroll to bottom after a short delay to let React update DOM
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 150);
-  };
-
-  // Helper function to replace the last aime message
-  const replaceLastAimeMessage = (content: string, type: 'text' | 'workflow_generated' = 'text') => {
-    if (!conversationManager) return;
-    
-    // Get current state and messages
-    const currentState = conversationManager.getState();
-    const messages = currentState.messages;
-    
-    // Find the last aime message and replace it
-    const newMessages = [...messages];
-    for (let i = newMessages.length - 1; i >= 0; i--) {
-      if (newMessages[i].sender === 'aime') {
-        newMessages[i] = {
-          ...newMessages[i],
-          content,
-          type,
-          timestamp: new Date()
-        };
-        break;
-      }
-    }
-    
-    // Create new state with updated messages
-    const newState = {
-      ...currentState,
-      messages: newMessages
+    // Create the message object manually to maintain control over IDs
+    const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const newMessage: ConversationMessage = {
+      id: messageId,
+      sender,
+      content,
+      timestamp: new Date(),
+      status: sender === 'user' ? 'complete' : 'streaming',
+      type,
     };
     
-    // Create new manager and update state
-    const newManager = new ConversationStateManager(newState);
-    setConversationManager(newManager);
+    // Add to local state first (single source of truth)
+    setMessages(prev => [...prev, newMessage]);
     
-    // Ensure scroll to bottom
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 150);
-  };
+    // Also add to conversation manager for history tracking
+    if (sender === 'user') {
+      conversationManager.addUserMessage(content);
+    } else {
+      conversationManager.addAimeMessage(content, type);
+    }
+  }, [conversationManager]);
+
+  // Helper function to replace the last aime message
+  const replaceLastAimeMessage = useCallback((content: string, type: 'text' | 'workflow_generated' = 'text') => {
+    if (!conversationManager) return;
+    
+    // Find the last aime message in the local messages state (single source of truth)
+    setMessages(prev => {
+      const lastAimeIndex = prev.findLastIndex(msg => msg.sender === 'aime');
+      
+      if (lastAimeIndex !== -1) {
+        const newMessages = [...prev];
+        newMessages[lastAimeIndex] = {
+          ...newMessages[lastAimeIndex],
+          content,
+          type,
+          timestamp: new Date(),
+          status: 'complete' as const
+        };
+        
+        // Scroll to bottom after message replacement
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 50);
+        
+        return newMessages;
+      }
+      return prev;
+    });
+  }, [conversationManager]);
   
   // Handle keyboard input
   const handleKeyPress = (event: React.KeyboardEvent) => {
@@ -473,23 +499,32 @@ export default function WorkflowCreationPane({
   // Get messages and trigger re-render when they change
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   
-  // Update messages when conversation manager changes
+  // Initialize messages from conversation manager only once
   useEffect(() => {
-    if (conversationManager) {
+    if (conversationManager && messages.length === 0) {
       const currentMessages = conversationManager.getMessages();
-      setMessages([...currentMessages]); // Create new array to trigger re-render
+      // Create new message objects with guaranteed unique IDs
+      const uniqueMessages = currentMessages.map((msg, index) => ({
+        ...msg,
+        id: `init_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`
+      }));
+      setMessages(uniqueMessages);
     }
-  }, [conversationManager]);
+  }, [conversationManager, messages.length]);
   
-  // Auto-scroll to bottom when messages change
+  // Auto-scroll to bottom when new messages are added (not when existing ones are updated)
+  const previousMessageCount = useRef(0);
   useEffect(() => {
-    // Use a small timeout to ensure DOM has updated after state changes
-    const scrollTimeout = setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
-    
-    return () => clearTimeout(scrollTimeout);
-  }, [messages]); // Depend on messages array for auto-scroll
+    if (messages.length > previousMessageCount.current) {
+      // Only scroll when new messages are added, not when existing ones are updated
+      const scrollTimeout = setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 50); // Reduced delay for better UX
+      
+      previousMessageCount.current = messages.length;
+      return () => clearTimeout(scrollTimeout);
+    }
+  }, [messages.length]); // Only depend on message count, not the entire array
   
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -515,33 +550,11 @@ export default function WorkflowCreationPane({
         {messages.length > 0 ? (
           <List sx={{ height: '100%', overflow: 'auto' }}>
             {messages.map((message) => (
-              <ListItem key={message.id} sx={{ display: 'block', py: 1 }}>
-                <Paper
-                  sx={{
-                    p: 2,
-                    backgroundColor: message.sender === 'user' ? 'primary.light' : 'grey.100',
-                    color: message.sender === 'user' ? 'primary.contrastText' : 'text.primary',
-                    borderRadius: 2,
-                    maxWidth: '80%',
-                    ml: message.sender === 'user' ? 'auto' : 0
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                    {message.sender === 'aime' && <AimeIcon sx={{ mr: 1, fontSize: 16 }} />}
-                    <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
-                      {message.sender === 'user' ? 'You' : 'aime'}
-                    </Typography>
-                    <Typography variant="caption" sx={{ ml: 'auto', opacity: 0.7 }}>
-                      {new Date(message.timestamp).toLocaleTimeString()}
-                    </Typography>
-                  </Box>
-                  
-                  <SimpleMessageRenderer
-                    message={message}
-                    isStreaming={isStreaming && message.status === 'streaming'}
-                  />
-                </Paper>
-              </ListItem>
+              <MessageItem
+                key={message.id}
+                message={message}
+                isStreaming={isStreaming && message.status === 'streaming'}
+              />
             ))}
             <div ref={messagesEndRef} />
           </List>
