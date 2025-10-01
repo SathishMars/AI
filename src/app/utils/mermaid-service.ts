@@ -57,38 +57,41 @@ export function clearMermaidCache(): void {
   diagramCache.clear();
 }
 
-// Fallback diagram for when generation fails
+// Enhanced fallback diagram for when generation fails
 export function createFallbackDiagram(workflow: WorkflowJSON): string {
   const steps = Object.entries(workflow.steps);
   
   let diagram = 'flowchart TD\n';
   
-  // Add nodes
+  // Add nodes with enhanced styling and emojis
   steps.forEach(([stepId, step]) => {
     const sanitizedId = stepId.replace(/[^a-zA-Z0-9]/g, '_');
     let nodeShape = '';
     
     switch (step.type) {
       case 'trigger':
-        nodeShape = `${sanitizedId}(["${step.name}"])`;
+        nodeShape = `${sanitizedId}(["🚀 ${step.name}"])`;
         break;
       case 'condition':
-        nodeShape = `${sanitizedId}{"${step.name}"}`;
+        nodeShape = `${sanitizedId}{"❓ ${step.name}"}`;
         break;
       case 'action':
-        nodeShape = `${sanitizedId}["${step.name}"]`;
+        const actionLabel = step.action ? `⚡ ${step.name}<br/>📋 ${step.action}` : `⚡ ${step.name}`;
+        nodeShape = `${sanitizedId}["${actionLabel}"]`;
         break;
       case 'end':
-        nodeShape = `${sanitizedId}(("${step.name}"))`;
+        nodeShape = `${sanitizedId}(("🏁 ${step.name}"))`;
         break;
       default:
-        nodeShape = `${sanitizedId}["${step.name}"]`;
+        nodeShape = `${sanitizedId}["📄 ${step.name}"]`;
     }
     
     diagram += `    ${nodeShape}\n`;
   });
   
-  // Add connections
+  diagram += '\n';
+  
+  // Add connections with enhanced labels
   steps.forEach(([stepId, step]) => {
     const sanitizedId = stepId.replace(/[^a-zA-Z0-9]/g, '_');
     
@@ -101,13 +104,45 @@ export function createFallbackDiagram(workflow: WorkflowJSON): string {
     
     if (step.onSuccess) {
       const sanitizedNext = step.onSuccess.replace(/[^a-zA-Z0-9]/g, '_');
-      diagram += `    ${sanitizedId} -->|Success| ${sanitizedNext}\n`;
+      diagram += `    ${sanitizedId} -->|✅ Success| ${sanitizedNext}\n`;
     }
     
     if (step.onFailure) {
       const sanitizedNext = step.onFailure.replace(/[^a-zA-Z0-9]/g, '_');
-      diagram += `    ${sanitizedId} -->|Failure| ${sanitizedNext}\n`;
+      diagram += `    ${sanitizedId} -->|❌ Failure| ${sanitizedNext}\n`;
     }
+  });
+  
+  // Add professional styling classes
+  diagram += '\n    %% Enhanced styling for professional workflows\n';
+  diagram += '    classDef triggerClass fill:#e1f5fe,stroke:#4caf50,stroke-width:2px,color:#000\n';
+  diagram += '    classDef conditionClass fill:#fff3e0,stroke:#ff9800,stroke-width:2px,color:#000\n';
+  diagram += '    classDef actionClass fill:#e3f2fd,stroke:#2196f3,stroke-width:2px,color:#000\n';
+  diagram += '    classDef endClass fill:#ffebee,stroke:#f44336,stroke-width:2px,color:#000\n\n';
+  
+  // Apply classes to nodes based on step type
+  steps.forEach(([stepId, step]) => {
+    const sanitizedId = stepId.replace(/[^a-zA-Z0-9]/g, '_');
+    let className = '';
+    
+    switch (step.type) {
+      case 'trigger':
+        className = 'triggerClass';
+        break;
+      case 'condition':
+        className = 'conditionClass';
+        break;
+      case 'action':
+        className = 'actionClass';
+        break;
+      case 'end':
+        className = 'endClass';
+        break;
+      default:
+        className = 'actionClass';
+    }
+    
+    diagram += `    class ${sanitizedId} ${className}\n`;
   });
   
   return diagram;
