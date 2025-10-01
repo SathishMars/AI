@@ -107,14 +107,7 @@ function createAppTheme(mode: PaletteMode) {
       },
     },
     components: {
-      MuiCssBaseline: {
-        styleOverrides: {
-          body: {
-            backgroundColor: mode === 'dark' ? '#121212' : '#fafafa',
-            color: mode === 'dark' ? '#ffffff' : '#212121',
-          },
-        },
-      },
+      // Let Material-UI handle CssBaseline automatically based on palette
       // Minimal container customization
       MuiContainer: {
         styleOverrides: {
