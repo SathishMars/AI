@@ -67,7 +67,8 @@ export const WorkflowMetadataSchema = z.object({
 export const WorkflowJSONSchema = z.object({
   schemaVersion: z.string().default(CURRENT_SCHEMA_VERSION),
   metadata: WorkflowMetadataSchema,
-  steps: z.record(z.string(), WorkflowStepSchema)
+  steps: z.record(z.string(), WorkflowStepSchema),
+  mermaidDiagram: z.string().optional() // LLM-generated Mermaid markdown
 });
 
 // TypeScript types derived from schemas

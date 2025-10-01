@@ -121,13 +121,38 @@ export class LLMWorkflowGenerator {
     
     if (this.config.conversationalMode) {
       // Conversational mode: Generate workflow AND conversational response with parameter collection
-      return await this.generateConversationalResponse(userInput, context, currentWorkflow);
+      const result = await this.generateConversationalResponse(userInput, context, currentWorkflow);
+      
+      // If we have a complete workflow, generate the Mermaid diagram
+      if (result.workflow && result.workflow.steps && Object.keys(result.workflow.steps).length > 0) {
+        try {
+          const mermaidDiagram = await this.generateMermaidDiagram(result.workflow);
+          result.workflow.mermaidDiagram = mermaidDiagram;
+        } catch (error) {
+          console.warn('⚠️ Failed to generate Mermaid diagram:', error);
+          // Continue without diagram
+        }
+      }
+      
+      return result;
     } else {
       // Traditional mode: JSON only
       const systemPrompt = this.buildSystemPrompt(context, currentWorkflow);
       const userPrompt = this.buildUserPrompt(userInput, context, currentWorkflow);
       
       const workflow = await this.generateWorkflowJSON(systemPrompt, userPrompt);
+      
+      // Generate Mermaid diagram for traditional mode too
+      if (workflow && workflow.steps && Object.keys(workflow.steps).length > 0) {
+        try {
+          const mermaidDiagram = await this.generateMermaidDiagram(workflow);
+          workflow.mermaidDiagram = mermaidDiagram;
+        } catch (error) {
+          console.warn('⚠️ Failed to generate Mermaid diagram:', error);
+          // Continue without diagram
+        }
+      }
+      
       return { workflow };
     }
   }
@@ -821,6 +846,165 @@ Respond with the JSON structure specified in the system prompt.`;
       console.error('Raw response:', content.text);
       throw new Error(`Invalid JSON response from Anthropic: ${parseError instanceof Error ? parseError.message : 'Unknown parse error'}`);
     }
+  }
+
+  /**
+   * Generate Mermaid diagram from workflow JSON
+   */
+  private async generateMermaidDiagram(workflow: Partial<WorkflowJSON>): Promise<string> {
+    if (!workflow.steps || Object.keys(workflow.steps).length === 0) {
+      return '```mermaid\nflowchart TD\n    Empty["No workflow steps defined"]\n```';
+    }
+
+    const systemPrompt = `You are a Mermaid diagram expert. Generate a clean, professional Mermaid flowchart from the provided workflow JSON.
+
+REQUIREMENTS:
+1. Use flowchart TD (top-down) layout
+2. Create clear, readable node labels with step names
+3. Use appropriate Mermaid node shapes for different step types:
+   - trigger: rounded rectangles [("Step Name")]
+   - condition: diamond {"Step Name"}
+   - action: rectangles ["Step Name"]
+   - end: rounded rectangles (["Step Name"])
+4. Show all step connections (nextSteps, onSuccess, onFailure)
+5. Use meaningful icons and colors where appropriate
+6. Make the diagram readable and professional
+7. Include markdown code fence with mermaid language tag
+
+EXAMPLE OUTPUT FORMAT:
+\`\`\`mermaid
+flowchart TD
+    Start[("🚀 MRF Submitted")] --> Check{"📋 Check Approval Required"}
+    Check -->|"✅ Yes"| Approval["👤 Request Approval"]
+    Check -->|"❌ No"| Create["📅 Create Event"]
+    Approval --> Create
+    Create --> End(["✅ Complete"])
+\`\`\`
+
+Return ONLY the Mermaid diagram with markdown code fence - no other text.`;
+
+    const userPrompt = `Generate a Mermaid flowchart diagram for this workflow:
+
+${JSON.stringify(workflow, null, 2)}
+
+Focus on clarity and visual appeal. Make the diagram easy to understand at a glance.`;
+
+    try {
+      let response: string;
+      
+      if (this.config.provider === 'openai') {
+        if (!this.openai) {
+          throw new Error('OpenAI client not initialized');
+        }
+        
+        const completion = await this.openai.chat.completions.create({
+          model: this.config.model || 'gpt-4',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          temperature: 0.1,
+          max_tokens: 2000
+        });
+
+        response = completion.choices[0]?.message?.content || '';
+      } else if (this.config.provider === 'anthropic') {
+        if (!this.anthropic) {
+          throw new Error('Anthropic client not initialized');
+        }
+        
+        const completion = await this.anthropic.messages.create({
+          model: this.config.model || 'claude-3-sonnet-20240229',
+          max_tokens: 2000,
+          temperature: 0.1,
+          system: systemPrompt,
+          messages: [
+            { role: 'user', content: userPrompt }
+          ]
+        });
+
+        const content = completion.content[0];
+        response = content.type === 'text' ? content.text : '';
+      } else {
+        throw new Error(`Unsupported provider: ${this.config.provider}`);
+      }
+
+      if (!response) {
+        throw new Error('Empty response from LLM');
+      }
+
+      // Ensure the response is properly formatted with code fence
+      if (!response.includes('```mermaid')) {
+        // If the LLM didn't include the code fence, add it
+        const cleanResponse = response.trim();
+        return `\`\`\`mermaid\n${cleanResponse}\n\`\`\``;
+      }
+
+      return response.trim();
+      
+    } catch (error) {
+      console.error('❌ Failed to generate Mermaid diagram:', error);
+      
+      // Fallback: Generate a basic diagram programmatically
+      const fallbackDiagram = this.generateFallbackMermaidDiagram(workflow);
+      return fallbackDiagram;
+    }
+  }
+
+  /**
+   * Generate a basic Mermaid diagram programmatically as fallback
+   */
+  private generateFallbackMermaidDiagram(workflow: Partial<WorkflowJSON>): string {
+    if (!workflow.steps) {
+      return '```mermaid\nflowchart TD\n    Empty["No workflow steps defined"]\n```';
+    }
+
+    const steps = workflow.steps;
+    let mermaidCode = 'flowchart TD\n';
+    
+    // Generate nodes
+    Object.entries(steps).forEach(([stepId, step]) => {
+      let nodeShape = '';
+      const icon = '';
+      
+      switch (step.type) {
+        case 'trigger':
+          nodeShape = `[("${icon}🚀 ${step.name}")]`;
+          break;
+        case 'condition':
+          nodeShape = `{"${icon}❓ ${step.name}"}`;
+          break;
+        case 'action':
+          nodeShape = `["${icon}⚙️ ${step.name}"]`;
+          break;
+        case 'end':
+          nodeShape = `(["${icon}🏁 ${step.name}"])`;
+          break;
+        default:
+          nodeShape = `["${step.name}"]`;
+      }
+      
+      mermaidCode += `    ${stepId}${nodeShape}\n`;
+    });
+
+    // Generate connections
+    Object.entries(steps).forEach(([stepId, step]) => {
+      if (step.nextSteps) {
+        step.nextSteps.forEach(nextStep => {
+          mermaidCode += `    ${stepId} --> ${nextStep}\n`;
+        });
+      }
+      
+      if (step.onSuccess) {
+        mermaidCode += `    ${stepId} -->|"✅ Success"| ${step.onSuccess}\n`;
+      }
+      
+      if (step.onFailure) {
+        mermaidCode += `    ${stepId} -->|"❌ Failure"| ${step.onFailure}\n`;
+      }
+    });
+
+    return `\`\`\`mermaid\n${mermaidCode}\`\`\``;
   }
 }
 

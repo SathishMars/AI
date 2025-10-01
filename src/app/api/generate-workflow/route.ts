@@ -131,7 +131,17 @@ export async function POST(request: NextRequest) {
             type: 'end',
             result: 'success'
           }
-        }
+        },
+        mermaidDiagram: `\`\`\`mermaid
+flowchart TD
+    start[("🚀 MRF Submitted")] --> checkApprovalNeeded{"❓ Check Approval Requirements"}
+    checkApprovalNeeded -->|"✅ Needs Approval"| requestManagerApproval["👤 Request Manager Approval"]
+    checkApprovalNeeded -->|"❌ No Approval Needed"| proceedDirectly["⚡ Proceed Without Approval"]
+    requestManagerApproval -->|"✅ Approved"| createEvent["📅 Create Event"]
+    requestManagerApproval -->|"❌ Rejected"| notifyUser["📧 Notify User"]
+    proceedDirectly --> createEvent
+    createEvent --> end(["🏁 Workflow Complete"])
+\`\`\``,
       };
 
       return NextResponse.json({
