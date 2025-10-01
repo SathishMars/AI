@@ -6,7 +6,7 @@
  */
 
 // Import the new LLM workflow generator
-const { LLMWorkflowGenerator, createDefaultContext, DEFAULT_WORKFLOW_FUNCTIONS } = require('../src/app/utils/llm-workflow-generator');
+import { LLMWorkflowGenerator, DEFAULT_WORKFLOW_FUNCTIONS } from '../src/app/utils/llm-workflow-generator.js';
 
 /**
  * Test the LLM workflow generation with user's specific conditional statement

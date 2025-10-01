@@ -154,9 +154,11 @@ export default function WorkflowCreationPane({
       try {
         console.log('🚀 Initializing workflow creation session');
         
+        const workflowId = workflow.metadata?.id || 'new-workflow';
+        
         // Create conversation context
         const context: CreationContext = {
-          workflowId: workflow.metadata?.id || 'new-workflow',
+          workflowId,
           workflowName: workflow.metadata?.name || 'New Workflow',
           userRole: 'admin',
           userDepartment: 'IT',
@@ -166,27 +168,55 @@ export default function WorkflowCreationPane({
           mrfData
         };
         
-        // Initialize conversation manager
-        const conversationState = createEmptyConversationState(
-          workflow.metadata?.id || 'new-workflow',
-          context
-        );
-        const manager = new ConversationStateManager(conversationState);
+        // Try to load existing conversation first
+        const existingConversationKey = `conversation_${workflowId}`;
+        let manager: ConversationStateManager | null = null;
         
-        // Add combined welcome and guidance message
-        const welcomeMessage = mrfData 
-          ? `Hi! I'm aime, your AI workflow assistant. I see you want to create a workflow for "${mrfData.title}". Let's build this together step by step! Just describe what you want the workflow to do.`
-          : isNewWorkflow
-            ? `Hi! I'm aime, your AI workflow assistant. I'm here to help you create a new workflow from scratch. What would you like to build or modify?\n\nTo get started, you can describe your workflow in natural language. For example: 'When an MRF is submitted, check if it needs approval based on budget or location, then either send for approval or proceed directly.'`
-            : `Hi! I'm aime, your AI workflow assistant. I'm here to help you edit your existing workflow. What would you like to build or modify?`;
+        if (typeof window !== 'undefined' && window.localStorage) {
+          const savedData = localStorage.getItem(existingConversationKey);
+          if (savedData) {
+            try {
+              const parsedState = JSON.parse(savedData);
+              // Restore conversation state with proper Date objects
+              const restoredState = {
+                ...parsedState,
+                messages: parsedState.messages.map((msg: ConversationMessage) => ({
+                  ...msg,
+                  timestamp: new Date(msg.timestamp)
+                })),
+                lastActivity: new Date(parsedState.lastActivity),
+                context: { ...context, ...parsedState.context } // Merge with current context
+              };
+              
+              manager = new ConversationStateManager(restoredState);
+              console.log('✅ Loaded existing conversation with', restoredState.messages.length, 'messages');
+            } catch (error) {
+              console.warn('⚠️ Failed to restore conversation, creating new one:', error);
+            }
+          }
+        }
         
-        manager.addAimeMessage(welcomeMessage, 'text');
+        // Create new conversation if no existing one found
+        if (!manager) {
+          const conversationState = createEmptyConversationState(workflowId, context);
+          manager = new ConversationStateManager(conversationState);
+          
+          // Add combined welcome and guidance message only for new conversations
+          const welcomeMessage = mrfData 
+            ? `Hi! I'm aime, your AI workflow assistant. I see you want to create a workflow for "${mrfData.title}". Let's build this together step by step! Just describe what you want the workflow to do.`
+            : isNewWorkflow
+              ? `Hi! I'm aime, your AI workflow assistant. I'm here to help you create a new workflow from scratch. What would you like to build or modify?\n\nTo get started, you can describe your workflow in natural language. For example: 'When an MRF is submitted, check if it needs approval based on budget or location, then either send for approval or proceed directly.'`
+              : `Hi! I'm aime, your AI workflow assistant. I'm here to help you edit your existing workflow. What would you like to build or modify?`;          
+          manager.addAimeMessage(welcomeMessage, 'text');
+          console.log('✅ Created new conversation with welcome message');
+        }
+        
         setConversationManager(manager);
         
         // Initialize creation session
         const session = await creationFlow.initiateCreation(
-          workflow.metadata?.id || 'new-workflow',
-          conversationState.conversationId,
+          workflowId,
+          manager.getState().conversationId,
           context,
           mrfData
         );
@@ -274,55 +304,49 @@ export default function WorkflowCreationPane({
   const addMessage = useCallback((content: string, sender: 'user' | 'aime', type: 'text' | 'workflow_generated' = 'text') => {
     if (!conversationManager) return;
     
-    // Create the message object manually to maintain control over IDs
-    const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const newMessage: ConversationMessage = {
-      id: messageId,
-      sender,
-      content,
-      timestamp: new Date(),
-      status: sender === 'user' ? 'complete' : 'streaming',
-      type,
-    };
-    
-    // Add to local state first (single source of truth)
-    setMessages(prev => [...prev, newMessage]);
-    
-    // Also add to conversation manager for history tracking
+    // Add to conversation manager first (single source of truth)
     if (sender === 'user') {
       conversationManager.addUserMessage(content);
     } else {
       conversationManager.addAimeMessage(content, type);
     }
+    
+    // Sync local state with conversation manager
+    const updatedMessages = conversationManager.getMessages();
+    setMessages([...updatedMessages]);
   }, [conversationManager]);
 
   // Helper function to replace the last aime message
   const replaceLastAimeMessage = useCallback((content: string, type: 'text' | 'workflow_generated' = 'text') => {
     if (!conversationManager) return;
     
-    // Find the last aime message in the local messages state (single source of truth)
-    setMessages(prev => {
-      const lastAimeIndex = prev.findLastIndex(msg => msg.sender === 'aime');
-      
-      if (lastAimeIndex !== -1) {
+    // Get current messages from conversation manager
+    const currentMessages = conversationManager.getMessages();
+    const lastAimeIndex = currentMessages.findLastIndex(msg => msg.sender === 'aime');
+    
+    if (lastAimeIndex !== -1) {
+      // Since we can't directly modify the conversation manager's internal state,
+      // we'll update the local state and rely on the fact that new messages
+      // will be properly synced through the addMessage function
+      setMessages(prev => {
         const newMessages = [...prev];
-        newMessages[lastAimeIndex] = {
-          ...newMessages[lastAimeIndex],
-          content,
-          type,
-          timestamp: new Date(),
-          status: 'complete' as const
-        };
-        
-        // Scroll to bottom after message replacement
-        setTimeout(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-        }, 50);
-        
+        if (lastAimeIndex < newMessages.length) {
+          newMessages[lastAimeIndex] = {
+            ...newMessages[lastAimeIndex],
+            content,
+            type,
+            timestamp: new Date(),
+            status: 'complete' as const
+          };
+        }
         return newMessages;
-      }
-      return prev;
-    });
+      });
+      
+      // Scroll to bottom after message replacement
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 50);
+    }
   }, [conversationManager]);
   
   // Handle keyboard input
@@ -499,18 +523,55 @@ export default function WorkflowCreationPane({
   // Get messages and trigger re-render when they change
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   
-  // Initialize messages from conversation manager only once
+  // Sync messages with conversation manager whenever it changes
   useEffect(() => {
-    if (conversationManager && messages.length === 0) {
+    if (conversationManager) {
       const currentMessages = conversationManager.getMessages();
-      // Create new message objects with guaranteed unique IDs
-      const uniqueMessages = currentMessages.map((msg, index) => ({
-        ...msg,
-        id: `init_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`
-      }));
-      setMessages(uniqueMessages);
+      setMessages([...currentMessages]);
     }
-  }, [conversationManager, messages.length]);
+  }, [conversationManager]);
+  
+    // Periodic sync to ensure messages stay in sync across navigation
+  useEffect(() => {
+    if (!conversationManager) return;
+    
+    let lastSyncedLength = 0;
+    let lastSyncTime = Date.now();
+    
+    const syncInterval = setInterval(() => {
+      const currentMessages = conversationManager.getMessages();
+      const currentTime = Date.now();
+      
+      // Only sync if:
+      // 1. No streaming is happening (to avoid interrupting)
+      // 2. Message count has changed (new messages)
+      // 3. It's been more than 5 seconds since last sync (periodic check)
+      if (!isStreaming && 
+          (currentMessages.length !== lastSyncedLength || currentTime - lastSyncTime > 5000)) {
+        
+        setMessages(prev => {
+          // Only update if there are actual differences
+          const hasChanges = prev.length !== currentMessages.length || 
+            prev.some((msg, index) => {
+              const currentMsg = currentMessages[index];
+              return !currentMsg || 
+                msg.id !== currentMsg.id || 
+                msg.content !== currentMsg.content || 
+                msg.status !== currentMsg.status;
+            });
+          
+          if (hasChanges) {
+            lastSyncedLength = currentMessages.length;
+            lastSyncTime = currentTime;
+            return [...currentMessages];
+          }
+          return prev;
+        });
+      }
+    }, 3000); // Check every 3 seconds
+    
+    return () => clearInterval(syncInterval);
+  }, [conversationManager, isStreaming]);
   
   // Auto-scroll to bottom when new messages are added (not when existing ones are updated)
   const previousMessageCount = useRef(0);
