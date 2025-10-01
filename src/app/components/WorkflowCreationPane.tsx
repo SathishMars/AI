@@ -20,7 +20,8 @@ import {
   SmartToy as AimeIcon,
   Send as SendIcon,
   Check as CheckIcon,
-  Error as ErrorIcon
+  Error as ErrorIcon,
+  HelpOutline as HelpOutlineIcon
 } from '@mui/icons-material';
 import { WorkflowJSON, ValidationResult } from '@/app/types/workflow';
 import { 
@@ -304,49 +305,58 @@ export default function WorkflowCreationPane({
   const addMessage = useCallback((content: string, sender: 'user' | 'aime', type: 'text' | 'workflow_generated' = 'text') => {
     if (!conversationManager) return;
     
-    // Add to conversation manager first (single source of truth)
+    // Create the message object with unique ID
+    const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const newMessage: ConversationMessage = {
+      id: messageId,
+      sender,
+      content,
+      timestamp: new Date(),
+      status: sender === 'user' ? 'complete' : 'streaming',
+      type,
+    };
+    
+    // Add to local state first (primary source of truth for UI)
+    setMessages(prev => [...prev, newMessage]);
+    
+    // Also add to conversation manager for persistence
     if (sender === 'user') {
       conversationManager.addUserMessage(content);
     } else {
       conversationManager.addAimeMessage(content, type);
     }
-    
-    // Sync local state with conversation manager
-    const updatedMessages = conversationManager.getMessages();
-    setMessages([...updatedMessages]);
   }, [conversationManager]);
 
   // Helper function to replace the last aime message
   const replaceLastAimeMessage = useCallback((content: string, type: 'text' | 'workflow_generated' = 'text') => {
     if (!conversationManager) return;
     
-    // Get current messages from conversation manager
-    const currentMessages = conversationManager.getMessages();
-    const lastAimeIndex = currentMessages.findLastIndex(msg => msg.sender === 'aime');
-    
-    if (lastAimeIndex !== -1) {
-      // Since we can't directly modify the conversation manager's internal state,
-      // we'll update the local state and rely on the fact that new messages
-      // will be properly synced through the addMessage function
-      setMessages(prev => {
-        const newMessages = [...prev];
-        if (lastAimeIndex < newMessages.length) {
-          newMessages[lastAimeIndex] = {
-            ...newMessages[lastAimeIndex],
-            content,
-            type,
-            timestamp: new Date(),
-            status: 'complete' as const
-          };
-        }
-        return newMessages;
-      });
+    // Update local state (primary source of truth for UI)
+    setMessages(prev => {
+      const lastAimeIndex = prev.findLastIndex(msg => msg.sender === 'aime');
       
-      // Scroll to bottom after message replacement
-      setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }, 50);
-    }
+      if (lastAimeIndex !== -1) {
+        const newMessages = [...prev];
+        newMessages[lastAimeIndex] = {
+          ...newMessages[lastAimeIndex],
+          content,
+          type,
+          timestamp: new Date(),
+          status: 'complete' as const
+        };
+        
+        // Scroll to bottom after message replacement
+        setTimeout(() => {
+          // Check if scrollIntoView exists (JSDOM compatibility)
+          if (messagesEndRef.current?.scrollIntoView) {
+            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+          }
+        }, 50);
+        
+        return newMessages;
+      }
+      return prev;
+    });
   }, [conversationManager]);
   
   // Handle keyboard input
@@ -523,63 +533,59 @@ export default function WorkflowCreationPane({
   // Get messages and trigger re-render when they change
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   
-  // Sync messages with conversation manager whenever it changes
+  // Initialize messages from conversation manager only once when it's set
   useEffect(() => {
-    if (conversationManager) {
+    if (conversationManager && messages.length === 0) {
       const currentMessages = conversationManager.getMessages();
       setMessages([...currentMessages]);
     }
-  }, [conversationManager]);
+  }, [conversationManager, messages.length]);
   
-    // Periodic sync to ensure messages stay in sync across navigation
+  // Simple background persistence - save messages occasionally without affecting UI
   useEffect(() => {
-    if (!conversationManager) return;
+    if (!conversationManager || messages.length === 0) return;
     
-    let lastSyncedLength = 0;
-    let lastSyncTime = Date.now();
-    
-    const syncInterval = setInterval(() => {
-      const currentMessages = conversationManager.getMessages();
-      const currentTime = Date.now();
-      
-      // Only sync if:
-      // 1. No streaming is happening (to avoid interrupting)
-      // 2. Message count has changed (new messages)
-      // 3. It's been more than 5 seconds since last sync (periodic check)
-      if (!isStreaming && 
-          (currentMessages.length !== lastSyncedLength || currentTime - lastSyncTime > 5000)) {
+    // Save to localStorage periodically (non-intrusive)
+    const saveInterval = setInterval(() => {
+      try {
+        const workflowId = workflow.metadata?.id || 'new-workflow';
+        const conversationKey = `conversation_${workflowId}`;
+        const state = conversationManager.getState();
         
-        setMessages(prev => {
-          // Only update if there are actual differences
-          const hasChanges = prev.length !== currentMessages.length || 
-            prev.some((msg, index) => {
-              const currentMsg = currentMessages[index];
-              return !currentMsg || 
-                msg.id !== currentMsg.id || 
-                msg.content !== currentMsg.content || 
-                msg.status !== currentMsg.status;
-            });
-          
-          if (hasChanges) {
-            lastSyncedLength = currentMessages.length;
-            lastSyncTime = currentTime;
-            return [...currentMessages];
-          }
-          return prev;
-        });
+        // Update conversation manager with current local messages if they differ
+        const managerMessages = conversationManager.getMessages();
+        if (messages.length > managerMessages.length) {
+          // Local state has more messages, sync the difference
+          const newMessages = messages.slice(managerMessages.length);
+          newMessages.forEach(msg => {
+            if (msg.sender === 'user') {
+              conversationManager.addUserMessage(msg.content);
+            } else {
+              conversationManager.addAimeMessage(msg.content, msg.type);
+            }
+          });
+        }
+        
+        localStorage.setItem(conversationKey, JSON.stringify(state));
+      } catch (error) {
+        console.warn('Failed to save conversation:', error);
       }
-    }, 3000); // Check every 3 seconds
+    }, 5000); // Save every 5 seconds
     
-    return () => clearInterval(syncInterval);
-  }, [conversationManager, isStreaming]);
+    return () => clearInterval(saveInterval);
+  }, [conversationManager, messages, workflow.metadata?.id]);
   
+
   // Auto-scroll to bottom when new messages are added (not when existing ones are updated)
   const previousMessageCount = useRef(0);
   useEffect(() => {
     if (messages.length > previousMessageCount.current) {
       // Only scroll when new messages are added, not when existing ones are updated
       const scrollTimeout = setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        // Check if scrollIntoView exists (JSDOM compatibility)
+        if (messagesEndRef.current?.scrollIntoView) {
+          messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
       }, 50); // Reduced delay for better UX
       
       previousMessageCount.current = messages.length;
@@ -601,7 +607,16 @@ export default function WorkflowCreationPane({
           sx={{ ml: 2 }}
           color={isNewWorkflow ? 'success' : 'info'}
         />
-        <Box sx={{ ml: 'auto' }}>
+        <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Tooltip title="Toggle guidance">
+            <IconButton 
+              size="small" 
+              aria-label="Toggle guidance"
+              onClick={() => {/* Toggle guidance panel */}}
+            >
+              <HelpOutlineIcon />
+            </IconButton>
+          </Tooltip>
           <AutoSaveIndicator status={autoSaveStatus} />
         </Box>
       </Box>
@@ -657,6 +672,7 @@ export default function WorkflowCreationPane({
                 disabled={!currentMessage.trim() || isStreaming || isCreating}
                 color="primary"
                 sx={{ mb: 1 }}
+                aria-label="Send message"
               >
                 {isStreaming || isCreating ? (
                   <CircularProgress size={24} />

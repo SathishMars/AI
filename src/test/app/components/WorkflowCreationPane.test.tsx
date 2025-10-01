@@ -1,6 +1,6 @@
 // src/test/app/components/WorkflowCreationPane.test.tsx
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import { createTheme } from '@mui/material/styles';
@@ -429,11 +429,18 @@ describe('WorkflowCreationPane', () => {
         />
       );
 
-      // Simulate auto-save event
-      const autoSaveEvent = new CustomEvent('autoSaveStatus', {
-        detail: { sessionId: 'test-session-123', status: 'saved' }
+      // Wait for component to be fully mounted
+      await waitFor(() => {
+        expect(screen.getByText('aime workflow creator')).toBeInTheDocument();
       });
-      window.dispatchEvent(autoSaveEvent);
+
+      // Simulate auto-save event using act
+      await act(async () => {
+        const autoSaveEvent = new CustomEvent('autoSaveStatus', {
+          detail: { sessionId: 'test-session-123', status: 'saved' }
+        });
+        window.dispatchEvent(autoSaveEvent);
+      });
 
       await waitFor(() => {
         expect(screen.getByText('Saved')).toBeInTheDocument();
