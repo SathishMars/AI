@@ -1,0 +1,252 @@
+// src/app/components/ThemeProvider.tsx
+'use client';
+
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { ThemeProvider as MUIThemeProvider } from '@mui/material/styles';
+import { createTheme, PaletteMode } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
+import { Roboto } from 'next/font/google';
+
+const roboto = Roboto({
+  weight: ['300', '400', '500', '700'],
+  subsets: ['latin'],
+  display: 'swap',
+});
+
+export type ThemeMode = 'light' | 'dark' | 'device';
+
+interface ThemeModeContextType {
+  themeMode: ThemeMode;
+  setThemeMode: (mode: ThemeMode) => void;
+  effectiveMode: PaletteMode;
+}
+
+const ThemeModeContext = createContext<ThemeModeContextType | undefined>(undefined);
+
+export function useThemeMode() {
+  const context = useContext(ThemeModeContext);
+  if (context === undefined) {
+    throw new Error('useThemeMode must be used within a ThemeModeProvider');
+  }
+  return context;
+}
+
+// Enhanced theme creation with proper dark mode colors
+function createAppTheme(mode: PaletteMode) {
+  return createTheme({
+    palette: {
+      mode,
+      ...(mode === 'light'
+        ? {
+            // Light theme colors
+            primary: {
+              main: '#1976d2',
+              light: '#42a5f5',
+              dark: '#1565c0',
+            },
+            secondary: {
+              main: '#dc004e',
+              light: '#ff5983',
+              dark: '#9a0036',
+            },
+            background: {
+              default: '#ffffff',
+              paper: '#f5f5f5',
+            },
+            text: {
+              primary: '#212121',
+              secondary: '#757575',
+            },
+          }
+        : {
+            // Dark theme colors
+            primary: {
+              main: '#90caf9',
+              light: '#e3f2fd',
+              dark: '#42a5f5',
+            },
+            secondary: {
+              main: '#f48fb1',
+              light: '#fce4ec',
+              dark: '#e91e63',
+            },
+            background: {
+              default: '#121212',
+              paper: '#1e1e1e',
+            },
+            text: {
+              primary: '#ffffff',
+              secondary: '#aaaaaa',
+            },
+            divider: '#333333',
+            action: {
+              hover: 'rgba(255, 255, 255, 0.08)',
+              selected: 'rgba(255, 255, 255, 0.12)',
+              disabled: 'rgba(255, 255, 255, 0.26)',
+              disabledBackground: 'rgba(255, 255, 255, 0.12)',
+            },
+          }),
+    },
+    typography: {
+      fontFamily: roboto.style.fontFamily,
+      h1: {
+        color: mode === 'dark' ? '#ffffff' : '#212121',
+      },
+      h2: {
+        color: mode === 'dark' ? '#ffffff' : '#212121',
+      },
+      h3: {
+        color: mode === 'dark' ? '#ffffff' : '#212121',
+      },
+      h4: {
+        color: mode === 'dark' ? '#ffffff' : '#212121',
+      },
+      h5: {
+        color: mode === 'dark' ? '#ffffff' : '#212121',
+      },
+      h6: {
+        color: mode === 'dark' ? '#ffffff' : '#212121',
+      },
+      body1: {
+        color: mode === 'dark' ? '#ffffff' : '#212121',
+      },
+      body2: {
+        color: mode === 'dark' ? '#aaaaaa' : '#757575',
+      },
+    },
+    components: {
+      MuiCssBaseline: {
+        styleOverrides: {
+          body: {
+            backgroundColor: mode === 'dark' ? '#121212' : '#ffffff',
+            color: mode === 'dark' ? '#ffffff' : '#212121',
+          },
+        },
+      },
+      MuiPaper: {
+        styleOverrides: {
+          root: {
+            backgroundColor: mode === 'dark' ? '#1e1e1e' : '#f5f5f5',
+            color: mode === 'dark' ? '#ffffff' : '#212121',
+          },
+        },
+      },
+      MuiCard: {
+        styleOverrides: {
+          root: {
+            backgroundColor: mode === 'dark' ? '#1e1e1e' : '#ffffff',
+            color: mode === 'dark' ? '#ffffff' : '#212121',
+          },
+        },
+      },
+      MuiTextField: {
+        styleOverrides: {
+          root: {
+            '& .MuiInputBase-root': {
+              color: mode === 'dark' ? '#ffffff' : '#212121',
+              backgroundColor: mode === 'dark' ? '#2a2a2a' : '#ffffff',
+            },
+            '& .MuiInputLabel-root': {
+              color: mode === 'dark' ? '#aaaaaa' : '#757575',
+            },
+            '& .MuiOutlinedInput-notchedOutline': {
+              borderColor: mode === 'dark' ? '#555555' : '#cccccc',
+            },
+          },
+        },
+      },
+      MuiTab: {
+        styleOverrides: {
+          root: {
+            color: mode === 'dark' ? '#aaaaaa' : '#757575',
+            '&.Mui-selected': {
+              color: mode === 'dark' ? '#90caf9' : '#1976d2',
+            },
+          },
+        },
+      },
+      MuiAlert: {
+        styleOverrides: {
+          root: {
+            backgroundColor: mode === 'dark' ? '#2a2a2a' : '#f5f5f5',
+            color: mode === 'dark' ? '#ffffff' : '#212121',
+          },
+        },
+      },
+    },
+  });
+}
+
+interface ThemeModeProviderProps {
+  children: React.ReactNode;
+}
+
+export function ThemeModeProvider({ children }: ThemeModeProviderProps) {
+  const [themeMode, setThemeModeState] = useState<ThemeMode>('device');
+  const [effectiveMode, setEffectiveMode] = useState<PaletteMode>('light');
+
+  // Determine effective mode based on theme mode and system preference
+  useEffect(() => {
+    const updateEffectiveMode = () => {
+      if (themeMode === 'device') {
+        // Use system preference
+        const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        setEffectiveMode(systemPrefersDark ? 'dark' : 'light');
+      } else {
+        setEffectiveMode(themeMode as PaletteMode);
+      }
+    };
+
+    // Load saved theme preference
+    const savedTheme = localStorage.getItem('theme-mode') as ThemeMode;
+    if (savedTheme && ['light', 'dark', 'device'].includes(savedTheme)) {
+      setThemeModeState(savedTheme);
+    }
+
+    updateEffectiveMode();
+
+    // Listen for system theme changes
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = () => {
+      if (themeMode === 'device') {
+        updateEffectiveMode();
+      }
+    };
+
+    mediaQuery.addEventListener('change', handleChange);
+    
+    return () => {
+      mediaQuery.removeEventListener('change', handleChange);
+    };
+  }, [themeMode]);
+
+  const setThemeMode = (mode: ThemeMode) => {
+    setThemeModeState(mode);
+    localStorage.setItem('theme-mode', mode);
+    
+    // Update effective mode immediately
+    if (mode === 'device') {
+      const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      setEffectiveMode(systemPrefersDark ? 'dark' : 'light');
+    } else {
+      setEffectiveMode(mode as PaletteMode);
+    }
+  };
+
+  const theme = React.useMemo(() => createAppTheme(effectiveMode), [effectiveMode]);
+
+  const contextValue: ThemeModeContextType = {
+    themeMode,
+    setThemeMode,
+    effectiveMode,
+  };
+
+  return (
+    <ThemeModeContext.Provider value={contextValue}>
+      <MUIThemeProvider theme={theme}>
+        <CssBaseline />
+        {children}
+      </MUIThemeProvider>
+    </ThemeModeContext.Provider>
+  );
+}

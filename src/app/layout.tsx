@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import ThemeRegistry from './components/ThemeRegistry';
+import TopNavigation from './components/TopNavigation';
 
 export const metadata: Metadata = {
   title: "Groupize Workflows",
@@ -16,7 +17,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <ThemeRegistry>{children}</ThemeRegistry>
+        <ThemeRegistry>
+          <TopNavigation />
+          {children}
+        </ThemeRegistry>
        </body>
     </html>
   );
