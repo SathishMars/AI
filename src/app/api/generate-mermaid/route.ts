@@ -71,7 +71,8 @@ Generate production-quality diagrams that business users can easily read and fol
       max_tokens: 4000
     });
 
-    const mermaidDiagram = completion.choices[0]?.message?.content?.trim();
+    let mermaidDiagram = completion.choices[0]?.message?.content?.trim();
+    console.log('Raw LLM response:', mermaidDiagram);
     
     if (!mermaidDiagram) {
       return NextResponse.json(
@@ -79,6 +80,21 @@ Generate production-quality diagrams that business users can easily read and fol
         { status: 500 }
       );
     }
+
+    // Clean up the response: remove markdown code blocks if present
+    // This handles cases where LLM adds ```mermaid wrapper despite instructions
+    if (mermaidDiagram.startsWith('```mermaid')) {
+      mermaidDiagram = mermaidDiagram.replace(/^```mermaid\s*\n/, '');
+    }
+    if (mermaidDiagram.startsWith('```')) {
+      mermaidDiagram = mermaidDiagram.replace(/^```\s*\n/, '');
+    }
+    if (mermaidDiagram.endsWith('```')) {
+      mermaidDiagram = mermaidDiagram.replace(/\n```$/, '');
+    }
+    
+    mermaidDiagram = mermaidDiagram.trim();
+    console.log('Cleaned Mermaid diagram:', mermaidDiagram);
 
     return NextResponse.json({ mermaidDiagram });
     
@@ -204,5 +220,11 @@ CRITICAL REQUIREMENTS:
 - NEVER use emojis in node labels - keep text clean and professional
 - ALWAYS show business logic and parameter details where relevant
 
-Generate ONLY the complete Mermaid diagram code with accessibility-compliant styling and detailed content. Do not include explanations, markdown blocks, or additional text.`;
+Generate ONLY the complete Mermaid diagram code with accessibility-compliant styling and detailed content. 
+
+CRITICAL OUTPUT FORMAT:
+- Start directly with: flowchart TD
+- Do NOT wrap in markdown code blocks
+- Do NOT include explanations, comments, or additional text
+- Return ONLY the pure Mermaid diagram syntax`;
 }

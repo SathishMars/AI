@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
-import { Box, Alert, Typography, CircularProgress } from '@mui/material';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { Box, Typography, CircularProgress } from '@mui/material';
 
 interface MermaidChartProps {
   chart: string;
@@ -19,10 +19,36 @@ const MermaidChart: React.FC<MermaidChartProps> = ({
   const ref = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+  const [refReady, setRefReady] = useState(false);
+  const [svgContent, setSvgContent] = useState<string>('');
+
+  // Callback ref to track when the DOM element is actually set
+  const setRefCallback = useCallback((node: HTMLDivElement | null) => {
+    if (node) {
+      ref.current = node;
+      setRefReady(true);
+    } else {
+      setRefReady(false);
+    }
+  }, []);
+
+  // Track when the component is mounted
+  useEffect(() => {
+    setIsMounted(true);
+    return () => {
+      setIsMounted(false);
+    };
+  }, []);
 
   useEffect(() => {
-    if (!chart || !ref.current) {
+    if (!chart) {
       setIsLoading(false);
+      return;
+    }
+
+    if (!refReady || !isMounted) {
+      setIsLoading(true); // Keep loading since we expect the ref to be ready soon
       return;
     }
 
@@ -49,89 +75,44 @@ const MermaidChart: React.FC<MermaidChartProps> = ({
         if (ref.current) {
           const uniqueId = `${id}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
           
-          // Clear previous content
-          ref.current.innerHTML = '';
-          
           // Render the chart
           const { svg } = await mermaid.render(uniqueId, chart);
           
-          // Insert the SVG
-          ref.current.innerHTML = svg;
-          
-          // Apply responsive styling
-          const svgElement = ref.current.querySelector('svg');
-          if (svgElement) {
-            svgElement.style.maxWidth = '100%';
-            svgElement.style.height = 'auto';
-            svgElement.style.display = 'block';
-            svgElement.style.margin = '0 auto';
-          }
+          // Set SVG content in React state instead of direct DOM manipulation
+          setSvgContent(svg);
         }
         
         setIsLoading(false);
       } catch (err) {
-        console.error('Mermaid rendering error:', err);
-        const errorMessage = err instanceof Error ? err.message : 'Failed to render Mermaid chart';
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+        console.error('Error rendering Mermaid chart:', err);
         setError(errorMessage);
-        setIsLoading(false);
-        onError?.(errorMessage);
         
-        // Show fallback content
-        if (ref.current) {
-          ref.current.innerHTML = `
-            <div style="padding: 16px; background: #f5f5f5; border: 1px solid #ddd; border-radius: 4px;">
-              <strong>Mermaid Chart:</strong>
-              <pre style="margin-top: 8px; font-family: monospace; font-size: 12px; white-space: pre-wrap;">${chart}</pre>
-            </div>
-          `;
+        // Call onError callback if provided
+        if (onError) {
+          onError(errorMessage);
         }
+        
+        setIsLoading(false);
       }
     };
 
     renderChart();
-  }, [chart, id, onError]);
-
-  if (isLoading) {
-    return (
-      <Box 
-        sx={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          alignItems: 'center', 
-          justifyContent: 'center',
-          p: 4,
-          minHeight: 200
-        }}
-      >
-        <CircularProgress size={40} sx={{ mb: 2 }} />
-        <Typography variant="body2" color="text.secondary">
-          Rendering workflow diagram...
-        </Typography>
-      </Box>
-    );
-  }
-
-  if (error) {
-    return (
-      <Alert severity="error" sx={{ m: 2 }}>
-        <Typography variant="subtitle2" gutterBottom>
-          Chart Rendering Error
-        </Typography>
-        <Typography variant="body2">
-          {error}
-        </Typography>
-      </Alert>
-    );
-  }
+  }, [chart, id, isMounted, refReady, onError]); // Added refReady to dependencies
 
   return (
     <Box
-      ref={ref}
+      ref={setRefCallback}
       className={className}
       sx={{
         width: '100%',
         overflow: 'auto',
         p: 2,
+        minHeight: 200,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
         '& svg': {
           maxWidth: '100%',
           height: 'auto',
@@ -139,7 +120,31 @@ const MermaidChart: React.FC<MermaidChartProps> = ({
           margin: '0 auto'
         }
       }}
-    />
+    >
+      {isLoading && (
+        <>
+          <CircularProgress size={40} sx={{ mb: 2 }} />
+          <Typography variant="body2" color="text.secondary">
+            Rendering workflow diagram...
+          </Typography>
+        </>
+      )}
+      
+      {error && (
+        <Box sx={{ textAlign: 'center', p: 2 }}>
+          <Typography color="error" variant="body2" gutterBottom>
+            Error rendering diagram: {error}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Check console for details
+          </Typography>
+        </Box>
+      )}
+      
+      {!isLoading && !error && svgContent && (
+        <div dangerouslySetInnerHTML={{ __html: svgContent }} />
+      )}
+    </Box>
   );
 };
 
