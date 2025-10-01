@@ -37,16 +37,30 @@ MERMAID SYNTAX REQUIREMENTS:
 - Add descriptive labels and meaningful connections
 - Use proper Mermaid v11 syntax and features
 
+ACCESSIBILITY & COLOR GUIDELINES (CRITICAL):
+- ALWAYS ensure high contrast between text and background colors
+- Use dark text (#000000 or #333333) on light backgrounds
+- Use light text (#FFFFFF or #F5F5F5) on dark backgrounds
+- Test readability: text must be clearly visible against background
+- Maintain WCAG AA contrast ratios (4.5:1 minimum)
+
+CONSISTENT COLOR SCHEME (MANDATORY):
+- Triggers/Start: Light green backgrounds (#E8F5E8, #C8E6C9) with dark text (#1B5E20, #2E7D32)
+- Conditions/Decisions: Light orange/yellow (#FFF3E0, #FFE0B2) with dark text (#E65100, #F57C00)
+- Actions/Processes: Light blue backgrounds (#E3F2FD, #BBDEFB) with dark text (#0D47A1, #1976D2)
+- End/Complete: Light gray/red backgrounds (#FFEBEE, #F3E5F5) with dark text (#B71C1C, #4A148C)
+
 WORKFLOW-SPECIFIC BEST PRACTICES:
 - Show clear start and end points
 - Highlight decision points with diamond shapes
-- Use different colors for different step types (triggers=green, conditions=yellow, actions=blue, end=red)
+- Use consistent colors for same step types across the entire diagram
 - Include action descriptions and parameters when relevant
 - Show approval flows and conditional branches clearly
 - Add swimlanes or subgraphs for different actors/systems
 - Use proper arrow labels for Success/Failure paths
+- Ensure all text is readable and high-contrast
 
-Generate production-quality diagrams that business users can easily understand and follow.`
+Generate production-quality diagrams that business users can easily read and follow with excellent visual accessibility.`
         },
         {
           role: 'user',
@@ -128,27 +142,41 @@ DETAILED REQUIREMENTS:
    - Include timeout or error handling paths if present
 
 7. ADVANCED MERMAID FEATURES:
-   - Use classDef for consistent styling
+   - Use classDef for consistent styling across all nodes of the same type
    - Apply click events if beneficial
    - Add linkStyle for emphasis on critical paths
    - Include %% comments for complex logic explanation
 
+8. COLOR ACCESSIBILITY EXAMPLES:
+   \`\`\`
+   classDef triggerClass fill:#E8F5E8,stroke:#2E7D32,stroke-width:2px,color:#1B5E20
+   classDef conditionClass fill:#FFF3E0,stroke:#F57C00,stroke-width:2px,color:#E65100
+   classDef actionClass fill:#E3F2FD,stroke:#1976D2,stroke-width:2px,color:#0D47A1
+   classDef endClass fill:#FFEBEE,stroke:#B71C1C,stroke-width:2px,color:#B71C1C
+   \`\`\`
+
 EXAMPLE STRUCTURE:
 \`\`\`
 flowchart TD
-    Start([\"Process Started\"]) --> Decision{\"Check Condition\"}
-    Decision -->|Yes| Action1[\"Execute Action\"]
-    Decision -->|No| Action2[\"Alternative Path\"]
+    Start([\"🚀 Process Started\"]) --> Decision{\"❓ Check Condition\"}
+    Decision -->|✅ Yes| Action1[\"⚡ Execute Action\"]
+    Decision -->|❌ No| Action2[\"⚡ Alternative Path\"]
     
-    classDef triggerClass fill:#e1f5fe,stroke:#4caf50,stroke-width:2px
-    classDef conditionClass fill:#fff3e0,stroke:#ff9800,stroke-width:2px
-    classDef actionClass fill:#e3f2fd,stroke:#2196f3,stroke-width:2px
-    classDef endClass fill:#ffebee,stroke:#f44336,stroke-width:2px
+    classDef triggerClass fill:#E8F5E8,stroke:#2E7D32,stroke-width:2px,color:#1B5E20
+    classDef conditionClass fill:#FFF3E0,stroke:#F57C00,stroke-width:2px,color:#E65100
+    classDef actionClass fill:#E3F2FD,stroke:#1976D2,stroke-width:2px,color:#0D47A1
+    classDef endClass fill:#FFEBEE,stroke:#B71C1C,stroke-width:2px,color:#B71C1C
     
     class Start triggerClass
     class Decision conditionClass
     class Action1,Action2 actionClass
 \`\`\`
 
-Generate ONLY the complete Mermaid diagram code with styling. Do not include explanations, markdown blocks, or additional text.`;
+CRITICAL REQUIREMENTS:
+- ALWAYS include classDef statements for consistent coloring
+- ALWAYS apply classes to ensure same step types have identical colors
+- ALWAYS verify text contrast meets accessibility standards
+- ALWAYS use the specified color palette for consistency
+
+Generate ONLY the complete Mermaid diagram code with accessibility-compliant styling. Do not include explanations, markdown blocks, or additional text.`;
 }

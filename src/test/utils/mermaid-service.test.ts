@@ -136,10 +136,10 @@ describe('Mermaid Service', () => {
       expect(fallbackDiagram).toContain('start --> checkCondition');
       expect(fallbackDiagram).toContain('checkCondition -->|✅ Success| requireApproval');
       expect(fallbackDiagram).toContain('checkCondition -->|❌ Failure| autoApprove');
-      expect(fallbackDiagram).toContain('classDef triggerClass');
-      expect(fallbackDiagram).toContain('classDef conditionClass');
-      expect(fallbackDiagram).toContain('classDef actionClass');
-      expect(fallbackDiagram).toContain('classDef endClass');
+      expect(fallbackDiagram).toContain('classDef triggerClass fill:#E8F5E8,stroke:#2E7D32');
+      expect(fallbackDiagram).toContain('classDef conditionClass fill:#FFF3E0,stroke:#F57C00');
+      expect(fallbackDiagram).toContain('classDef actionClass fill:#E3F2FD,stroke:#1976D2');
+      expect(fallbackDiagram).toContain('classDef endClass fill:#FFEBEE,stroke:#B71C1C');
     });
 
     it('should handle workflows with nextSteps connections', () => {

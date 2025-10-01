@@ -113,12 +113,12 @@ export function createFallbackDiagram(workflow: WorkflowJSON): string {
     }
   });
   
-  // Add professional styling classes
-  diagram += '\n    %% Enhanced styling for professional workflows\n';
-  diagram += '    classDef triggerClass fill:#e1f5fe,stroke:#4caf50,stroke-width:2px,color:#000\n';
-  diagram += '    classDef conditionClass fill:#fff3e0,stroke:#ff9800,stroke-width:2px,color:#000\n';
-  diagram += '    classDef actionClass fill:#e3f2fd,stroke:#2196f3,stroke-width:2px,color:#000\n';
-  diagram += '    classDef endClass fill:#ffebee,stroke:#f44336,stroke-width:2px,color:#000\n\n';
+  // Add professional styling classes with accessibility compliance
+  diagram += '\n    %% Accessible styling with high contrast colors\n';
+  diagram += '    classDef triggerClass fill:#E8F5E8,stroke:#2E7D32,stroke-width:2px,color:#1B5E20\n';
+  diagram += '    classDef conditionClass fill:#FFF3E0,stroke:#F57C00,stroke-width:2px,color:#E65100\n';
+  diagram += '    classDef actionClass fill:#E3F2FD,stroke:#1976D2,stroke-width:2px,color:#0D47A1\n';
+  diagram += '    classDef endClass fill:#FFEBEE,stroke:#B71C1C,stroke-width:2px,color:#B71C1C\n\n';
   
   // Apply classes to nodes based on step type
   steps.forEach(([stepId, step]) => {
