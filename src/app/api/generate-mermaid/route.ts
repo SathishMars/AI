@@ -141,11 +141,27 @@ DETAILED REQUIREMENTS:
    - Ensure decision outcomes are clear
    - Include timeout or error handling paths if present
 
+5. DETAILED CONTENT REQUIREMENTS:
+   - Include step names AND action details (e.g., "Request Approval<br/>📋 functions.requestApproval")
+   - Show condition logic descriptions (e.g., "Check Attendees > 100")
+   - Display parameter information when relevant
+   - Add meaningful descriptions for business context
+   - Include step sequences or IDs for reference
+   - Show timeout or error handling information if present
+
+6. CLEAN VISUAL DESIGN:
+   - NO emojis in node labels - keep text clean and professional
+   - Use descriptive text labels without visual clutter
+   - Focus on information hierarchy and clarity
+   - Let colors provide visual distinction, not icons
+   - Ensure business users can easily read and understand content
+
 7. ADVANCED MERMAID FEATURES:
    - Use classDef for consistent styling across all nodes of the same type
    - Apply click events if beneficial
    - Add linkStyle for emphasis on critical paths
    - Include %% comments for complex logic explanation
+   - Add subgraphs for logical groupings when helpful
 
 8. COLOR ACCESSIBILITY EXAMPLES:
    \`\`\`
@@ -158,9 +174,15 @@ DETAILED REQUIREMENTS:
 EXAMPLE STRUCTURE:
 \`\`\`
 flowchart TD
-    Start([\"🚀 Process Started\"]) --> Decision{\"❓ Check Condition\"}
-    Decision -->|✅ Yes| Action1[\"⚡ Execute Action\"]
-    Decision -->|❌ No| Action2[\"⚡ Alternative Path\"]
+    Start([\"Process Started\"]) --> Decision{\"Check Event Size<br/>Attendees > 100?\"}
+    Decision -->|✅ Yes| Approval[\"Request Manager Approval<br/>functions.requestApproval<br/>Notify: user.manager\"]
+    Decision -->|❌ No| AutoApprove[\"Auto Approve Event<br/>functions.autoApprove<br/>Update status to approved\"]
+    Approval --> ApprovalCheck{\"Approval Received?\"}
+    ApprovalCheck -->|✅ Approved| CreateEvent[\"Create Event<br/>functions.createEvent<br/>Send confirmations\"]
+    ApprovalCheck -->|❌ Rejected| NotifyRejection[\"Notify Rejection<br/>functions.sendNotification<br/>Update status\"]
+    AutoApprove --> CreateEvent
+    CreateEvent --> End((\"Process Complete\"))
+    NotifyRejection --> End
     
     classDef triggerClass fill:#E8F5E8,stroke:#2E7D32,stroke-width:2px,color:#1B5E20
     classDef conditionClass fill:#FFF3E0,stroke:#F57C00,stroke-width:2px,color:#E65100
@@ -168,8 +190,9 @@ flowchart TD
     classDef endClass fill:#FFEBEE,stroke:#B71C1C,stroke-width:2px,color:#B71C1C
     
     class Start triggerClass
-    class Decision conditionClass
-    class Action1,Action2 actionClass
+    class Decision,ApprovalCheck conditionClass
+    class Approval,AutoApprove,CreateEvent,NotifyRejection actionClass
+    class End endClass
 \`\`\`
 
 CRITICAL REQUIREMENTS:
@@ -177,6 +200,9 @@ CRITICAL REQUIREMENTS:
 - ALWAYS apply classes to ensure same step types have identical colors
 - ALWAYS verify text contrast meets accessibility standards
 - ALWAYS use the specified color palette for consistency
+- ALWAYS include detailed action descriptions and function names
+- NEVER use emojis in node labels - keep text clean and professional
+- ALWAYS show business logic and parameter details where relevant
 
-Generate ONLY the complete Mermaid diagram code with accessibility-compliant styling. Do not include explanations, markdown blocks, or additional text.`;
+Generate ONLY the complete Mermaid diagram code with accessibility-compliant styling and detailed content. Do not include explanations, markdown blocks, or additional text.`;
 }

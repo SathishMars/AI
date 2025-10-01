@@ -128,14 +128,14 @@ describe('Mermaid Service', () => {
       const fallbackDiagram = createFallbackDiagram(sampleWorkflow);
 
       expect(fallbackDiagram).toContain('flowchart TD');
-      expect(fallbackDiagram).toContain('start(["🚀 Start Process"])');
-      expect(fallbackDiagram).toContain('checkCondition{"❓ Check Requirements"}');
-      expect(fallbackDiagram).toContain('requireApproval["⚡ Require Approval<br/>📋 functions.requestApproval"]');
-      expect(fallbackDiagram).toContain('autoApprove["⚡ Auto Approve<br/>📋 functions.autoApprove"]');
-      expect(fallbackDiagram).toContain('end(("🏁 Process Complete"))');
-      expect(fallbackDiagram).toContain('start --> checkCondition');
-      expect(fallbackDiagram).toContain('checkCondition -->|✅ Success| requireApproval');
-      expect(fallbackDiagram).toContain('checkCondition -->|❌ Failure| autoApprove');
+      expect(fallbackDiagram).toContain('start(["Start Process"])');
+      expect(fallbackDiagram).toContain('checkCondition{"Check Requirements');
+      expect(fallbackDiagram).toContain('requireApproval["Require Approval<br/>functions.requestApproval"]');
+      expect(fallbackDiagram).toContain('autoApprove["Auto Approve<br/>functions.autoApprove"]');
+      expect(fallbackDiagram).toContain('end(("Process Complete<br/>Result: success"))');
+      expect(fallbackDiagram).toContain('checkCondition{"Check Requirements<br/>event.attendees greaterThan 50"}');
+      expect(fallbackDiagram).toContain('checkCondition -->|Success| requireApproval');
+      expect(fallbackDiagram).toContain('checkCondition -->|Failure| autoApprove');
       expect(fallbackDiagram).toContain('classDef triggerClass fill:#E8F5E8,stroke:#2E7D32');
       expect(fallbackDiagram).toContain('classDef conditionClass fill:#FFF3E0,stroke:#F57C00');
       expect(fallbackDiagram).toContain('classDef actionClass fill:#E3F2FD,stroke:#1976D2');
