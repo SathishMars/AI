@@ -285,6 +285,13 @@ import "@fontsource/roboto/700.css";
 - Optimize for embedded loading performance
 - Consider bundle size impact on parent pages
 
+### Git and Version Control
+- **Commit Messages**: Use concise, clear summaries of changes
+- **No Iconography**: Avoid emojis, symbols, or decorative characters in commit messages
+- **Professional Format**: Write commit messages suitable for enterprise development environments
+- **Example Format**: "Add user authentication middleware" or "Fix workflow validation logic"
+- **Avoid**: Long multi-paragraph commit messages, emoji usage, excessive formatting
+
 ## User Stories and Epic Management
 
 ### Story Organization
