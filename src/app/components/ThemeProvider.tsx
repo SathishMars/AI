@@ -31,7 +31,7 @@ export function useThemeMode() {
   return context;
 }
 
-// Enhanced theme creation with proper dark mode colors and workflow customizations
+// Enhanced theme creation with proper dark mode colors and essential workflow customizations
 function createAppTheme(mode: PaletteMode) {
   return createTheme({
     // Custom breakpoints for workflow responsiveness
@@ -99,30 +99,8 @@ function createAppTheme(mode: PaletteMode) {
     },
     typography: {
       fontFamily: roboto.style.fontFamily,
-      h1: {
-        color: mode === 'dark' ? '#ffffff' : '#212121',
-      },
-      h2: {
-        color: mode === 'dark' ? '#ffffff' : '#212121',
-      },
-      h3: {
-        color: mode === 'dark' ? '#ffffff' : '#212121',
-      },
-      h4: {
-        color: mode === 'dark' ? '#ffffff' : '#212121',
-      },
-      h5: {
-        color: mode === 'dark' ? '#ffffff' : '#212121',
-      },
       h6: {
-        color: mode === 'dark' ? '#ffffff' : '#212121',
         fontWeight: 600,
-      },
-      body1: {
-        color: mode === 'dark' ? '#ffffff' : '#212121',
-      },
-      body2: {
-        color: mode === 'dark' ? '#aaaaaa' : '#757575',
       },
       button: {
         textTransform: 'none',
@@ -137,6 +115,7 @@ function createAppTheme(mode: PaletteMode) {
           },
         },
       },
+      // Minimal container customization
       MuiContainer: {
         styleOverrides: {
           root: {
@@ -157,47 +136,14 @@ function createAppTheme(mode: PaletteMode) {
           },
         },
       },
-      MuiPaper: {
-        styleOverrides: {
-          root: {
-            backgroundColor: mode === 'dark' ? '#1e1e1e' : '#ffffff',
-            color: mode === 'dark' ? '#ffffff' : '#212121',
-          },
-        },
-      },
-      MuiCard: {
-        styleOverrides: {
-          root: {
-            backgroundColor: mode === 'dark' ? '#1e1e1e' : '#ffffff',
-            color: mode === 'dark' ? '#ffffff' : '#212121',
-          },
-        },
-      },
-      MuiTextField: {
-        styleOverrides: {
-          root: {
-            '& .MuiInputBase-root': {
-              color: mode === 'dark' ? '#ffffff' : '#212121',
-              backgroundColor: mode === 'dark' ? '#2a2a2a' : '#ffffff',
-            },
-            '& .MuiInputLabel-root': {
-              color: mode === 'dark' ? '#aaaaaa' : '#757575',
-            },
-            '& .MuiOutlinedInput-notchedOutline': {
-              borderColor: mode === 'dark' ? '#555555' : '#cccccc',
-            },
-          },
-        },
-      },
+      // Essential tab styling
       MuiTab: {
         styleOverrides: {
           root: {
-            color: mode === 'dark' ? '#aaaaaa' : '#757575',
             minWidth: 0,
             padding: '12px 16px',
             transition: 'all 0.2s ease',
             '&.Mui-selected': {
-              color: mode === 'dark' ? '#90caf9' : '#1976d2',
               fontWeight: 600,
             },
             '&:hover': {
@@ -212,34 +158,14 @@ function createAppTheme(mode: PaletteMode) {
         styleOverrides: {
           root: {
             minHeight: 48,
-            // Smooth indicator animation
             '& .MuiTabs-indicator': {
               transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-            },
-          },
-          indicator: {
-            height: 3,
-          },
-        },
-      },
-      MuiAppBar: {
-        styleOverrides: {
-          root: {
-            boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
-            transition: 'box-shadow 0.2s ease',
-          },
-        },
-      },
-      MuiIconButton: {
-        styleOverrides: {
-          root: {
-            transition: 'all 0.2s ease',
-            '&:hover': {
-              transform: 'scale(1.05)',
+              height: 3,
             },
           },
         },
       },
+      // Clean button animations
       MuiButton: {
         styleOverrides: {
           root: {
@@ -251,11 +177,13 @@ function createAppTheme(mode: PaletteMode) {
           },
         },
       },
-      MuiAlert: {
+      MuiIconButton: {
         styleOverrides: {
           root: {
-            backgroundColor: mode === 'dark' ? '#2a2a2a' : '#f5f5f5',
-            color: mode === 'dark' ? '#ffffff' : '#212121',
+            transition: 'all 0.2s ease',
+            '&:hover': {
+              transform: 'scale(1.05)',
+            },
           },
         },
       },
