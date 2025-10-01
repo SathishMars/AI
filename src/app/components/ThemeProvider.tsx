@@ -31,9 +31,19 @@ export function useThemeMode() {
   return context;
 }
 
-// Enhanced theme creation with proper dark mode colors
+// Enhanced theme creation with proper dark mode colors and workflow customizations
 function createAppTheme(mode: PaletteMode) {
   return createTheme({
+    // Custom breakpoints for workflow responsiveness
+    breakpoints: {
+      values: {
+        xs: 0,      // Mobile start
+        sm: 768,    // Tablet start (768px-1199px)
+        md: 1200,   // Desktop start (≥1200px)
+        lg: 1400,   // Large Desktop
+        xl: 1920    // Extra Large
+      }
+    },
     palette: {
       mode,
       ...(mode === 'light'
@@ -50,8 +60,8 @@ function createAppTheme(mode: PaletteMode) {
               dark: '#9a0036',
             },
             background: {
-              default: '#ffffff',
-              paper: '#f5f5f5',
+              default: '#fafafa',
+              paper: '#ffffff',
             },
             text: {
               primary: '#212121',
@@ -106,6 +116,7 @@ function createAppTheme(mode: PaletteMode) {
       },
       h6: {
         color: mode === 'dark' ? '#ffffff' : '#212121',
+        fontWeight: 600,
       },
       body1: {
         color: mode === 'dark' ? '#ffffff' : '#212121',
@@ -113,20 +124,43 @@ function createAppTheme(mode: PaletteMode) {
       body2: {
         color: mode === 'dark' ? '#aaaaaa' : '#757575',
       },
+      button: {
+        textTransform: 'none',
+      },
     },
     components: {
       MuiCssBaseline: {
         styleOverrides: {
           body: {
-            backgroundColor: mode === 'dark' ? '#121212' : '#ffffff',
+            backgroundColor: mode === 'dark' ? '#121212' : '#fafafa',
             color: mode === 'dark' ? '#ffffff' : '#212121',
+          },
+        },
+      },
+      MuiContainer: {
+        styleOverrides: {
+          root: {
+            paddingLeft: 0,
+            paddingRight: 0,
+            '&.MuiContainer-maxWidthSm': {
+              maxWidth: 'none',
+            },
+            '&.MuiContainer-maxWidthMd': {
+              maxWidth: 'none',
+            },
+            '&.MuiContainer-maxWidthLg': {
+              maxWidth: 'none',
+            },
+            '&.MuiContainer-maxWidthXl': {
+              maxWidth: 'none',
+            },
           },
         },
       },
       MuiPaper: {
         styleOverrides: {
           root: {
-            backgroundColor: mode === 'dark' ? '#1e1e1e' : '#f5f5f5',
+            backgroundColor: mode === 'dark' ? '#1e1e1e' : '#ffffff',
             color: mode === 'dark' ? '#ffffff' : '#212121',
           },
         },
@@ -159,8 +193,60 @@ function createAppTheme(mode: PaletteMode) {
         styleOverrides: {
           root: {
             color: mode === 'dark' ? '#aaaaaa' : '#757575',
+            minWidth: 0,
+            padding: '12px 16px',
+            transition: 'all 0.2s ease',
             '&.Mui-selected': {
               color: mode === 'dark' ? '#90caf9' : '#1976d2',
+              fontWeight: 600,
+            },
+            '&:hover': {
+              backgroundColor: mode === 'dark' 
+                ? 'rgba(144, 202, 249, 0.08)' 
+                : 'rgba(25, 118, 210, 0.04)',
+            },
+          },
+        },
+      },
+      MuiTabs: {
+        styleOverrides: {
+          root: {
+            minHeight: 48,
+            // Smooth indicator animation
+            '& .MuiTabs-indicator': {
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            },
+          },
+          indicator: {
+            height: 3,
+          },
+        },
+      },
+      MuiAppBar: {
+        styleOverrides: {
+          root: {
+            boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+            transition: 'box-shadow 0.2s ease',
+          },
+        },
+      },
+      MuiIconButton: {
+        styleOverrides: {
+          root: {
+            transition: 'all 0.2s ease',
+            '&:hover': {
+              transform: 'scale(1.05)',
+            },
+          },
+        },
+      },
+      MuiButton: {
+        styleOverrides: {
+          root: {
+            transition: 'all 0.2s ease',
+            '&:hover': {
+              transform: 'translateY(-1px)',
+              boxShadow: '0 4px 8px rgba(0,0,0,0.12)',
             },
           },
         },

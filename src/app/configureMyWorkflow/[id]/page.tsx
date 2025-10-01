@@ -10,7 +10,6 @@ import {
 } from '@mui/material';
 import { WorkflowJSON } from '@/app/types/workflow';
 import ResponsiveWorkflowConfigurator from '@/app/components/ResponsiveWorkflowConfigurator';
-import WorkflowThemeProvider from '@/app/components/WorkflowThemeProvider';
 import { createDefaultWorkflow } from '@/app/utils/workflow-defaults';
 
 interface PageProps {
@@ -163,18 +162,16 @@ export default function ConfigureMyWorkflowPage({ params }: PageProps) {
   }
 
   return (
-    <WorkflowThemeProvider>
-      <Box sx={{ height: '100vh', overflow: 'hidden' }}>
-        <ResponsiveWorkflowConfigurator
-          workflow={workflow || createDefaultWorkflow()}
-          onWorkflowChange={(updatedWorkflow: WorkflowJSON) => {
-            console.log('Workflow updated:', updatedWorkflow);
-            setWorkflow(updatedWorkflow); // Actually update the state!
-          }}
-          validationResult={null}
-          isNewWorkflow={workflow === null}
-        />
-      </Box>
-    </WorkflowThemeProvider>
+    <Box sx={{ height: '100vh', overflow: 'hidden' }}>
+      <ResponsiveWorkflowConfigurator
+        workflow={workflow || createDefaultWorkflow()}
+        onWorkflowChange={(updatedWorkflow: WorkflowJSON) => {
+          console.log('Workflow updated:', updatedWorkflow);
+          setWorkflow(updatedWorkflow); // Actually update the state!
+        }}
+        validationResult={null}
+        isNewWorkflow={workflow === null}
+      />
+    </Box>
   );
 }
