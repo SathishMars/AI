@@ -2,7 +2,6 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Box, Alert, Typography, CircularProgress } from '@mui/material';
-import mermaid from 'mermaid';
 
 interface MermaidChartProps {
   chart: string;
@@ -22,84 +21,45 @@ const MermaidChart: React.FC<MermaidChartProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Initialize Mermaid with enhanced configuration
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: 'default',
-      securityLevel: 'loose',
-      fontFamily: 'Roboto, Arial, sans-serif',
-      fontSize: 14,
-      flowchart: {
-        useMaxWidth: true,
-        htmlLabels: true,
-        curve: 'basis',
-        padding: 20,
-        nodeSpacing: 50,
-        rankSpacing: 50
-      },
-      er: {
-        useMaxWidth: true
-      },
-      sequence: {
-        useMaxWidth: true,
-        showSequenceNumbers: true
-      },
-      gantt: {
-        useMaxWidth: true
-      },
-      journey: {
-        useMaxWidth: true
-      },
-      timeline: {
-        useMaxWidth: true
-      },
-      gitGraph: {
-        useMaxWidth: true
-      },
-      mindmap: {
-        useMaxWidth: true
-      },
-      quadrantChart: {
-        useMaxWidth: true
-      },
-      xyChart: {
-        useMaxWidth: true
-      }
-    });
-  }, []);
+    if (!chart || !ref.current) {
+      setIsLoading(false);
+      return;
+    }
 
-  useEffect(() => {
-    if (!chart || !ref.current) return;
-
-    setIsLoading(true);
-    setError(null);
-    
-    const currentRef = ref.current; // Capture ref for cleanup
-    
     const renderChart = async () => {
       try {
-        // Generate unique ID for this chart instance
-        const uniqueId = `${id}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-        // Clear previous content
-        if (currentRef) {
-          currentRef.innerHTML = '';
-        }
-
-        // Validate and parse the Mermaid syntax
-        const isValid = await mermaid.parse(chart);
-        if (!isValid) {
-          throw new Error('Invalid Mermaid syntax');
-        }
-
-        // Render the chart
-        const { svg } = await mermaid.render(uniqueId, chart);
+        setIsLoading(true);
+        setError(null);
         
-        if (currentRef) {
-          currentRef.innerHTML = svg;
+        // Dynamic import to ensure proper loading
+        const mermaid = (await import('mermaid')).default;
+        
+        // Initialize mermaid
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: 'default',
+          securityLevel: 'loose',
+          fontFamily: 'Roboto, Arial, sans-serif',
+          flowchart: {
+            useMaxWidth: true,
+            htmlLabels: true
+          }
+        });
+
+        if (ref.current) {
+          const uniqueId = `${id}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
           
-          // Apply responsive styling to the SVG
-          const svgElement = currentRef.querySelector('svg');
+          // Clear previous content
+          ref.current.innerHTML = '';
+          
+          // Render the chart
+          const { svg } = await mermaid.render(uniqueId, chart);
+          
+          // Insert the SVG
+          ref.current.innerHTML = svg;
+          
+          // Apply responsive styling
+          const svgElement = ref.current.querySelector('svg');
           if (svgElement) {
             svgElement.style.maxWidth = '100%';
             svgElement.style.height = 'auto';
@@ -110,18 +70,17 @@ const MermaidChart: React.FC<MermaidChartProps> = ({
         
         setIsLoading(false);
       } catch (err) {
+        console.error('Mermaid rendering error:', err);
         const errorMessage = err instanceof Error ? err.message : 'Failed to render Mermaid chart';
         setError(errorMessage);
         setIsLoading(false);
         onError?.(errorMessage);
         
-        console.error('Mermaid rendering error:', err);
-        
-        // Fallback: show the raw chart text
-        if (currentRef) {
-          currentRef.innerHTML = `
+        // Show fallback content
+        if (ref.current) {
+          ref.current.innerHTML = `
             <div style="padding: 16px; background: #f5f5f5; border: 1px solid #ddd; border-radius: 4px;">
-              <strong>Chart Syntax:</strong>
+              <strong>Mermaid Chart:</strong>
               <pre style="margin-top: 8px; font-family: monospace; font-size: 12px; white-space: pre-wrap;">${chart}</pre>
             </div>
           `;
@@ -130,18 +89,6 @@ const MermaidChart: React.FC<MermaidChartProps> = ({
     };
 
     renderChart();
-    
-    // Cleanup function
-    return () => {
-      if (currentRef) {
-        try {
-          // Chart cleanup - clear the content
-          currentRef.innerHTML = '';
-        } catch {
-          // Ignore cleanup errors
-        }
-      }
-    };
   }, [chart, id, onError]);
 
   if (isLoading) {
@@ -190,12 +137,6 @@ const MermaidChart: React.FC<MermaidChartProps> = ({
           height: 'auto',
           display: 'block',
           margin: '0 auto'
-        },
-        '& .node': {
-          cursor: 'pointer'
-        },
-        '& .edgePath': {
-          cursor: 'pointer'
         }
       }}
     />

@@ -155,12 +155,16 @@ const TestMermaidPage = () => {
           <Typography variant="h6" gutterBottom>
             Generated Enhanced Mermaid Diagram:
           </Typography>
+          <Typography variant="body2" sx={{ mb: 2, p: 1, bgcolor: 'grey.100', fontFamily: 'monospace' }}>
+            Chart length: {mermaidDiagram.length} characters
+          </Typography>
           <Box sx={{ maxHeight: '80vh', overflow: 'auto' }}>
             <MermaidChart 
               chart={mermaidDiagram}
               id="test-workflow-diagram"
               onError={(error) => {
                 console.error('Test Mermaid chart error:', error);
+                alert('Chart rendering error: ' + error);
               }}
             />
           </Box>
