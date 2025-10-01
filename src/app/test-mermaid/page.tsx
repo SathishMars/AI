@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Box, Button, Typography, Paper } from '@mui/material';
 import { generateMermaidDiagram } from '@/app/utils/mermaid-service';
-import MDEditor from '@uiw/react-md-editor';
+import MermaidChart from '@/app/components/MermaidChart';
 
 const TestMermaidPage = () => {
   const [mermaidDiagram, setMermaidDiagram] = useState<string>('');
@@ -156,8 +156,12 @@ const TestMermaidPage = () => {
             Generated Enhanced Mermaid Diagram:
           </Typography>
           <Box sx={{ maxHeight: '80vh', overflow: 'auto' }}>
-            <MDEditor.Markdown 
-              source={`\`\`\`mermaid\n${mermaidDiagram}\n\`\`\``}
+            <MermaidChart 
+              chart={mermaidDiagram}
+              id="test-workflow-diagram"
+              onError={(error) => {
+                console.error('Test Mermaid chart error:', error);
+              }}
             />
           </Box>
         </Paper>

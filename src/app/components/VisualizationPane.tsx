@@ -30,9 +30,9 @@ import {
 } from '@mui/icons-material';
 import { WorkflowJSON, ValidationResult, WorkflowStep } from '@/app/types/workflow';
 import { useMermaidGeneration } from '@/app/hooks/useMermaidGeneration';
-import MDEditor from '@uiw/react-md-editor';
-import '@uiw/react-md-editor/markdown-editor.css';
-import '@uiw/react-markdown-preview/markdown.css';
+import MermaidChart from '@/app/components/MermaidChart';
+
+
 
 interface VisualizationPaneProps {
   workflow: WorkflowJSON;
@@ -466,16 +466,11 @@ export default function VisualizationPane({
         
         {/* Mermaid Viewer */}
         <Box sx={{ p: 2 }}>
-          <MDEditor
-            value={workflow.mermaidDiagram}
-            preview="preview"
-            hideToolbar
-            visibleDragbar={false}
-            data-color-mode="light"
-            height={undefined}
-            style={{ 
-              backgroundColor: 'transparent',
-              border: 'none'
+          <MermaidChart
+            chart={workflow.mermaidDiagram || ''}
+            id="workflow-diagram"
+            onError={(error) => {
+              console.error('Mermaid chart error:', error);
             }}
           />
         </Box>
