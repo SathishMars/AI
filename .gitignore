@@ -30,8 +30,17 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files (exclude actual env files, but include example/template files)
+.env
+.env.local
+.env.development
+.env.staging
+.env.production
+.env.test
+# Include example files for developers
+!.env.example
+!.env.sample
+!.env.template
 
 # vercel
 .vercel

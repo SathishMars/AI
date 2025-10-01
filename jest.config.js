@@ -1,15 +1,11 @@
-/** @type {impor  transform: {
-    '^.+\.(ts|tsx)$': ['ts-jest', {
-      tsconfig: {
-        jsx: 'react-jsx',
-      },
-    }],
-  },).Config} */
+/** @type {import('jest').Config} */
 const config = {
   testEnvironment: 'jsdom',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    // Mock MongoDB to avoid ES module issues
+    '^mongodb$': '<rootDir>/src/test/__mocks__/mongodb.ts',
   },
   collectCoverageFrom: [
     'src/**/*.{js,jsx,ts,tsx}',

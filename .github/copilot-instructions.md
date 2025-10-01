@@ -9,7 +9,8 @@ This is a Next.js 15+ embeddable frontend application designed to gradually migr
 - TypeScript with strict mode
 - Material-UI (MUI) v7 for components
 - Tailwind CSS v4 for additional styling  
-- MongoDB and Postgres database connection
+- MongoDB 5.0 (local development) / AWS DocumentDB (production) with connection pooling
+- PostgreSQL database connection
 - JWT-based session management
 
 ## Key Architecture Patterns
@@ -181,6 +182,7 @@ import "@fontsource/roboto/700.css";
 - **Pages**: Each page or route in its own folder under `src/app/` (e.g., `src/app/workflow-builder/page.tsx`)
 - **Story & Epic Management**: Store user stories and epics in `user-stories/` folder at project root (outside `src/`)
 - **AI Implementation Summaries**: Store AI implementation notes and summaries in `ai-implementation-summaries/` folder at project root (outside `src/`)
+- **Database Scripts**: Store all database scripts, migrations, and SQL files in `db-scripts/` folder at project root (outside `src/`)
 - **Critical Files**:
   - `src/app/layout.tsx` - Main layout with font loading and metadata
   - `src/app/globals.css` - Tailwind imports and CSS variables
@@ -209,6 +211,7 @@ import "@fontsource/roboto/700.css";
 - **TypeScript**: `^5` - Use TypeScript 5 features
 - **OpenAI SDK**: `^5.20.3` - Use OpenAI v5 API patterns
 - **Anthropic SDK**: `^0.63.0` - Use current Anthropic SDK patterns
+- **MongoDB**: `mongodb@^6.20.0` - Use MongoDB v6.20.0 driver (includes built-in TypeScript types)
 - **json-rules-engine**: `^7.3.1` - Use v7 API for workflow rules
 - **react-md-editor**: `@uiw/react-md-editor@^4.0.8` - Use v4 API
 - **Mermaid**: `^11.12.0` - Use Mermaid v11 syntax
@@ -276,9 +279,19 @@ import "@fontsource/roboto/700.css";
 12. Write comprehensive tests in `src/test/` mirroring source structure using current testing library versions
 
 ### Database Integration
-- Use PostgreSQL and MongoDB with connection pooling
-- Design schemas that align with existing Rails models
-- Plan for data migration scenarios
+- **Connection Pool**: ALWAYS use the MongoDB connection pool utility (`@/app/utils/mongodb-connection`) for ALL database operations
+- **MongoDB Version**: Use MongoDB 5.0 compatible syntax and features only
+- **Environment Support**: Support both local MongoDB and AWS DocumentDB (MongoDB 5.0 compatible) based on environment flags
+- **Connection Pattern**: 
+  ```typescript
+  import { getMongoDatabase } from '@/app/utils/mongodb-connection';
+  const db = await getMongoDatabase();
+  const collection = db.collection('collectionName');
+  ```
+- **Query Syntax**: Use MongoDB 5.0 compatible aggregation pipelines, operators, and query syntax
+- **Error Handling**: Always wrap database operations in try-catch blocks with proper MongoDB error handling
+- **Schema Design**: Design schemas that align with existing Rails models for gradual migration
+- **Data Migration**: Plan for data migration scenarios between PostgreSQL and MongoDB
 
 ### Performance Considerations
 - Leverage Turbopack for development speed
