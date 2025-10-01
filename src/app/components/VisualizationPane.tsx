@@ -13,7 +13,9 @@ import {
   CardContent,
   CardHeader,
   TextField,
-  IconButton
+  IconButton,
+  Button,
+  CircularProgress
 } from '@mui/material';
 import {
   AccountTree as WorkflowIcon,
@@ -22,9 +24,12 @@ import {
   CheckCircle as SuccessIcon,
   Edit as EditIcon,
   Save as SaveIcon,
-  Cancel as CancelIcon
+  Cancel as CancelIcon,
+  Refresh as RefreshIcon,
+  AutoAwesome as AIIcon
 } from '@mui/icons-material';
 import { WorkflowJSON, ValidationResult, WorkflowStep } from '@/app/types/workflow';
+import { useMermaidGeneration } from '@/app/hooks/useMermaidGeneration';
 import MDEditor from '@uiw/react-md-editor';
 import '@uiw/react-md-editor/markdown-editor.css';
 import '@uiw/react-markdown-preview/markdown.css';
@@ -75,6 +80,12 @@ export default function VisualizationPane({
   const [tabValue, setTabValue] = useState(0);
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
   const [editingStep, setEditingStep] = useState<WorkflowStep | null>(null);
+  
+  // Initialize Mermaid generation hook
+  const mermaidGeneration = useMermaidGeneration(workflow, onWorkflowChange, {
+    autoGenerate: true,
+    debounceMs: 2000
+  });
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -338,22 +349,86 @@ export default function VisualizationPane({
   };
 
   const renderMermaidDiagram = () => {
-    if (!workflow.mermaidDiagram) {
+    const hasSteps = Object.keys(workflow.steps).length > 0;
+    
+    if (!hasSteps) {
       return (
-        <Box sx={{ 
-          flex: 1, 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center',
-          p: 3
-        }}>
+        <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 4 }}>
           <Alert severity="info">
             <Typography variant="h6" gutterBottom>
-              No Diagram Available
+              No Workflow Steps
             </Typography>
             <Typography variant="body2">
-              The workflow diagram will be generated automatically by aime when you create or modify your workflow.
-              Ask aime to create a workflow, and the Mermaid diagram will appear here.
+              Create workflow steps to generate a visual diagram. The diagram will be automatically generated using AI when you add or modify workflow steps.
+            </Typography>
+          </Alert>
+        </Box>
+      );
+    }
+    
+    if (mermaidGeneration.isGenerating) {
+      return (
+        <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 4 }}>
+          <Box sx={{ textAlign: 'center' }}>
+            <CircularProgress size={40} sx={{ mb: 2 }} />
+            <Typography variant="h6" gutterBottom>
+              Generating Workflow Diagram
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              AI is creating a visual representation of your workflow...
+            </Typography>
+          </Box>
+        </Box>
+      );
+    }
+    
+    if (mermaidGeneration.error && !workflow.mermaidDiagram) {
+      return (
+        <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 4 }}>
+          <Alert 
+            severity="warning"
+            action={
+              <Button
+                startIcon={<RefreshIcon />}
+                onClick={mermaidGeneration.regenerateDiagram}
+                size="small"
+              >
+                Retry
+              </Button>
+            }
+          >
+            <Typography variant="h6" gutterBottom>
+              Diagram Generation Failed
+            </Typography>
+            <Typography variant="body2">
+              {mermaidGeneration.error}
+            </Typography>
+          </Alert>
+        </Box>
+      );
+    }
+
+    if (!workflow.mermaidDiagram) {
+      return (
+        <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 4 }}>
+          <Alert 
+            severity="info"
+            action={
+              <Button
+                startIcon={<AIIcon />}
+                onClick={mermaidGeneration.regenerateDiagram}
+                variant="outlined"
+                size="small"
+              >
+                Generate Diagram
+              </Button>
+            }
+          >
+            <Typography variant="h6" gutterBottom>
+              Diagram Not Generated
+            </Typography>
+            <Typography variant="body2">
+              Click &ldquo;Generate Diagram&rdquo; to create an AI-powered visual representation of your workflow.
             </Typography>
           </Alert>
         </Box>
@@ -361,19 +436,49 @@ export default function VisualizationPane({
     }
 
     return (
-      <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
-        <MDEditor
-          value={workflow.mermaidDiagram}
-          preview="preview"
-          hideToolbar
-          visibleDragbar={false}
-          data-color-mode="light"
-          height={undefined}
-          style={{ 
-            backgroundColor: 'transparent',
-            border: 'none'
-          }}
-        />
+      <Box sx={{ flex: 1, overflow: 'auto' }}>
+        {/* Diagram Controls */}
+        <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
+            {mermaidGeneration.lastGenerated && (
+              `Last generated: ${mermaidGeneration.lastGenerated.toLocaleTimeString()}`
+            )}
+          </Typography>
+          
+          {mermaidGeneration.error && (
+            <Chip 
+              label="Generation Error" 
+              color="warning" 
+              size="small" 
+              icon={<ErrorIcon />}
+            />
+          )}
+          
+          <Button
+            startIcon={<RefreshIcon />}
+            onClick={mermaidGeneration.regenerateDiagram}
+            size="small"
+            disabled={mermaidGeneration.isGenerating}
+          >
+            Regenerate
+          </Button>
+        </Box>
+        
+        {/* Mermaid Viewer */}
+        <Box sx={{ p: 2 }}>
+          <MDEditor
+            value={workflow.mermaidDiagram}
+            preview="preview"
+            hideToolbar
+            visibleDragbar={false}
+            data-color-mode="light"
+            height={undefined}
+            style={{ 
+              backgroundColor: 'transparent',
+              border: 'none'
+            }}
+          />
+        </Box>
       </Box>
     );
   };
@@ -405,7 +510,18 @@ export default function VisualizationPane({
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
         <Tabs value={tabValue} onChange={handleTabChange} aria-label="workflow visualization tabs">
           <Tab label="Workflow Forms" {...a11yProps(0)} />
-          <Tab label="Diagram" {...a11yProps(1)} />
+          <Tab 
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                Diagram
+                {mermaidGeneration.isGenerating && (
+                  <CircularProgress size={12} />
+                )}
+                <AIIcon fontSize="small" color="primary" />
+              </Box>
+            } 
+            {...a11yProps(1)} 
+          />
         </Tabs>
       </Box>
       
