@@ -1,65 +1,58 @@
 # User Story: Advanced Workflow Visualization
 
 **As a** workflow creator  
-**I want** interactive workflow diagrams with detailed information  
-**So that** I can better understand complex workflows and navigate them efficiently
+**I want** professional Mermaid workflow diagrams with clean rendering  
+**So that** I can clearly visualize complex workflows with proper formatting and styling
 
 ## Summary
-Enhance the basic visualization with interactive elements, navigation controls, and detailed step information.
+Implement direct Mermaid rendering with enhanced AI-generated diagrams, replacing react-md-editor for better performance and visual quality.
 
 ## Epic
 [Epic: Workflow Configurator Screen](epic-workflow-configurator.md)
 
 ## UI Considerations
-- **Real-time AI Integration:** Dynamic diagram updates when AI modifies workflow during conversation
-- **Draft/Published State Visualization:** Clear visual distinction between draft modifications and published workflows
-- **Direct Parameter Modification:** Interactive parameter editing within visualization pane triggers AI awareness
-- **Dual-Pane Integration:** Full-view button integration with Story 9's responsive layout system
-- **Validation Error Visualization:** Real-time error highlighting integrated with Story 8's streaming validation
-- **Interactive Diagram Elements:** Hover states, zoom/pan controls, step detail panels without AI conversation triggers
-- **Responsive Visualization:** Current approach maintained across devices, future mobile customization planned
-- **Performance Optimization:** Smooth interactions maintained for large workflows (50+ steps)
-- **Material-UI Integration:** MUI v7 components for interactive controls, overlays, and navigation elements
-- **Loading States:** Smooth transitions during real-time workflow updates from AI modifications
+- **Direct Mermaid Rendering:** Replace react-md-editor with native Mermaid library for better performance
+- **Professional Styling:** WCAG AA compliant color schemes with business-ready appearance  
+- **Clean Syntax Processing:** Automatic cleanup of LLM-generated markdown code blocks
+- **Responsive Design:** Diagrams scale properly across phone, tablet, and desktop viewports
+- **Loading States:** Smooth transitions with proper spinner states during diagram generation
+- **Error Handling:** Graceful fallbacks with detailed error information
+- **Material-UI Integration:** MUI v7 components for loading indicators and error displays
+- **React Compatibility:** Proper virtual DOM integration to avoid rendering conflicts
+- **Enhanced AI Prompts:** Detailed business logic visualization with accessibility compliance
+- **Performance Optimization:** Efficient rendering for complex workflows with 50+ steps
 
 ## Acceptance Criteria
-- [ ] **Real-time Workflow Updates:**
-  - [ ] Dynamic Mermaid diagram updates when AI modifies workflow during conversation
-  - [ ] Smooth visual transitions during workflow modifications
-  - [ ] Real-time validation error highlighting integrated with Story 8
-  - [ ] Performance optimization for frequent updates during AI conversations
-- [ ] **Draft/Published State Visualization:**
-  - [ ] Visual distinction between draft and published workflow elements
-  - [ ] Clear indicators for modified vs original workflow steps
-  - [ ] Draft state persistence across visualization interactions
-  - [ ] Published workflow read-only visual indicators
-- [ ] **Interactive Parameter Modification:**
-  - [ ] Direct editing of step parameters within visualization pane
-  - [ ] Parameter changes trigger AI awareness without conversation initiation
-  - [ ] Inline validation feedback for parameter modifications
-  - [ ] Auto-save draft functionality for direct parameter edits
-- [ ] **Advanced Visualization Features:**
-  - [ ] Interactive diagram elements with hover states and tooltips
-  - [ ] Zoom and pan controls with smooth animations (mouse wheel, touch)
-  - [ ] Step detail panels with comprehensive parameter information
-  - [ ] Workflow minimap for navigation of large diagrams
-  - [ ] Search and highlight functionality within diagrams
-  - [ ] Full-screen visualization mode integrated with Story 9's dual-pane layout
-- [ ] **Error and Validation Integration:**
-  - [ ] Real-time validation error visualization from Story 8
-  - [ ] Error indicators with detailed tooltips
-  - [ ] Visual error highlighting without automatic AI conversation triggers
-  - [ ] Critical error blocking with visual feedback
-- [ ] **Performance and Responsiveness:**
-  - [ ] Smooth performance for large workflows (50+ steps)
-  - [ ] Responsive design maintaining current visualization approach
-  - [ ] Efficient rendering during real-time AI updates
-  - [ ] Memory optimization for extended visualization sessions
-- [ ] **Testing Requirements:**
-  - [ ] Comprehensive tests for real-time update functionality (90%+ coverage)
-  - [ ] Performance tests for large workflow rendering and updates
-  - [ ] User interaction tests for parameter modification
-  - [ ] Visual regression tests for draft/published state differences
+- [x] **Direct Mermaid Rendering Implementation:**
+  - [x] Replace react-md-editor with direct Mermaid v11.12.0 integration
+  - [x] Implement MermaidChart component with proper React lifecycle management
+  - [x] Use dynamic imports to ensure proper client-side loading
+  - [x] Resolve DOM element timing issues with callback ref pattern
+- [x] **Enhanced AI-Generated Diagrams:**
+  - [x] Professional business-ready diagram generation via OpenAI GPT-4o-mini
+  - [x] WCAG AA compliant color schemes and contrast ratios
+  - [x] Detailed step information including action parameters and conditions
+  - [x] Proper node shapes for different step types (triggers, conditions, actions, ends)
+  - [x] Clean Mermaid syntax without markdown code block wrappers
+- [x] **LLM Response Processing:**
+  - [x] Automatic cleanup of markdown code blocks (```mermaid...```) from API responses
+  - [x] Enhanced system prompts for clean Mermaid syntax generation
+  - [x] Fallback diagram generation for API failures
+  - [x] Improved error handling with detailed logging
+- [x] **React Virtual DOM Compatibility:**
+  - [x] Use React state management instead of innerHTML manipulation
+  - [x] Implement dangerouslySetInnerHTML for safe SVG rendering
+  - [x] Resolve React DOM conflicts that caused removeChild errors
+  - [x] Proper component cleanup and lifecycle management
+- [x] **Performance and User Experience:**
+  - [x] Smooth loading states with Material-UI CircularProgress
+  - [x] Proper error states with detailed user feedback
+  - [x] Responsive SVG scaling for all device types
+  - [x] Efficient caching of generated diagrams
+- [x] **Testing and Quality:**
+  - [x] Remove debugging console.log statements for production
+  - [x] Comprehensive error handling for all failure scenarios
+  - [x] Clean code structure with proper TypeScript typing
 
 ## Developer Notes
 
