@@ -299,6 +299,7 @@ import "@fontsource/roboto/700.css";
 - **Schema Design**: Design schemas that align with existing Rails models for gradual migration
 - **Data Migration**: Plan for data migration scenarios between PostgreSQL and MongoDB
 - **Database Scripts**: **CRITICAL** - When user stories require new database objects (collections, indexes, migrations, etc.), ALL database operations must be scripted and stored in the `db-scripts/` folder at project root. Include collection creation scripts, index definitions, data migration scripts, and usage examples. Never create database objects directly in application code without corresponding scripts in `db-scripts/`.
+- **AI-Generated Documentation**: **CRITICAL** - All AI-generated documentation, implementation summaries, usage examples, and explanatory markdown files must be stored in the `ai-implementation-summaries/` folder at project root (outside `src/`). This includes documentation generated during development, implementation notes, and any markdown files that explain code or provide usage examples. Only executable scripts should remain in `db-scripts/` - all documentation belongs in `ai-implementation-summaries/`.
 
 ### Performance Considerations
 - Leverage Turbopack for development speed
