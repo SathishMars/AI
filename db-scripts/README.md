@@ -8,7 +8,7 @@ This folder contains database scripts for setting up and managing the MongoDB da
 ### Local MongoDB (Development)
 - **Environment**: `DATABASE_ENVIRONMENT=local`
 - **MongoDB Version**: 5.0 compatible
-- **Setup**: Use the setup script below
+- **Setup**: Use the initialization script below
 
 ### AWS DocumentDB (Production)
 - **Environment**: `DATABASE_ENVIRONMENT=documentdb`
@@ -18,39 +18,51 @@ This folder contains database scripts for setting up and managing the MongoDB da
 
 ## Scripts
 
-### setup-mongodb.js
-Sets up the local MongoDB database with the following components:
+### initialize-fresh-database.js ⭐ **RECOMMENDED**
+**Complete database initialization from scratch**
+Sets up the entire database with:
 - **Database**: `groupize-workflows`
-- **User**: `groupize_app` with password `gr0up!zeapP`
-- **Permissions**: Full read/write and admin permissions on `groupize-workflows` database
-- **Collection**: `workflowTemplates` with unique index on `name` field
+- **Collections**: `workflowTemplates` and `workflowConfiguratorConversations`
+- **Schema Validation**: Full JSON schema validation for both collections
+- **Indexes**: Optimized indexes for account+organization+name uniqueness and query performance
+- **Sample Data**: Demo account with organizations and sample templates
+- **User**: `groupize-workflows-app` with proper permissions
 
-## Usage for Local Development
+### workflow-template-collections.js
+**Individual collection setup** (for existing databases)
+Updates only the workflow template collections and indexes.
 
-### Method 1: Run the entire script
+## Usage for Fresh Database Setup
+
+### Method 1: Complete Fresh Setup (Recommended)
 ```bash
-mongosh < db-scripts/setup-mongodb.js
+mongosh < db-scripts/initialize-fresh-database.js
 ```
 
-### Method 2: Run commands manually in mongosh
-Open mongosh and run the following commands:
+This script will:
+1. Create the `groupize-workflows` database
+2. Set up all collections with proper schemas
+3. Create optimized indexes
+4. Add sample data and demo account
+5. Create database user with proper permissions
 
-```javascript
-// Switch to admin database
-use admin
+### Method 2: Individual Collection Setup (Existing Database)
+```bash
+mongosh < db-scripts/workflow-template-collections.js
+```
 
-// Create user
-db.createUser({
-  user: "groupize_app",
-  pwd: "gr0up!zeapP",
-  roles: [
-    { role: "readWrite", db: "groupize-workflows" },
-    { role: "dbAdmin", db: "groupize-workflows" }
-  ]
-})
+Use this for updating existing databases with new schema changes.
 
-// Switch to application database
-use groupize-workflows
+## Connection Examples
+
+### Local MongoDB
+```bash
+# Connect as application user
+mongosh mongodb://groupize-workflows-app:secure-password-change-in-production@localhost:27017/groupize-workflows
+
+# Connect as admin
+mongosh mongodb://localhost:27017/groupize-workflows
+```
 
 // Create collection and index
 db.createCollection("workflowTemplates")

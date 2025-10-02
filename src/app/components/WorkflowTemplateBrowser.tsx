@@ -1,7 +1,7 @@
 // src/app/components/WorkflowTemplateBrowser.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -33,7 +33,7 @@ import {
   Delete as DeleteIcon,
   Publish as PublishIcon
 } from '@mui/icons-material';
-import { workflowTemplateService } from '@/app/services/workflow-template-service';
+import { WorkflowTemplateService } from '@/app/services/workflow-template-service';
 import { 
   WorkflowTemplate, 
   TemplateListResponse,
@@ -62,19 +62,22 @@ export default function WorkflowTemplateBrowser({
   const [selectedTab, setSelectedTab] = useState(0);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<WorkflowTemplate | null>(null);
+  
+  // Create service instance
+  const [templateService] = useState(() => new WorkflowTemplateService());
 
   // Set account on service
   useEffect(() => {
-    workflowTemplateService.setAccount(account);
-  }, [account]);
+    templateService.setAccount(account);
+  }, [account, templateService]);
 
   // Load templates
-  const loadTemplates = async (filters: TemplateQueryFilters = {}) => {
+  const loadTemplates = useCallback(async (filters: TemplateQueryFilters = {}) => {
     try {
       setIsLoading(true);
       setError(null);
       
-      const response: TemplateListResponse = await workflowTemplateService.listTemplates(
+      const response: TemplateListResponse = await templateService.listTemplates(
         filters,
         1,
         100
@@ -87,12 +90,12 @@ export default function WorkflowTemplateBrowser({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [templateService]);
 
   // Initial load
   useEffect(() => {
     loadTemplates();
-  }, [account]);
+  }, [loadTemplates]);
 
   // Handle tab change
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
@@ -155,7 +158,7 @@ export default function WorkflowTemplateBrowser({
     
     try {
       setIsLoading(true);
-      await workflowTemplateService.deleteTemplate(
+      await templateService.deleteTemplate(
         templateToDelete.name,
         templateToDelete.version
       );
@@ -176,7 +179,7 @@ export default function WorkflowTemplateBrowser({
   const handlePublish = async (template: WorkflowTemplate) => {
     try {
       setIsLoading(true);
-      await workflowTemplateService.publishTemplate(template.name, template.version);
+      await templateService.publishTemplate(template.name, template.version);
       
       // Reload templates
       await loadTemplates();

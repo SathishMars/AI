@@ -215,13 +215,3 @@ export class WorkflowTemplateService {
     return Array.from(names).sort();
   }
 }
-
-// Export a default instance
-export const workflowTemplateService = new WorkflowTemplateService();
-
-// Export helper function to create service with custom account
-export function createWorkflowTemplateService(account: string): WorkflowTemplateService {
-  const service = new WorkflowTemplateService();
-  service.setAccount(account);
-  return service;
-}
