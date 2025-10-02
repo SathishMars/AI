@@ -51,3 +51,6 @@ next-env.d.ts
 
 # AI implementation summaries (development notes)
 ai-implementation-summaries/
+
+# User stories and epics (development planning)
+user-stories/
