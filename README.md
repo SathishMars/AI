@@ -1,36 +1,318 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Groupize Workflows
 
-## Getting Started
+A Next.js 15+ embeddable frontend application for workflow automation with AI-powered workflow generation. Built to gradually migrate features from a Ruby on Rails monolith while maintaining independent functionality.
 
-First, run the development server:
+## 🚀 Tech Stack
+
+- **Next.js 15** with App Router and Turbopack
+- **TypeScript** with strict mode
+- **Material-UI (MUI) v7** for components
+- **Tailwind CSS v4** for styling
+- **MongoDB 5.0** (local development) / **AWS DocumentDB** (production)
+- **AI Integration**: OpenAI GPT and Anthropic Claude
+- **Workflow Engine**: json-rules-engine v7
+- **Testing**: Jest with React Testing Library
+
+## 🛠️ Development Setup
+
+### Prerequisites
+
+- **Node.js 18+** (recommended: Node.js 20)
+- **npm** (comes with Node.js)
+- **MongoDB 5.0** for local development
+- **Git** for version control
+
+### 1. Clone and Install Dependencies
 
 ```bash
+# Clone the repository
+git clone <repository-url>
+cd groupize-workflows
+
+# Install dependencies (use legacy peer deps flag if needed)
+npm install --legacy-peer-deps
+
+# If you encounter dependency conflicts, try:
+npm install --legacy-peer-deps --force
+```
+
+> **Note**: The `--legacy-peer-deps` flag may be required due to version conflicts between OpenAI SDK, Anthropic SDK, and Zod versions.
+
+### 2. Environment Configuration
+
+Copy the environment template and configure your settings:
+
+```bash
+# Copy environment template
+cp .env.example .env.local
+
+# Edit .env.local with your configuration
+nano .env.local  # or use your preferred editor
+```
+
+#### Required Environment Variables
+
+```bash
+# Database Configuration
+DATABASE_ENVIRONMENT=local  # 'local' for MongoDB, 'documentdb' for AWS DocumentDB
+
+# MongoDB (Local Development)
+MONGODB_HOST=localhost
+MONGODB_PORT=27017
+MONGODB_USER=groupize_app
+MONGODB_PASSWORD=gr0up!zeapP
+MONGODB_DATABASE=groupize-workflows
+
+# AI API Keys (Required)
+OPENAI_API_KEY=sk-your-openai-api-key-here
+ANTHROPIC_API_KEY=sk-ant-your-anthropic-api-key-here
+
+# Application Settings
+NODE_ENV=development
+NEXT_PUBLIC_APP_ENV=development
+NEXT_PUBLIC_ENABLE_MOCK_DATA=true
+```
+
+### 3. Database Setup
+
+#### Option A: Local MongoDB Setup
+
+1. **Install MongoDB 5.0**:
+   ```bash
+   # macOS (using Homebrew)
+   brew tap mongodb/brew
+   brew install mongodb-community@5.0
+   
+   # Ubuntu/Debian
+   wget -qO - https://www.mongodb.org/static/pgp/server-5.0.asc | sudo apt-key add -
+   sudo apt-get install -y mongodb-org=5.0.*
+   
+   # Windows: Download from MongoDB website
+   ```
+
+2. **Start MongoDB**:
+   ```bash
+   # macOS/Linux
+   brew services start mongodb/brew/mongodb-community@5.0
+   # or
+   sudo systemctl start mongod
+   
+   # Windows: Start as Windows Service or run mongod.exe
+   ```
+
+3. **Set up Database and User**:
+   ```bash
+   # Run the setup script
+   mongosh < db-scripts/setup-mongodb.js
+   
+   # Or run commands manually in mongosh:
+   mongosh
+   ```
+
+4. **Verify Connection**:
+   ```bash
+   # Test the connection
+   npm test mongodb-connection
+   ```
+
+#### Option B: MongoDB Atlas (Cloud)
+
+1. Create a MongoDB Atlas account
+2. Create a cluster (free tier available)
+3. Get connection string and update `.env.local`
+4. Update `DATABASE_ENVIRONMENT=local` and connection details
+
+### 4. Development Server
+
+Start the development server:
+
+```bash
+# Start with Turbopack (recommended)
 npm run dev
-# or
+
+# Alternative development commands
 yarn dev
-# or
 pnpm dev
-# or
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to view the application.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 🧪 Testing
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Running Tests
 
-## Learn More
+```bash
+# Run all tests
+npm test
 
-To learn more about Next.js, take a look at the following resources:
+# Run tests in watch mode
+npm run test:watch
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Run tests with coverage
+npm run test:coverage
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# Run specific test file
+npm test mongodb-connection
+```
 
-## Deploy on Vercel
+### Test Coverage Requirements
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Minimum 90% code coverage** required
+- All components must have unit tests
+- Database utilities must have integration tests
+- API routes must have endpoint tests
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Test Structure
+
+```
+src/test/
+├── app/
+│   ├── components/     # Component tests
+│   ├── utils/         # Utility function tests
+│   └── api/           # API route tests
+└── __mocks__/         # Mock implementations
+```
+
+## 🏗️ Project Structure
+
+```
+groupize-workflows/
+├── src/
+│   ├── app/                  # Next.js App Router
+│   │   ├── components/       # Reusable components
+│   │   ├── utils/           # Utility functions
+│   │   ├── validators/      # Form validation (Zod)
+│   │   ├── types/           # TypeScript types
+│   │   └── api/             # API routes
+│   └── test/                # Test files (mirrors src structure)
+├── db-scripts/              # Database setup scripts
+├── user-stories/            # User stories and epics
+├── ai-implementation-summaries/  # AI implementation notes
+├── docs/                    # Additional documentation
+└── public/                  # Static assets
+```
+
+## 🔧 Development Guidelines
+
+### Code Quality
+
+- **TypeScript**: Strict mode enabled - handle all type errors
+- **Linting**: Run `npm run lint` before committing
+- **Testing**: Maintain 90%+ test coverage
+- **Git**: Use conventional commit messages (no emojis)
+
+### Database Usage
+
+**CRITICAL**: Always use the connection pool for database operations:
+
+```typescript
+// ✅ Correct way - Always use connection pool
+import { getMongoDatabase } from '@/app/utils/mongodb-connection';
+
+async function example() {
+  const db = await getMongoDatabase();
+  const collection = db.collection('workflowTemplates');
+  // ... your operations
+}
+
+// ❌ Never create direct connections
+```
+
+### Component Development
+
+1. Check existing components in `src/app/components/` before creating new ones
+2. Use MUI v7 components as foundation
+3. Use Tailwind v4 for additional styling
+4. Ensure responsiveness (phone, tablet, desktop)
+5. Write comprehensive tests
+
+## 🚀 Production Deployment
+
+### AWS DocumentDB Setup
+
+For production, the application uses AWS DocumentDB:
+
+```bash
+# Update environment variables
+DATABASE_ENVIRONMENT=documentdb
+DOCUMENTDB_HOST=your-cluster.cluster-xyz.us-east-1.docdb.amazonaws.com
+DOCUMENTDB_USER=your-username
+DOCUMENTDB_PASSWORD=your-password
+```
+
+### Build Commands
+
+```bash
+# Production build
+npm run build
+
+# Start production server
+npm start
+
+# Lint code
+npm run lint
+```
+
+## 📚 Documentation
+
+- **Database Setup**: `db-scripts/README.md`
+- **Environment Config**: `docs/environment-configuration.md`
+- **Usage Examples**: `db-scripts/mongodb-usage-examples.md`
+- **User Stories**: `user-stories/` directory
+- **Implementation Notes**: `ai-implementation-summaries/` directory
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+1. **Dependency Conflicts**:
+   ```bash
+   rm -rf node_modules package-lock.json
+   npm install --legacy-peer-deps
+   ```
+
+2. **MongoDB Connection Issues**:
+   - Ensure MongoDB is running: `brew services start mongodb-community@5.0`
+   - Check connection string in `.env.local`
+   - Verify user credentials: `mongosh "mongodb://groupize_app:gr0up!zeapP@localhost:27017/groupize-workflows"`
+
+3. **Test Failures**:
+   - Ensure all environment variables are set
+   - Run tests with: `npm test -- --verbose`
+
+4. **Build Issues**:
+   - Clear Next.js cache: `rm -rf .next`
+   - Rebuild: `npm run build`
+
+### Environment Switching
+
+```bash
+# Switch to local MongoDB
+DATABASE_ENVIRONMENT=local
+
+# Switch to AWS DocumentDB
+DATABASE_ENVIRONMENT=documentdb
+```
+
+## 🤝 Contributing
+
+1. Create a feature branch
+2. Make your changes
+3. Write/update tests
+4. Ensure all tests pass: `npm test`
+5. Run linting: `npm run lint`
+6. Commit with descriptive message
+7. Create pull request
+
+## 📄 License
+
+[Add your license information here]
+
+## 🔗 Additional Resources
+
+- [Next.js Documentation](https://nextjs.org/docs)
+- [Material-UI Documentation](https://mui.com/)
+- [MongoDB Documentation](https://docs.mongodb.com/)
+- [TypeScript Documentation](https://www.typescriptlang.org/docs/)
+- [Jest Testing Framework](https://jestjs.io/docs/getting-started)

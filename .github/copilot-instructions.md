@@ -292,6 +292,7 @@ import "@fontsource/roboto/700.css";
 - **Error Handling**: Always wrap database operations in try-catch blocks with proper MongoDB error handling
 - **Schema Design**: Design schemas that align with existing Rails models for gradual migration
 - **Data Migration**: Plan for data migration scenarios between PostgreSQL and MongoDB
+- **Database Scripts**: **CRITICAL** - When user stories require new database objects (collections, indexes, migrations, etc.), ALL database operations must be scripted and stored in the `db-scripts/` folder at project root. Include collection creation scripts, index definitions, data migration scripts, and usage examples. Never create database objects directly in application code without corresponding scripts in `db-scripts/`.
 
 ### Performance Considerations
 - Leverage Turbopack for development speed

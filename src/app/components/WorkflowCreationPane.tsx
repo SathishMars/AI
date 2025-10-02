@@ -35,6 +35,7 @@ import { createEmptyConversationState, ConversationStateManager } from '@/app/ut
 import { SmartAutocomplete } from './ConversationPane';
 import { populateFunctionSchemas, DEFAULT_REFERENCE_DATA } from '@/app/utils/function-schemas';
 import { ConversationHistoryMessage } from '@/app/utils/llm-workflow-generator';
+import { useAccount } from '@/app/hooks/useAccount';
 
 // Memoized message item component to prevent unnecessary re-renders
 const MessageItem = memo(({ message, isStreaming }: { message: ConversationMessage; isStreaming: boolean }) => (
@@ -419,8 +420,6 @@ export default function WorkflowCreationPane({
       if (!response.ok) {
         throw new Error(result.error || 'Failed to generate workflow');
       }
-      
-      console.log('📊 API Response:', result);
       
       // Update workflow in the right pane
       if (result.workflow && onWorkflowChange) {
