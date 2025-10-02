@@ -18,7 +18,13 @@ This folder contains database scripts for setting up and managing the MongoDB da
 
 ## Scripts
 
-### initialize-fresh-database.js ⭐ **RECOMMENDED**
+### Execution Order
+Scripts are numbered to indicate their proper execution sequence:
+
+1. **01-initialize-fresh-database.js** - Fresh database setup (new installations)
+2. **02-workflow-template-collections.js** - Collection updates (existing databases)
+
+### 01-initialize-fresh-database.js ⭐ **RECOMMENDED**
 **Complete database initialization from scratch**
 Sets up the entire database with:
 - **Database**: `groupize-workflows`
@@ -28,7 +34,7 @@ Sets up the entire database with:
 - **Sample Data**: Demo account with organizations and sample templates
 - **User**: `groupize-workflows-app` with proper permissions
 
-### workflow-template-collections.js
+### 02-workflow-template-collections.js
 **Individual collection setup** (for existing databases)
 Updates only the workflow template collections and indexes.
 
@@ -36,7 +42,7 @@ Updates only the workflow template collections and indexes.
 
 ### Method 1: Complete Fresh Setup (Recommended)
 ```bash
-mongosh < db-scripts/initialize-fresh-database.js
+mongosh < db-scripts/01-initialize-fresh-database.js
 ```
 
 This script will:
@@ -48,10 +54,21 @@ This script will:
 
 ### Method 2: Individual Collection Setup (Existing Database)
 ```bash
-mongosh < db-scripts/workflow-template-collections.js
+mongosh < db-scripts/02-workflow-template-collections.js
 ```
 
 Use this for updating existing databases with new schema changes.
+
+### Method 3: Run All Scripts in Order (Advanced)
+```bash
+# Execute all scripts in proper sequence
+for script in db-scripts/0*.js; do
+  echo "Executing: $script"
+  mongosh < "$script"
+done
+```
+
+This method runs all numbered scripts in order, useful for complex setups or migrations.
 
 ## Connection Examples
 
