@@ -196,7 +196,7 @@ db.createCollection('workflowConfiguratorConversations', {
   validator: {
     $jsonSchema: {
       bsonType: "object",
-      required: ["account", "organization", "sessionId", "status", "metadata"],
+      required: ["account", "workflowTemplateName", "conversationId", "sessionInfo"],
       properties: {
         account: {
           bsonType: "string",
@@ -204,18 +204,21 @@ db.createCollection('workflowConfiguratorConversations', {
         },
         organization: {
           bsonType: "string",
-          description: "Organization identifier within account"
+          description: "Organization identifier within account (optional - null for account-wide templates)"
         },
-        sessionId: {
+        workflowTemplateName: {
           bsonType: "string",
-          description: "Unique session identifier for the conversation"
+          description: "Name of the workflow template this conversation belongs to"
         },
-        status: {
+        conversationId: {
           bsonType: "string",
-          enum: ["active", "completed", "abandoned", "error"],
-          description: "Current status of the conversation"
+          description: "Unique conversation identifier"
         },
-        conversationHistory: {
+        sessionInfo: {
+          bsonType: "object",
+          description: "Session information for the conversation"
+        },
+        messages: {
           bsonType: "array",
           description: "Array of conversation messages",
           items: {
@@ -274,30 +277,39 @@ db.createCollection('workflowConfiguratorConversations', {
 // Create indexes for workflowConfiguratorConversations collection
 print('📊 Creating indexes for workflowConfiguratorConversations...');
 
-// Primary lookup index
+// Primary lookup index - one conversation per template per account/organization
 db.workflowConfiguratorConversations.createIndex(
-  { account: 1, organization: 1, sessionId: 1 },
+  { account: 1, organization: 1, workflowTemplateName: 1, conversationId: 1 },
   { 
-    name: "idx_account_org_session",
+    name: "idx_account_org_template_conversation",
     unique: true,
     background: true 
   }
 );
 
-// Status and timestamp queries
+// Template-based lookup (organization can be null for account-wide templates)
 db.workflowConfiguratorConversations.createIndex(
-  { account: 1, organization: 1, status: 1, "metadata.createdAt": -1 },
+  { account: 1, workflowTemplateName: 1, "sessionInfo.lastActivity": -1 },
   { 
-    name: "idx_account_org_status_created",
+    name: "idx_account_template_activity",
+    background: true 
+  }
+);
+
+// Session activity queries
+db.workflowConfiguratorConversations.createIndex(
+  { account: 1, organization: 1, "sessionInfo.isActive": 1, "sessionInfo.startedAt": -1 },
+  { 
+    name: "idx_account_org_session_activity",
     background: true 
   }
 );
 
 // User activity tracking
 db.workflowConfiguratorConversations.createIndex(
-  { "metadata.userId": 1, "metadata.createdAt": -1 },
+  { "sessionInfo.userId": 1, "sessionInfo.startedAt": -1 },
   { 
-    name: "idx_user_created",
+    name: "idx_user_activity",
     background: true 
   }
 );

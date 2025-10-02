@@ -142,7 +142,8 @@ export interface ConversationRetentionPolicy {
 export interface ConfiguratorConversation {
   _id?: string; // MongoDB ObjectId
   account: string; // Account identifier matching template
-  templateName: string; // Links to WorkflowTemplate.name within account
+  organization?: string | null; // Organization identifier within account (null for account-wide templates)
+  workflowTemplateName: string; // Name of the workflow template this conversation belongs to
   conversationId: string; // Unique conversation identifier
   messages: ConfiguratorMessage[];
   sessionInfo: ConversationSessionInfo;
@@ -152,7 +153,8 @@ export interface ConfiguratorConversation {
 // Conversation creation input
 export interface CreateConversationInput {
   account: string;
-  templateName: string;
+  organization?: string | null; // Organization identifier (null for account-wide templates)
+  workflowTemplateName: string; // Name of the workflow template
   conversationId?: string; // Generated if not provided
   initialMessage?: ConfiguratorMessage;
   userAgent?: string;
@@ -161,7 +163,8 @@ export interface CreateConversationInput {
 // Message addition input
 export interface AddMessageInput {
   account: string;
-  templateName: string;
+  organization?: string | null; // Organization identifier (null for account-wide templates)
+  workflowTemplateName: string; // Name of the workflow template
   conversationId?: string;
   role: ConfiguratorMessageRole;
   content: string;
@@ -251,7 +254,8 @@ export const ConfiguratorMessageSchema = z.object({
 export const ConfiguratorConversationSchema = z.object({
   _id: z.string().optional(),
   account: z.string().min(1).max(100),
-  templateName: z.string().min(1),
+  organization: z.string().nullable().optional(), // Organization identifier (null for account-wide templates)
+  workflowTemplateName: z.string().min(1), // Name of the workflow template this conversation belongs to
   conversationId: z.string().min(1),
   messages: z.array(ConfiguratorMessageSchema),
   sessionInfo: z.object({

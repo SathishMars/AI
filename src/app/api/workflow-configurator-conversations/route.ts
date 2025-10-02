@@ -45,11 +45,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Get account from headers
+    // Get account and organization from headers
     const account = request.headers.get('x-account') || 'default-account';
+    const organization = request.headers.get('x-organization') || null; // null for account-wide templates
 
     // Get conversation history
-    const conversations = await getConversationHistory(account, templateName, limit);
+    const conversations = await getConversationHistory(account, templateName, organization, limit);
 
     return NextResponse.json({
       success: true,
@@ -90,18 +91,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const body = await request.json();
     const { action, ...data } = body;
 
-    // Get account from headers or body
+    // Get account and organization from headers or body
     const account = body.account || request.headers.get('x-account') || 'default-account';
+    const organization = body.organization || request.headers.get('x-organization') || null;
 
     switch (action) {
       case 'create_conversation':
-        return await handleCreateConversation({ ...data, account });
+        return await handleCreateConversation({ ...data, account, organization });
       
       case 'add_message':
-        return await handleAddMessage({ ...data, account });
+        return await handleAddMessage({ ...data, account, organization });
       
       case 'update_activity':
-        return await handleUpdateActivity({ ...data, account });
+        return await handleUpdateActivity({ ...data, account, organization });
       
       default:
         return NextResponse.json(
@@ -140,8 +142,9 @@ async function handleCreateConversation(data: {
   initialMessage?: ConfiguratorMessage;
   userAgent?: string;
   account: string;
+  organization?: string | null;
 }): Promise<NextResponse> {
-  const { templateName, conversationId, initialMessage, userAgent, account } = data;
+  const { templateName, conversationId, initialMessage, userAgent, account, organization } = data;
 
   if (!templateName) {
     return NextResponse.json(
@@ -153,7 +156,8 @@ async function handleCreateConversation(data: {
   // Create conversation
   const conversation = await createConfiguratorConversation({
     account,
-    templateName,
+    organization: organization || null,
+    workflowTemplateName: templateName,
     conversationId,
     initialMessage,
     userAgent
@@ -175,8 +179,9 @@ async function handleAddMessage(data: {
   content?: string;
   metadata?: ConfiguratorMessageMetadata;
   account: string;
+  organization?: string | null;
 }): Promise<NextResponse> {
-  const { templateName, conversationId, role, content, metadata, account } = data;
+  const { templateName, conversationId, role, content, metadata, account, organization } = data;
 
   if (!templateName) {
     return NextResponse.json(
@@ -202,7 +207,8 @@ async function handleAddMessage(data: {
   // Add message to conversation
   const message = await addMessageToConversation({
     account,
-    templateName,
+    organization: organization || null,
+    workflowTemplateName: templateName,
     conversationId,
     role: role as ConfiguratorMessageRole,
     content,
@@ -222,8 +228,9 @@ async function handleUpdateActivity(data: {
   templateName?: string;
   conversationId?: string;
   account: string;
+  organization?: string | null;
 }): Promise<NextResponse> {
-  const { templateName, conversationId, account } = data;
+  const { templateName, conversationId, account, organization } = data;
 
   if (!templateName) {
     return NextResponse.json(
@@ -240,7 +247,7 @@ async function handleUpdateActivity(data: {
   }
 
   // Update conversation activity
-  await updateConversationActivity(account, templateName, conversationId);
+  await updateConversationActivity(account, templateName, conversationId, organization);
 
   return NextResponse.json({
     success: true,

@@ -505,14 +505,14 @@ describe('Workflow Template Database Operations', () => {
       it('should create a new conversation successfully', async () => {
         const input = {
           account: 'test-account',
-          templateName: 'test-workflow',
+          workflowTemplateName: 'test-workflow',
           conversationId: 'conv-123',
           userAgent: 'test-browser'
         };
 
         const result = await createConfiguratorConversation(input);
 
-        expect(result.templateName).toBe(input.templateName);
+        expect(result.workflowTemplateName).toBe(input.workflowTemplateName);
         expect(result.conversationId).toBe(input.conversationId);
         expect(result._id).toBe('mock-conversation-id');
         expect(mockConversationsCollection.insertOne).toHaveBeenCalled();
@@ -523,7 +523,7 @@ describe('Workflow Template Database Operations', () => {
       it('should add message to existing conversation', async () => {
         const mockConversation = {
           _id: 'conv-id',
-          templateName: 'test-workflow',
+          workflowTemplateName: 'test-workflow',
           conversationId: 'conv-123',
           messages: []
         };
@@ -532,7 +532,7 @@ describe('Workflow Template Database Operations', () => {
 
         const input = {
           account: 'test-account',
-          templateName: 'test-workflow',
+          workflowTemplateName: 'test-workflow',
           conversationId: 'conv-123',
           role: 'user' as const,
           content: 'Hello, aime!'
@@ -550,7 +550,7 @@ describe('Workflow Template Database Operations', () => {
 
         const input = {
           account: 'test-account',
-          templateName: 'test-workflow',
+          workflowTemplateName: 'test-workflow',
           conversationId: 'conv-123',
           role: 'user' as const,
           content: 'Hello, aime!'
@@ -568,7 +568,7 @@ describe('Workflow Template Database Operations', () => {
         const mockConversations = [
           {
             _id: { toString: () => 'conv-1' },
-            templateName: 'test-workflow',
+            workflowTemplateName: 'test-workflow',
             conversationId: 'conv-1',
             messages: []
           }
@@ -582,10 +582,10 @@ describe('Workflow Template Database Operations', () => {
           })
         });
 
-        const result = await getConversationHistory('test-account', 'test-workflow', 50);
+        const result = await getConversationHistory('test-account', 'test-workflow', null, 50);
 
         expect(result).toHaveLength(1);
-        expect(result[0].templateName).toBe('test-workflow');
+        expect(result[0].workflowTemplateName).toBe('test-workflow');
       });
     });
   });

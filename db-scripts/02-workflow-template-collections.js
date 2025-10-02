@@ -219,6 +219,137 @@ if (accountUpdateResult.modifiedCount > 0) {
 }
 
 // ===========================================
+// 6. Update workflowConfiguratorConversations Collection Schema
+// ===========================================
+
+print('\n💬 Updating workflowConfiguratorConversations collection schema...');
+
+// Check if conversation collection exists
+if (!collections.includes('workflowConfiguratorConversations')) {
+  print('ℹ️  workflowConfiguratorConversations collection does not exist - will be created on first use');
+} else {
+  const conversationCollection = db.workflowConfiguratorConversations;
+  
+  // Add workflowTemplateName field to existing conversations
+  print('📝 Adding workflowTemplateName field to existing conversations...');
+  
+  // Since this is a breaking change, we need to handle existing data carefully
+  const conversationCount = conversationCollection.countDocuments();
+  if (conversationCount > 0) {
+    print(`⚠️  Found ${conversationCount} existing conversations. Manual migration required:`);
+    print('   1. Update existing conversations to include workflowTemplateName field');
+    print('   2. Map existing sessionId to appropriate template names');
+    print('   3. Drop and recreate unique indexes');
+    print('   For now, we will add the field as optional and let application handle migration');
+    
+    // Add workflowTemplateName field (initially null) to existing conversations
+    const migrationResult = conversationCollection.updateMany(
+      { workflowTemplateName: { $exists: false } },
+      { $set: { workflowTemplateName: null } }
+    );
+    print(`✅ Added workflowTemplateName field to ${migrationResult.modifiedCount} conversations`);
+  }
+  
+  // Update collection validator
+  try {
+    db.runCommand({
+      collMod: "workflowConfiguratorConversations",
+      validator: {
+        $jsonSchema: {
+          bsonType: "object",
+          required: ["account", "workflowTemplateName", "conversationId", "sessionInfo"],
+          properties: {
+            account: {
+              bsonType: "string",
+              description: "Account identifier for the conversation"
+            },
+            organization: {
+              bsonType: "string",
+              description: "Organization identifier within account (optional - null for account-wide templates)"
+            },
+            workflowTemplateName: {
+              bsonType: "string",
+              description: "Name of the workflow template this conversation belongs to"
+            },
+            conversationId: {
+              bsonType: "string",
+              description: "Unique conversation identifier"
+            },
+            messages: {
+              bsonType: "array",
+              description: "Array of conversation messages"
+            },
+            sessionInfo: {
+              bsonType: "object",
+              description: "Session information for the conversation"
+            },
+            retentionPolicy: {
+              bsonType: "object",
+              description: "Conversation retention policy"
+            }
+          }
+        }
+      }
+    });
+    print('✅ Updated workflowConfiguratorConversations schema validator');
+  } catch (error) {
+    print('⚠️ Schema validator update warning:', error.message);
+  }
+  
+  // Update indexes for conversations
+  print('📊 Updating conversation indexes...');
+  
+  // Remove old indexes
+  try {
+    conversationCollection.dropIndex("idx_account_org_session");
+    print('✅ Dropped old index: idx_account_org_session');
+  } catch (error) {
+    print('ℹ️  Old index not found: idx_account_org_session');
+  }
+  
+  try {
+    conversationCollection.dropIndex("idx_account_org_status_created");
+    print('✅ Dropped old index: idx_account_org_status_created');
+  } catch (error) {
+    print('ℹ️  Old index not found: idx_account_org_status_created');
+  }
+  
+  // Create new indexes
+  createIndexSafely(conversationCollection,
+    { account: 1, organization: 1, workflowTemplateName: 1, conversationId: 1 },
+    { 
+      name: "idx_account_org_template_conversation",
+      unique: true,
+      background: true 
+    }
+  );
+  
+  createIndexSafely(conversationCollection,
+    { account: 1, workflowTemplateName: 1, "sessionInfo.lastActivity": -1 },
+    { 
+      name: "idx_account_template_activity",
+      background: true 
+    }
+  );
+  
+  createIndexSafely(conversationCollection,
+    { account: 1, organization: 1, "sessionInfo.isActive": 1, "sessionInfo.startedAt": -1 },
+    { 
+      name: "idx_account_org_session_activity",
+      background: true 
+    }
+  );
+  
+  createIndexSafely(conversationCollection,
+    { "sessionInfo.userId": 1, "sessionInfo.startedAt": -1 },
+    { 
+      name: "idx_user_activity",
+      background: true 
+    }
+  );
+}
+
+// ===========================================
 // 6. Add Sample Template if Database is Empty
 // ===========================================
 

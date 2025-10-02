@@ -361,7 +361,7 @@ export async function getWorkflowTemplate(account: string, name: string): Promis
 
     // Get conversation history
     const conversations = await conversationsCollection
-      .find({ account, templateName: name })
+      .find({ account, workflowTemplateName: name })
       .sort({ 'sessionInfo.startedAt': -1 })
       .toArray();
 
@@ -551,7 +551,8 @@ export async function createConfiguratorConversation(
     // Build conversation document (without _id for insertion)
     const conversationDoc = {
       account: input.account,
-      templateName: input.templateName,
+      organization: input.organization || null, // Set to null if not provided for account-wide templates
+      workflowTemplateName: input.workflowTemplateName,
       conversationId,
       messages: input.initialMessage ? [input.initialMessage] : [],
       sessionInfo: {
@@ -624,7 +625,8 @@ export async function addMessageToConversation(
     // Find conversation (create if not exists)
     const conversation = await collection.findOne({ 
       account: input.account,
-      templateName: input.templateName,
+      organization: input.organization || null,
+      workflowTemplateName: input.workflowTemplateName,
       conversationId: input.conversationId || { $exists: true }
     });
 
@@ -632,7 +634,8 @@ export async function addMessageToConversation(
       // Create new conversation
       await createConfiguratorConversation({
         account: input.account,
-        templateName: input.templateName,
+        organization: input.organization,
+        workflowTemplateName: input.workflowTemplateName,
         conversationId: input.conversationId,
         initialMessage: message
       });
@@ -680,15 +683,27 @@ export async function addMessageToConversation(
  */
 export async function getConversationHistory(
   account: string,
-  templateName: string,
+  workflowTemplateName: string,
+  organization?: string | null,
   limit: number = 50
 ): Promise<ConfiguratorConversation[]> {
   try {
     const db = await getMongoDatabase();
     const collection = db.collection(COLLECTION_CONVERSATIONS);
 
+    // Build query filter
+    const filter: Record<string, string | null> = { 
+      account, 
+      workflowTemplateName
+    };
+    
+    // Include organization filter only if provided (otherwise get all conversations for template)
+    if (organization !== undefined) {
+      filter.organization = organization;
+    }
+
     const conversations = await collection
-      .find({ account, templateName })
+      .find(filter)
       .sort({ 'sessionInfo.lastActivity': -1 })
       .limit(limit)
       .toArray();
@@ -713,15 +728,28 @@ export async function getConversationHistory(
  */
 export async function updateConversationActivity(
   account: string,
-  templateName: string,
-  conversationId: string
+  workflowTemplateName: string,
+  conversationId: string,
+  organization?: string | null
 ): Promise<void> {
   try {
     const db = await getMongoDatabase();
     const collection = db.collection(COLLECTION_CONVERSATIONS);
 
+    // Build filter
+    const filter: Record<string, string | null> = { 
+      account, 
+      workflowTemplateName, 
+      conversationId 
+    };
+    
+    // Include organization if provided
+    if (organization !== undefined) {
+      filter.organization = organization;
+    }
+
     await collection.updateOne(
-      { account, templateName, conversationId },
+      filter,
       {
         $set: {
           'sessionInfo.lastActivity': new Date(),
