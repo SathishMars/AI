@@ -33,9 +33,13 @@ db.createCollection('workflowTemplates', {
           bsonType: "string",
           description: "Account identifier for multi-tenancy"
         },
+        organization: {
+          bsonType: "string",
+          description: "Organization identifier within account (optional - if null, template is shared across all organizations in account)"
+        },
         name: {
           bsonType: "string",
-          description: "Template name (unique within account)"
+          description: "Template name (unique within account+organization combination)"
         },
         status: {
           bsonType: "string",
@@ -126,12 +130,24 @@ db.workflowTemplates.createIndex(
   }
 );
 
-// Unique constraint for account + name + version combination
+// Unique constraint for account + organization + name + version combination
+// This handles both organization-specific templates and account-wide templates (organization: null)
+db.workflowTemplates.createIndex(
+  { account: 1, organization: 1, name: 1, version: 1 },
+  { 
+    name: "idx_account_org_name_version_unique",
+    unique: true,
+    background: true 
+  }
+);
+
+// Additional partial index for account-wide templates (organization is null)
 db.workflowTemplates.createIndex(
   { account: 1, name: 1, version: 1 },
   { 
-    name: "idx_account_name_version_unique",
+    name: "idx_account_name_version_null_org",
     unique: true,
+    partialFilterExpression: { organization: { $eq: null } },
     background: true 
   }
 );
@@ -141,6 +157,15 @@ db.workflowTemplates.createIndex(
   { account: 1, status: 1, "metadata.createdAt": -1 },
   { 
     name: "idx_account_status_created",
+    background: true 
+  }
+);
+
+// Organization-based queries index (includes null organization for account-wide templates)
+db.workflowTemplates.createIndex(
+  { account: 1, organization: 1, status: 1, "metadata.createdAt": -1 },
+  { 
+    name: "idx_account_org_status_created",
     background: true 
   }
 );

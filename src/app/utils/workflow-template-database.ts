@@ -410,6 +410,11 @@ export async function listWorkflowTemplates(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const query: any = { account };
     
+    // Add organization filter if specified in filters
+    if (filters.organization !== undefined) {
+      query.organization = filters.organization; // null for account-wide, string for org-specific
+    }
+    
     if (filters.status) {
       if (Array.isArray(filters.status)) {
         query.status = { $in: filters.status };

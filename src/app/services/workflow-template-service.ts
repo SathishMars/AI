@@ -15,13 +15,16 @@ import {
 export class WorkflowTemplateService {
   private baseUrl: string;
   private defaultAccount: string;
+  private defaultOrganization: string | null;
 
   constructor(
     baseUrl: string = '/api/workflow-templates',
-    defaultAccount: string = 'default-account'
+    defaultAccount: string = 'default-account',
+    defaultOrganization: string | null = null
   ) {
     this.baseUrl = baseUrl;
     this.defaultAccount = defaultAccount;
+    this.defaultOrganization = defaultOrganization;
   }
 
   /**
@@ -32,13 +35,26 @@ export class WorkflowTemplateService {
   }
 
   /**
+   * Set the organization context for all operations
+   */
+  setOrganization(organization: string | null) {
+    this.defaultOrganization = organization;
+  }
+
+  /**
    * Get common headers for API requests
    */
   private getHeaders(): Record<string, string> {
-    return {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'x-account': this.defaultAccount,
     };
+    
+    if (this.defaultOrganization) {
+      headers['x-organization'] = this.defaultOrganization;
+    }
+    
+    return headers;
   }
 
   /**

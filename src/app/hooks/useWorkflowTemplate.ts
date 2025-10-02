@@ -9,8 +9,8 @@ import {
   TemplateResolutionResult 
 } from '@/app/types/workflow-template';
 import { WorkflowJSON } from '@/app/types/workflow';
-import { workflowTemplateService } from '@/app/services/workflow-template-service';
-import { useAccount } from '@/app/contexts/UnifiedUserContext';
+import { WorkflowTemplateService } from '@/app/services/workflow-template-service';
+import { useUnifiedUserContext } from '@/app/contexts/UnifiedUserContext';
 
 interface UseWorkflowTemplateOptions {
   templateName?: string;
@@ -50,8 +50,12 @@ interface UseWorkflowTemplateReturn {
 
 export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): UseWorkflowTemplateReturn {
   const { templateName, autoLoad = true } = options;
-  const { account, isLoading: accountLoading } = useAccount();
+  const { account, currentOrganization, isLoading: contextLoading } = useUnifiedUserContext();
   const accountId = account?.id;
+  const organizationId = currentOrganization?.id || null;
+  
+  // Create service instance with current context
+  const [templateService] = useState(() => new WorkflowTemplateService());
   
   // State
   const [template, setTemplate] = useState<WorkflowTemplate | null>(null);
@@ -61,12 +65,15 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Set account on service
+  // Set account and organization on service
   useEffect(() => {
     if (accountId) {
-      workflowTemplateService.setAccount(accountId);
+      templateService.setAccount(accountId);
     }
-  }, [accountId]);
+    if (organizationId !== undefined) {
+      templateService.setOrganization(organizationId);
+    }
+  }, [accountId, organizationId, templateService]);
   
   // Computed state
   const isNewTemplate = !template;
@@ -80,7 +87,7 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
       setIsLoading(true);
       setError(null);
       
-      const result = await workflowTemplateService.getTemplate(name);
+      const result = await templateService.getTemplate(name);
       setTemplateResult(result);
       setTemplate(result.template);
       
@@ -98,22 +105,32 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [templateService]);
   
-    // Auto-load template if specified (wait for account to be loaded)
+      // Auto-load template on mount if specified
   useEffect(() => {
-    if (autoLoad && templateName && accountId && !accountLoading) {
+    if (autoLoad && templateName && accountId && !contextLoading) {
       loadTemplate(templateName);
     }
-  }, [autoLoad, templateName, accountId, accountLoading, loadTemplate]);
+  }, [autoLoad, templateName, accountId, contextLoading, loadTemplate]);
   
   // Create new template
-  const createTemplate = useCallback(async (input: Omit<CreateWorkflowTemplateInput, 'account'>) => {
+  const createTemplate = useCallback(async (input: Omit<CreateWorkflowTemplateInput, 'account' | 'organization'>) => {
+    if (!accountId) {
+      throw new Error('No account context available');
+    }
+    
     try {
       setIsLoading(true);
       setError(null);
       
-      const newTemplate = await workflowTemplateService.createTemplate(input);
+      const fullInput: CreateWorkflowTemplateInput = {
+        ...input,
+        account: accountId,
+        organization: organizationId || undefined // Convert null to undefined for optional field
+      };
+      
+      const newTemplate = await templateService.createTemplate(fullInput);
       setTemplate(newTemplate);
       setWorkflow(newTemplate.workflowDefinition);
       setOriginalWorkflow(newTemplate.workflowDefinition);
@@ -129,7 +146,7 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
     } finally {
       setIsLoading(false);
     }
-  }, [loadTemplate]);
+  }, [accountId, organizationId, templateService, loadTemplate]);
   
   // Update existing template
   const updateTemplate = useCallback(async (updates: UpdateWorkflowTemplateInput) => {
@@ -141,7 +158,7 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
       setIsLoading(true);
       setError(null);
       
-      const updatedTemplate = await workflowTemplateService.updateTemplate(
+      const updatedTemplate = await templateService.updateTemplate(
         template.name,
         template.version,
         updates
@@ -161,7 +178,7 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
     } finally {
       setIsLoading(false);
     }
-  }, [template]);
+  }, [template, templateService]);
   
   // Publish template
   const publishTemplate = useCallback(async () => {
@@ -173,7 +190,7 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
       setIsLoading(true);
       setError(null);
       
-      const publishedTemplate = await workflowTemplateService.publishTemplate(
+      const publishedTemplate = await templateService.publishTemplate(
         template.name,
         template.version
       );
@@ -191,7 +208,7 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
     } finally {
       setIsLoading(false);
     }
-  }, [template, loadTemplate]);
+  }, [template, loadTemplate, templateService]);
   
   // Create draft from published
   const createDraft = useCallback(async (author: string) => {
@@ -203,7 +220,7 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
       setIsLoading(true);
       setError(null);
       
-      const draftTemplate = await workflowTemplateService.createDraftFromPublished(
+      const draftTemplate = await templateService.createDraftFromPublished(
         template.name,
         template.version,
         author
@@ -224,7 +241,7 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
     } finally {
       setIsLoading(false);
     }
-  }, [template, loadTemplate]);
+  }, [template, loadTemplate, templateService]);
   
   // Delete template
   const deleteTemplate = useCallback(async () => {
@@ -236,7 +253,7 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
       setIsLoading(true);
       setError(null);
       
-      const success = await workflowTemplateService.deleteTemplate(
+      const success = await templateService.deleteTemplate(
         template.name,
         template.version
       );
@@ -256,7 +273,7 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
     } finally {
       setIsLoading(false);
     }
-  }, [template]);
+  }, [template, templateService]);
   
   // Update workflow in memory
   const updateWorkflow = useCallback((newWorkflow: WorkflowJSON) => {
@@ -282,7 +299,7 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
     workflow,
     
     // State
-    isLoading: isLoading || accountLoading,
+    isLoading: isLoading || contextLoading,
     error,
     isNewTemplate,
     hasUnsavedChanges,

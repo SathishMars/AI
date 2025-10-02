@@ -40,8 +40,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       ? new Date(searchParams.get('createdBefore')!) 
       : undefined;
 
-        // Get account from headers or query params (for multi-tenancy)
+    // Get account and organization from headers or query params (for multi-tenancy)
     const account = searchParams.get('account') || request.headers.get('x-account') || 'groupize-demos';
+    const organization = searchParams.get('organization') || request.headers.get('x-organization') || null;
     
     // Validate page and pageSize
     if (page < 1) {
@@ -66,6 +67,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (tags) filters.tags = tags;
     if (createdAfter) filters.createdAfter = createdAfter;
     if (createdBefore) filters.createdBefore = createdBefore;
+    if (organization !== null) filters.organization = organization; // Include organization filter
 
     // Get templates
     const result = await listWorkflowTemplates(account, filters, page, pageSize);
@@ -104,14 +106,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body = await request.json();
     
-    // Get account from headers or body (for multi-tenancy)
+    // Get account and organization from headers or body (for multi-tenancy)
     const account = body.account || request.headers.get('x-account') || 'default-account';
+    const organization = body.organization || request.headers.get('x-organization') || undefined;
     
-    // Add account to the input
-    const inputWithAccount = { ...body, account };
+    // Add account and organization to the input
+    const inputWithContext = { ...body, account };
+    if (organization !== undefined) {
+      inputWithContext.organization = organization;
+    }
 
     // Validate input
-    const validationResult = CreateWorkflowTemplateInputSchema.safeParse(inputWithAccount);
+    const validationResult = CreateWorkflowTemplateInputSchema.safeParse(inputWithContext);
     if (!validationResult.success) {
       return NextResponse.json(
         { 

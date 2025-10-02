@@ -36,7 +36,8 @@ export interface TemplateUsageStats {
 export interface WorkflowTemplate {
   _id?: string; // MongoDB ObjectId
   account: string; // Account identifier for multi-tenancy
-  name: string; // Template name (unique within account)
+  organization?: string; // Organization identifier within account (optional - if null, template is shared across all organizations in account)
+  name: string; // Template name (unique within account+organization combination)
   status: TemplateStatus;
   version: string; // Semantic version (major.minor.patch)
   workflowDefinition: WorkflowJSON; // Complete workflow JSON
@@ -49,6 +50,7 @@ export interface WorkflowTemplate {
 // Template creation/update input (without auto-generated fields)
 export interface CreateWorkflowTemplateInput {
   account: string;
+  organization?: string; // Optional - if null, template is shared across all organizations in account
   name: string;
   workflowDefinition: WorkflowJSON;
   description?: string;
@@ -69,6 +71,7 @@ export interface UpdateWorkflowTemplateInput {
 // Template query filters
 export interface TemplateQueryFilters {
   account?: string;
+  organization?: string | null; // null for account-wide templates, string for org-specific
   status?: TemplateStatus | TemplateStatus[];
   category?: string;
   tags?: string[];
