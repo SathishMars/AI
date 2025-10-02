@@ -1,13 +1,16 @@
-// db-scripts/workflow-template-collections.js
-// MongoDB collection setup script for workflow templates and configurator conversations
-// Run this script to set up the required collections and indexes
+// db-scripts/02-workflow-template-collections.js
+// MongoDB collection update script for existing databases
+// Run this script to update existing workflowTemplates collection with organization support
 
-/**
- * Workflow Template Collections Setup
+/*
+ * Workflow Template Collections Update
  * 
- * This script creates the necessary collections and indexes for:
- * 1. workflowTemplates - Primary collection for workflow template storage
- * 2. workflowConfiguratorConversations - AI conversation history storage
+ * This script updates existing collections for:
+ * 1. workflowTemplates - Add organization field and new indexes
+ * 2. workflowConfiguratorConversations - Update schema if needed
+ * 
+ * Use this script when you have an existing database that needs schema updates.
+ * For fresh installations, use 01-initialize-fresh-database.js instead.
  */
 
 // Connect to MongoDB (adjust connection string as needed)
@@ -16,123 +19,122 @@
 
 const db = db.getSiblingDB('groupize-workflows');
 
+print('='.repeat(60));
+print('UPDATING EXISTING WORKFLOW COLLECTIONS');
+print('='.repeat(60));
+
 // ===========================================
-// 1. Create workflowTemplates Collection
+// 1. Update workflowTemplates Collection Schema
 // ===========================================
 
-print('Creating workflowTemplates collection...');
+print('\n📝 Updating workflowTemplates collection schema...');
 
-// Create the collection if it doesn't exist
-db.createCollection('workflowTemplates', {
-  validator: {
-    $jsonSchema: {
-      bsonType: "object",
-      required: ["account", "name", "status", "version", "workflowDefinition", "metadata"],
-      properties: {
-        account: {
-          bsonType: "string",
-          description: "Account identifier for multi-tenancy"
-        },
-        organization: {
-          bsonType: "string",
-          description: "Organization identifier within account (optional - if null, template is shared across all organizations in account)"
-        },
-        name: {
-          bsonType: "string",
-          description: "Template name (unique within account+organization combination)"
-        },
-        status: {
-          bsonType: "string",
-          enum: ["draft", "published", "deprecated", "archived"],
-          description: "Template lifecycle status"
-        },
-        version: {
-          bsonType: "string",
-          pattern: "^\\d+\\.\\d+\\.\\d+$",
-          description: "Semantic version (major.minor.patch)"
-        },
-        workflowDefinition: {
-          bsonType: "object",
-          description: "Complete json-rules-engine compatible workflow JSON"
-        },
-        mermaidDiagram: {
-          bsonType: "string",
-          description: "Generated Mermaid diagram representation"
-        },
-        metadata: {
-          bsonType: "object",
-          required: ["createdAt", "updatedAt"],
-          properties: {
-            createdAt: { bsonType: "date" },
-            updatedAt: { bsonType: "date" },
-            publishedAt: { bsonType: "date" },
-            author: { bsonType: "string" },
-            description: { bsonType: "string" },
-            category: { bsonType: "string" },
-            tags: {
-              bsonType: "array",
-              items: { bsonType: "string" }
+// Check if collection exists
+const collections = db.getCollectionNames();
+if (!collections.includes('workflowTemplates')) {
+  print('❌ workflowTemplates collection does not exist. Use 01-initialize-fresh-database.js for fresh setup.');
+  quit(1);
+}
+
+// Update collection validator to include organization field
+try {
+  db.runCommand({
+    collMod: "workflowTemplates",
+    validator: {
+      $jsonSchema: {
+        bsonType: "object",
+        required: ["account", "name", "status", "version", "workflowDefinition", "metadata"],
+        properties: {
+          account: {
+            bsonType: "string",
+            description: "Account identifier for multi-tenancy"
+          },
+          organization: {
+            bsonType: "string",
+            description: "Organization identifier within account (optional - if null, template is shared across all organizations in account)"
+          },
+          name: {
+            bsonType: "string",
+            description: "Template name (unique within account+organization combination)"
+          },
+          status: {
+            bsonType: "string",
+            enum: ["draft", "published", "deprecated", "archived"],
+            description: "Template lifecycle status"
+          },
+          version: {
+            bsonType: "string",
+            pattern: "^\\d+\\.\\d+\\.\\d+$",
+            description: "Semantic version (major.minor.patch)"
+          },
+          workflowDefinition: {
+            bsonType: "object",
+            description: "Complete json-rules-engine compatible workflow JSON"
+          },
+          mermaidDiagram: {
+            bsonType: "string",
+            description: "Generated Mermaid diagram representation"
+          },
+          metadata: {
+            bsonType: "object",
+            required: ["createdAt", "updatedAt"],
+            properties: {
+              createdAt: { bsonType: "date" },
+              updatedAt: { bsonType: "date" },
+              publishedAt: { bsonType: "date" },
+              author: { bsonType: "string" },
+              description: { bsonType: "string" },
+              category: { bsonType: "string" },
+              tags: {
+                bsonType: "array",
+                items: { bsonType: "string" }
+              }
             }
-          }
-        },
-        parentVersion: {
-          bsonType: "string",
-          description: "Reference to parent version for lineage tracking"
-        },
-        usageStats: {
-          bsonType: "object",
-          properties: {
-            instanceCount: { bsonType: "int" },
-            lastUsed: { bsonType: "date" }
+          },
+          parentVersion: {
+            bsonType: "string",
+            description: "Reference to parent version for lineage tracking"
+          },
+          usageStats: {
+            bsonType: "object",
+            properties: {
+              instanceCount: { bsonType: "int" },
+              lastUsed: { bsonType: "date" }
+            }
           }
         }
       }
     }
+  });
+  print('✅ Collection schema updated with organization field');
+} catch (error) {
+  print('⚠️ Schema update warning:', error.message);
+}
+
+// ===========================================
+// 2. Add New Indexes for Organization Support
+// ===========================================
+
+print('\n📊 Adding new indexes for organization support...');
+
+// Function to safely create index (skip if exists)
+function createIndexSafely(collection, indexSpec, options) {
+  try {
+    collection.createIndex(indexSpec, options);
+    print('✅ Created index:', options.name);
+  } catch (error) {
+    if (error.message.includes('already exists')) {
+      print('ℹ️  Index already exists:', options.name);
+    } else {
+      print('❌ Error creating index:', options.name, error.message);
+    }
   }
-});
+}
 
-// Create indexes for workflowTemplates collection
-print('Creating indexes for workflowTemplates...');
+const templateCollection = db.workflowTemplates;
 
-// Primary lookup index - template name and status
-db.workflowTemplates.createIndex(
-  { name: 1, status: 1 },
-  { 
-    name: "idx_name_status",
-    background: true 
-  }
-);
-
-// Version management index - status and version for latest queries
-db.workflowTemplates.createIndex(
-  { status: 1, version: -1 },
-  { 
-    name: "idx_status_version_desc",
-    background: true 
-  }
-);
-
-// Template search index - category and tags
-db.workflowTemplates.createIndex(
-  { category: 1, "metadata.tags": 1 },
-  { 
-    name: "idx_category_tags",
-    background: true 
-  }
-);
-
-// Usage analytics index
-db.workflowTemplates.createIndex(
-  { "usageStats.lastUsed": -1 },
-  { 
-    name: "idx_last_used_desc",
-    background: true 
-  }
-);
-
-// Unique constraint for account + organization + name + version combination
-// This handles both organization-specific templates and account-wide templates (organization: null)
-db.workflowTemplates.createIndex(
+// Organization-based unique constraint
+createIndexSafely(templateCollection,
   { account: 1, organization: 1, name: 1, version: 1 },
   { 
     name: "idx_account_org_name_version_unique",
@@ -141,8 +143,8 @@ db.workflowTemplates.createIndex(
   }
 );
 
-// Additional partial index for account-wide templates (organization is null)
-db.workflowTemplates.createIndex(
+// Partial index for account-wide templates (organization is null)
+createIndexSafely(templateCollection,
   { account: 1, name: 1, version: 1 },
   { 
     name: "idx_account_name_version_null_org",
@@ -152,17 +154,8 @@ db.workflowTemplates.createIndex(
   }
 );
 
-// Account-based queries index
-db.workflowTemplates.createIndex(
-  { account: 1, status: 1, "metadata.createdAt": -1 },
-  { 
-    name: "idx_account_status_created",
-    background: true 
-  }
-);
-
-// Organization-based queries index (includes null organization for account-wide templates)
-db.workflowTemplates.createIndex(
+// Organization-based queries index
+createIndexSafely(templateCollection,
   { account: 1, organization: 1, status: 1, "metadata.createdAt": -1 },
   { 
     name: "idx_account_org_status_created",
@@ -170,257 +163,196 @@ db.workflowTemplates.createIndex(
   }
 );
 
-print('✅ workflowTemplates collection and indexes created successfully');
-
 // ===========================================
-// 2. Create workflowConfiguratorConversations Collection
+// 3. Remove Old Unique Index (if exists)
 // ===========================================
 
-print('Creating workflowConfiguratorConversations collection...');
+print('\n🔧 Updating unique constraints...');
 
-// Create the collection with validation
-db.createCollection('workflowConfiguratorConversations', {
-  validator: {
-    $jsonSchema: {
-      bsonType: "object",
-      required: ["account", "templateName", "conversationId", "messages", "sessionInfo"],
-      properties: {
-        account: {
-          bsonType: "string",
-          description: "Account identifier matching the template"
+// Try to drop old unique index that doesn't include organization
+try {
+  templateCollection.dropIndex("idx_account_name_version_unique");
+  print('✅ Removed old unique index without organization');
+} catch (error) {
+  if (error.message.includes('index not found')) {
+    print('ℹ️  Old unique index not found (already updated)');
+  } else {
+    print('⚠️ Could not remove old index:', error.message);
+  }
+}
+
+// ===========================================
+// 4. Data Migration (Add organization field to existing templates)
+// ===========================================
+
+print('\n🔄 Migrating existing template data...');
+
+// Add organization: null to existing templates that don't have the field
+const updateResult = templateCollection.updateMany(
+  { organization: { $exists: false } },
+  { $set: { organization: null } }
+);
+
+print(`✅ Updated ${updateResult.modifiedCount} existing templates with organization: null`);
+
+// ===========================================
+// 5. Update Sample Template Account
+// ===========================================
+
+print('\n📋 Updating sample template account...');
+
+// Update any existing "default-account" templates to use "groupize-demos"
+const accountUpdateResult = templateCollection.updateMany(
+  { account: "default-account" },
+  { 
+    $set: { 
+      account: "groupize-demos",
+      organization: null // Ensure they're account-wide templates
+    } 
+  }
+);
+
+if (accountUpdateResult.modifiedCount > 0) {
+  print(`✅ Updated ${accountUpdateResult.modifiedCount} templates to use "groupize-demos" account`);
+} else {
+  print('ℹ️  No templates with "default-account" found');
+}
+
+// ===========================================
+// 6. Add Sample Template if Database is Empty
+// ===========================================
+
+print('\n📝 Checking for sample data...');
+
+const templateCount = templateCollection.countDocuments();
+if (templateCount === 0) {
+  print('📋 Adding sample workflow template...');
+  
+  // Sample workflow template for testing
+  const sampleTemplate = {
+    account: "groupize-demos",
+    organization: null, // Account-wide template
+    name: "Sample Event Approval Workflow",
+    status: "published",
+    version: "1.0.0",
+    workflowDefinition: {
+      schemaVersion: "1.0",
+      metadata: {
+        id: "sample-workflow-001",
+        name: "Event Approval Workflow",
+        description: "Automated workflow for event approval process",
+        version: "1.0.0",
+        status: "published"
+      },
+      steps: {
+        start: {
+          name: "MRF Submitted",
+          type: "trigger",
+          action: "onMRF",
+          params: { mrfTemplateName: "Event Request" },
+          nextSteps: ["checkApprovalNeeded"]
         },
-        templateName: {
-          bsonType: "string",
-          description: "Links to workflowTemplates.name within account"
+        checkApprovalNeeded: {
+          name: "Check Approval Requirements",
+          type: "condition",
+          condition: {
+            any: [
+              { fact: "mrf.maxAttendees", operator: "greaterThan", value: 100 },
+              { fact: "user.role", operator: "notEqual", value: "admin" }
+            ]
+          },
+          onSuccess: "requestApproval",
+          onFailure: "createEvent"
         },
-        conversationId: {
-          bsonType: "string",
-          description: "Unique conversation identifier"
+        requestApproval: {
+          name: "Request Manager Approval",
+          type: "action",
+          action: "requestApproval",
+          params: { approverRole: "manager" },
+          onSuccess: "createEvent",
+          onFailure: "notifyFailure"
         },
-        messages: {
-          bsonType: "array",
-          items: {
-            bsonType: "object",
-            required: ["messageId", "role", "content", "timestamp"],
-            properties: {
-              messageId: { bsonType: "string" },
-              role: { 
-                bsonType: "string",
-                enum: ["user", "assistant", "system"]
-              },
-              content: { bsonType: "string" },
-              timestamp: { bsonType: "date" },
-              metadata: {
-                bsonType: "object",
-                properties: {
-                  templateVersion: { bsonType: "string" },
-                  model: { bsonType: "string" },
-                  tokenCount: { bsonType: "int" }
-                }
-              }
-            }
-          }
+        createEvent: {
+          name: "Create Event",
+          type: "action",
+          action: "createEvent",
+          params: { mrfID: "dynamic" },
+          nextSteps: ["end"]
         },
-        sessionInfo: {
-          bsonType: "object",
-          required: ["startedAt", "lastActivity"],
-          properties: {
-            startedAt: { bsonType: "date" },
-            lastActivity: { bsonType: "date" },
-            isActive: { bsonType: "bool" },
-            userAgent: { bsonType: "string" }
-          }
+        notifyFailure: {
+          name: "Notify Failure",
+          type: "action",
+          action: "sendNotification",
+          params: { message: "Approval failed" },
+          nextSteps: ["end"]
         },
-        retentionPolicy: {
-          bsonType: "object",
-          properties: {
-            expiresAt: { bsonType: "date" },
-            archived: { bsonType: "bool" }
-          }
+        end: {
+          name: "End",
+          type: "end",
+          result: "success"
         }
       }
-    }
-  }
-});
-
-// Create indexes for workflowConfiguratorConversations collection
-print('Creating indexes for workflowConfiguratorConversations...');
-
-// Primary lookup index - account and template name
-db.workflowConfiguratorConversations.createIndex(
-  { account: 1, templateName: 1 },
-  { 
-    name: "idx_account_template_name",
-    background: true 
-  }
-);
-
-// Conversation management index
-db.workflowConfiguratorConversations.createIndex(
-  { conversationId: 1 },
-  { 
-    name: "idx_conversation_id",
-    background: true 
-  }
-);
-
-// Account-based session activity index for cleanup
-db.workflowConfiguratorConversations.createIndex(
-  { account: 1, "sessionInfo.lastActivity": -1 },
-  { 
-    name: "idx_account_last_activity_desc",
-    background: true 
-  }
-);
-
-// Retention policy index for automated cleanup
-db.workflowConfiguratorConversations.createIndex(
-  { "retentionPolicy.expiresAt": 1 },
-  { 
-    name: "idx_expires_at",
-    background: true,
-    expireAfterSeconds: 0  // MongoDB TTL index for automatic cleanup
-  }
-);
-
-// Message timestamp index for chronological queries
-db.workflowConfiguratorConversations.createIndex(
-  { "messages.timestamp": -1 },
-  { 
-    name: "idx_message_timestamp_desc",
-    background: true 
-  }
-);
-
-print('✅ workflowConfiguratorConversations collection and indexes created successfully');
-
-// ===========================================
-// 3. Insert Sample Data (Optional)
-// ===========================================
-
-print('Inserting sample workflow template...');
-
-// Sample workflow template for testing
-const sampleTemplate = {
-  account: "default-account",
-  name: "sample-event-approval-workflow",
-  status: "published",
-  version: "1.0.0",
-  workflowDefinition: {
-    schemaVersion: "1.0",
-    metadata: {
-      id: "sample-workflow-001",
-      name: "Event Approval Workflow",
-      description: "Automated workflow for event approval process",
-      version: "1.0.0",
-      status: "published"
     },
-    steps: {
-      start: {
-        name: "MRF Submitted",
-        type: "trigger",
-        action: "onMRFSubmit",
-        params: { mrfID: "dynamic" },
-        nextSteps: ["checkApprovalNeeded"]
-      },
-      checkApprovalNeeded: {
-        name: "Check Approval Requirements",
-        type: "condition",
-        condition: {
-          any: [
-            { fact: "mrf.maxAttendees", operator: "greaterThan", value: 100 },
-            { fact: "user.role", operator: "notEqual", value: "admin" }
-          ]
-        },
-        onSuccess: "requestApproval",
-        onFailure: "createEvent"
-      },
-      requestApproval: {
-        name: "Request Manager Approval",
-        type: "action",
-        action: "functions.requestApproval",
-        params: { to: "manager@example.com" },
-        onSuccess: "createEvent",
-        onFailure: "notifyFailure"
-      },
-      createEvent: {
-        name: "Create Event",
-        type: "action",
-        action: "functions.createEvent",
-        params: { mrfID: "dynamic" },
-        nextSteps: ["end"]
-      },
-      notifyFailure: {
-        name: "Notify Failure",
-        type: "action",
-        action: "functions.sendNotification",
-        params: { message: "Approval failed" },
-        nextSteps: ["end"]
-      },
-      end: {
-        name: "End",
-        type: "end",
-        result: "success"
-      }
+    mermaidDiagram: `flowchart TD
+      A[MRF Submitted] --> B{Check Approval Needed}
+      B -->|Yes| C[Request Approval]
+      B -->|No| D[Create Event]
+      C -->|Approved| D
+      C -->|Rejected| E[Notify Failure]
+      D --> F[End]
+      E --> F`,
+    metadata: {
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      publishedAt: new Date(),
+      author: "system",
+      description: "Sample workflow template for event approval process",
+      category: "event-management",
+      tags: ["approval", "event", "sample"]
+    },
+    parentVersion: null,
+    usageStats: {
+      instanceCount: 0,
+      lastUsed: null
     }
-  },
-  mermaidDiagram: `flowchart TD
-    A[MRF Submitted] --> B{Check Approval Needed}
-    B -->|Yes| C[Request Approval]
-    B -->|No| D[Create Event]
-    C -->|Approved| D
-    C -->|Rejected| E[Notify Failure]
-    D --> F[End]
-    E --> F`,
-  metadata: {
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    publishedAt: new Date(),
-    author: "system",
-    description: "Sample workflow template for event approval process",
-    category: "event-management",
-    tags: ["approval", "event", "sample"]
-  },
-  parentVersion: null,
-  usageStats: {
-    instanceCount: 0,
-    lastUsed: null
-  }
-};
+  };
 
-// Insert sample template
-db.workflowTemplates.insertOne(sampleTemplate);
-
-print('✅ Sample workflow template inserted successfully');
+  // Insert sample template
+  templateCollection.insertOne(sampleTemplate);
+  print('✅ Sample workflow template inserted successfully');
+} else {
+  print(`ℹ️  Database already contains ${templateCount} templates`);
+}
 
 // ===========================================
-// 4. Verification
+// 7. Verification
 // ===========================================
 
-print('Verifying collection setup...');
+print('\n🔍 Verifying collection updates...');
 
 // Check collections exist
-const collections = db.getCollectionNames();
-print('Collections:', collections);
+const updatedCollections = db.getCollectionNames();
+print('Collections:', updatedCollections);
 
 // Check indexes
 print('workflowTemplates indexes:');
-db.workflowTemplates.getIndexes().forEach(index => {
-  print('  -', index.name, ':', JSON.stringify(index.key));
-});
-
-print('workflowConfiguratorConversations indexes:');
-db.workflowConfiguratorConversations.getIndexes().forEach(index => {
+templateCollection.getIndexes().forEach(index => {
   print('  -', index.name, ':', JSON.stringify(index.key));
 });
 
 // Check sample data
-const templateCount = db.workflowTemplates.countDocuments();
-print('Total workflow templates:', templateCount);
+const finalTemplateCount = templateCollection.countDocuments();
+print('Total workflow templates:', finalTemplateCount);
 
-print('\n🎉 Workflow template collections setup complete!');
+// Check organization field coverage
+const templatesWithOrg = templateCollection.countDocuments({ organization: { $exists: true } });
+print(`Templates with organization field: ${templatesWithOrg}/${finalTemplateCount}`);
+
+print('\n' + '='.repeat(60));
+print('✅ COLLECTION UPDATE COMPLETE');
+print('='.repeat(60));
+print('\nCollection updates applied successfully!');
 print('\nNext steps:');
-print('1. Update your application connection string to use this database');
-print('2. Implement the TypeScript types and database utilities');
-print('3. Create API endpoints for template management');
-print('4. Run tests to verify functionality');
+print('1. Verify your application works with the updated schema');
+print('2. Test organization-based template filtering');
+print('3. Update any application code that relies on old indexes');
