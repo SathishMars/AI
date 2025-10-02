@@ -10,7 +10,7 @@ import {
 } from '@/app/types/workflow-template';
 import { WorkflowJSON } from '@/app/types/workflow';
 import { workflowTemplateService } from '@/app/services/workflow-template-service';
-import { useAccount } from '@/app/hooks/useAccount';
+import { useAccount } from '@/app/contexts/UnifiedUserContext';
 
 interface UseWorkflowTemplateOptions {
   templateName?: string;
@@ -50,7 +50,8 @@ interface UseWorkflowTemplateReturn {
 
 export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): UseWorkflowTemplateReturn {
   const { templateName, autoLoad = true } = options;
-  const { accountId, isLoading: accountLoading } = useAccount();
+  const { account, isLoading: accountLoading } = useAccount();
+  const accountId = account?.id;
   
   // State
   const [template, setTemplate] = useState<WorkflowTemplate | null>(null);

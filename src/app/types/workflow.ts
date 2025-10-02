@@ -40,13 +40,25 @@ export const ConditionSchema: z.ZodType<WorkflowCondition> = z.lazy(() =>
 // Workflow step types
 export const WorkflowStepSchema = z.object({
   name: z.string(),
-  type: z.enum(['trigger', 'condition', 'action', 'end']),
+  type: z.enum(['trigger', 'condition', 'action', 'end', 'branch', 'merge']),
   action: z.string().optional(),
   params: z.record(z.string(), z.any()).optional(),
   condition: ConditionSchema.optional(),
   nextSteps: z.array(z.string()).optional(),
   onSuccess: z.string().optional(),
   onFailure: z.string().optional(),
+  // Enhanced condition outputs
+  onApproval: z.string().optional(),
+  onYes: z.string().optional(), 
+  onReject: z.string().optional(),
+  onNo: z.string().optional(),
+  // Branching properties
+  branches: z.array(z.string()).optional(),
+  waitForSteps: z.array(z.string()).optional(),
+  // Merge properties
+  requireAllSuccess: z.boolean().optional(),
+  timeout: z.number().optional(),
+  // End state
   result: z.string().optional()
 });
 

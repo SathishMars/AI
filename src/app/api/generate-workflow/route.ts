@@ -1,6 +1,7 @@
 // src/app/api/generate-workflow/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { LLMWorkflowGenerator } from '@/app/utils/llm-workflow-generator';
+import { getTriggerFunctionAutocomplete, getActionFunctionAutocomplete } from '@/app/data/workflow-conversation-autocomplete';
 
 /**
  * Server-side API route for LLM workflow generation
@@ -19,6 +20,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get available functions from autocomplete system
+    const triggerFunctions = getTriggerFunctionAutocomplete();
+    const actionFunctions = getActionFunctionAutocomplete();
+    
     // Create a default context if none provided or incomplete
     const defaultContext = {
       user: {
@@ -39,7 +44,22 @@ export async function POST(request: NextRequest) {
         location: 'TBD',
         budget: 1000
       },
-      availableFunctions: ['functions.requestApproval', 'functions.createEvent', 'functions.sendNotification'],
+      // Enhanced function context from autocomplete system
+      availableFunctions: [...triggerFunctions.map(f => f.name), ...actionFunctions.map(f => f.name)],
+      triggerFunctions: triggerFunctions.map(f => ({
+        name: f.name,
+        description: f.description,
+        parameters: f.parameters || [],
+        examples: f.examples,
+        llmInstructions: f.llmInstructions
+      })),
+      actionFunctions: actionFunctions.map(f => ({
+        name: f.name,
+        description: f.description,
+        parameters: f.parameters || [],
+        examples: f.examples,
+        llmInstructions: f.llmInstructions
+      })),
       currentDate: new Date().toISOString()
     };
 

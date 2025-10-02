@@ -15,7 +15,8 @@ import {
   TextField,
   IconButton,
   Button,
-  CircularProgress
+  CircularProgress,
+  MenuItem
 } from '@mui/material';
 import {
   AccountTree as WorkflowIcon,
@@ -260,28 +261,135 @@ export default function VisualizationPane({
                       />
                     )}
                     
-                    {(currentStep.onSuccess || currentStep.onFailure) && (
-                      <Box sx={{ display: 'flex', gap: 2 }}>
-                        {currentStep.onSuccess && (
-                          <TextField
-                            label="On Success"
-                            value={currentStep.onSuccess}
-                            onChange={(e) => setEditingStep(prev => prev ? { ...prev, onSuccess: e.target.value } : null)}
-                            size="small"
-                            sx={{ flex: 1 }}
-                          />
-                        )}
-                        {currentStep.onFailure && (
-                          <TextField
-                            label="On Failure"
-                            value={currentStep.onFailure}
-                            onChange={(e) => setEditingStep(prev => prev ? { ...prev, onFailure: e.target.value } : null)}
-                            size="small"
-                            sx={{ flex: 1 }}
-                          />
-                        )}
+                    {(currentStep.onSuccess || currentStep.onFailure || 
+                      ('onApproval' in currentStep && currentStep.onApproval) ||
+                      ('onYes' in currentStep && currentStep.onYes) ||
+                      ('onReject' in currentStep && currentStep.onReject) ||
+                      ('onNo' in currentStep && currentStep.onNo)) && (
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        <Typography variant="caption" color="text.secondary">Navigation Paths</Typography>
+                        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                          {currentStep.onSuccess && (
+                            <TextField
+                              label="On Success"
+                              value={currentStep.onSuccess}
+                              onChange={(e) => setEditingStep(prev => prev ? { ...prev, onSuccess: e.target.value } : null)}
+                              size="small"
+                              sx={{ flex: 1, minWidth: 120 }}
+                            />
+                          )}
+                          {currentStep.onFailure && (
+                            <TextField
+                              label="On Failure"
+                              value={currentStep.onFailure}
+                              onChange={(e) => setEditingStep(prev => prev ? { ...prev, onFailure: e.target.value } : null)}
+                              size="small"
+                              sx={{ flex: 1, minWidth: 120 }}
+                            />
+                          )}
+                          {'onApproval' in currentStep && currentStep.onApproval && (
+                            <TextField
+                              label="On Approval"
+                              value={currentStep.onApproval}
+                              onChange={(e) => setEditingStep(prev => prev ? { ...prev, onApproval: e.target.value } : null)}
+                              size="small"
+                              sx={{ flex: 1, minWidth: 120 }}
+                            />
+                          )}
+                          {'onYes' in currentStep && currentStep.onYes && (
+                            <TextField
+                              label="On Yes"
+                              value={currentStep.onYes}
+                              onChange={(e) => setEditingStep(prev => prev ? { ...prev, onYes: e.target.value } : null)}
+                              size="small"
+                              sx={{ flex: 1, minWidth: 120 }}
+                            />
+                          )}
+                          {'onReject' in currentStep && currentStep.onReject && (
+                            <TextField
+                              label="On Reject"
+                              value={currentStep.onReject}
+                              onChange={(e) => setEditingStep(prev => prev ? { ...prev, onReject: e.target.value } : null)}
+                              size="small"
+                              sx={{ flex: 1, minWidth: 120 }}
+                            />
+                          )}
+                          {'onNo' in currentStep && currentStep.onNo && (
+                            <TextField
+                              label="On No"
+                              value={currentStep.onNo}
+                              onChange={(e) => setEditingStep(prev => prev ? { ...prev, onNo: e.target.value } : null)}
+                              size="small"
+                              sx={{ flex: 1, minWidth: 120 }}
+                            />
+                          )}
+                        </Box>
                       </Box>
                     )}
+                    
+                    {('branches' in currentStep && currentStep.branches) ||
+                     ('waitForSteps' in currentStep && currentStep.waitForSteps) ? (
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        <Typography variant="caption" color="text.secondary">Branching/Merging</Typography>
+                        {'branches' in currentStep && currentStep.branches && (
+                          <TextField
+                            label="Branches"
+                            value={currentStep.branches.join(', ')}
+                            onChange={(e) => {
+                              const branches = e.target.value.split(',').map(s => s.trim()).filter(s => s);
+                              setEditingStep(prev => prev ? { ...prev, branches } : null);
+                            }}
+                            fullWidth
+                            size="small"
+                            helperText="Comma-separated list of parallel branch step IDs"
+                          />
+                        )}
+                        {'waitForSteps' in currentStep && currentStep.waitForSteps && (
+                          <TextField
+                            label="Wait For Steps"
+                            value={currentStep.waitForSteps.join(', ')}
+                            onChange={(e) => {
+                              const waitForSteps = e.target.value.split(',').map(s => s.trim()).filter(s => s);
+                              setEditingStep(prev => prev ? { ...prev, waitForSteps } : null);
+                            }}
+                            fullWidth
+                            size="small"
+                            helperText="Comma-separated list of step IDs to wait for"
+                          />
+                        )}
+                        {'requireAllSuccess' in currentStep && currentStep.requireAllSuccess !== undefined && (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <TextField
+                              label="Require All Success"
+                              value={currentStep.requireAllSuccess ? 'true' : 'false'}
+                              onChange={(e) => {
+                                const requireAllSuccess = e.target.value === 'true';
+                                setEditingStep(prev => prev ? { ...prev, requireAllSuccess } : null);
+                              }}
+                              select
+                              size="small"
+                              sx={{ flex: 1 }}
+                            >
+                              <MenuItem value="true">All Must Succeed</MenuItem>
+                              <MenuItem value="false">Partial Success OK</MenuItem>
+                            </TextField>
+                            {'timeout' in currentStep && currentStep.timeout && (
+                              <TextField
+                                label="Timeout (min)"
+                                value={currentStep.timeout}
+                                onChange={(e) => {
+                                  const timeout = parseInt(e.target.value) || 0;
+                                  setEditingStep(prev => prev ? { ...prev, timeout } : null);
+                                }}
+                                type="number"
+                                size="small"
+                                sx={{ width: 120 }}
+                              />
+                            )}
+                          </Box>
+                        )}
+                      </Box>
+                    ) : null}
                     
                     {currentStep.nextSteps && (
                       <TextField

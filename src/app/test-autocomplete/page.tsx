@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import { Box, Typography, Paper } from '@mui/material';
-import ConversationPane from '@/app/components/ConversationPane';
+import WorkflowCreationPane from '@/app/components/WorkflowCreationPane';
 import { WorkflowJSON, ValidationResult } from '@/app/types/workflow';
 
 const sampleWorkflow: WorkflowJSON = {
@@ -54,8 +54,12 @@ export default function TestAutocompletePage() {
         Test typing @ to see function suggestions and # for workflow steps.
       </Typography>
       
-      <Paper sx={{ mt: 2, height: '400px' }}>
-        <ConversationPane
+      <Typography variant="body2" color="info.main" sx={{ mb: 2, p: 1, bgcolor: 'info.light', borderRadius: 1 }}>
+        ℹ️ This page now uses WorkflowCreationPane - the modern conversation interface with enhanced autocomplete features.
+      </Typography>
+      
+      <Paper sx={{ mt: 2, height: '500px' }}>
+        <WorkflowCreationPane
           workflow={workflow}
           onWorkflowChange={setWorkflow}
           validationResult={sampleValidation}

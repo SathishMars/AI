@@ -155,6 +155,88 @@ export default function ParameterEditor({
       });
     }
 
+    // Enhanced condition outputs
+    if ('onApproval' in step && step.onApproval) {
+      params.push({
+        name: 'onApproval',
+        value: step.onApproval,
+        type: 'string',
+        required: false,
+        description: 'Next step on approval'
+      });
+    }
+
+    if ('onYes' in step && step.onYes) {
+      params.push({
+        name: 'onYes',
+        value: step.onYes,
+        type: 'string',
+        required: false,
+        description: 'Next step on yes response'
+      });
+    }
+
+    if ('onReject' in step && step.onReject) {
+      params.push({
+        name: 'onReject',
+        value: step.onReject,
+        type: 'string',
+        required: false,
+        description: 'Next step on rejection'
+      });
+    }
+
+    if ('onNo' in step && step.onNo) {
+      params.push({
+        name: 'onNo',
+        value: step.onNo,
+        type: 'string',
+        required: false,
+        description: 'Next step on no response'
+      });
+    }
+
+    // Branching properties
+    if ('branches' in step && step.branches) {
+      params.push({
+        name: 'branches',
+        value: step.branches,
+        type: 'array',
+        required: false,
+        description: 'Parallel execution branches'
+      });
+    }
+
+    if ('waitForSteps' in step && step.waitForSteps) {
+      params.push({
+        name: 'waitForSteps',
+        value: step.waitForSteps,
+        type: 'array',
+        required: false,
+        description: 'Steps to wait for completion'
+      });
+    }
+
+    if ('requireAllSuccess' in step && step.requireAllSuccess !== undefined) {
+      params.push({
+        name: 'requireAllSuccess',
+        value: step.requireAllSuccess,
+        type: 'boolean',
+        required: false,
+        description: 'Require all steps to succeed'
+      });
+    }
+
+    if ('timeout' in step && step.timeout) {
+      params.push({
+        name: 'timeout',
+        value: step.timeout,
+        type: 'number',
+        required: false,
+        description: 'Timeout in minutes'
+      });
+    }
+
     if (step.nextSteps) {
       params.push({
         name: 'nextSteps',

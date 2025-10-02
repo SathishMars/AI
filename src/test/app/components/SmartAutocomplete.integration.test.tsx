@@ -4,12 +4,12 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import { createTheme } from '@mui/material/styles';
-import { SmartAutocomplete } from '@/app/components/ConversationPane';
+import { SmartAutocomplete } from '@/app/components/SmartAutocomplete';
 import { ConversationContext } from '@/app/types/conversation';
 
-// Mock the autocomplete providers
-jest.mock('@/app/utils/autocomplete-providers', () => ({
-  AutocompleteManager: jest.fn().mockImplementation(() => ({
+// Mock the unified autocomplete manager
+jest.mock('@/app/utils/unified-autocomplete-manager', () => ({
+  UnifiedAutocompleteManager: jest.fn().mockImplementation(() => ({
     getSuggestions: jest.fn().mockImplementation(async (text, cursorPosition) => {
       const textBeforeCursor = text.substring(0, cursorPosition);
       

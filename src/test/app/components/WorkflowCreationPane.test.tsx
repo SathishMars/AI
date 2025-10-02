@@ -104,7 +104,7 @@ jest.mock('@/app/utils/conversation-manager', () => ({
 }));
 
 // Mock AutoComplete component
-jest.mock('@/app/components/ConversationPane', () => ({
+jest.mock('@/app/components/SmartAutocomplete', () => ({
   SmartAutocomplete: jest.fn(({ value, onChange, onKeyPress, placeholder }) => (
     <textarea
       data-testid="smart-autocomplete"

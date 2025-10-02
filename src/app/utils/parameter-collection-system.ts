@@ -1,18 +1,20 @@
 // src/app/utils/parameter-collection-system.ts
 import { 
-  FunctionDefinition, 
+  FunctionDefinition,
   FunctionParameter
 } from '@/app/types/workflow';
-import { ConversationStateManager } from './conversation-manager';
 import { enhancedFunctionsLibrary } from './functions-library';
+import { ConversationStateManager } from './conversation-manager';
 
 export interface ParameterCollectionContext {
   conversationId: string;
-  workflowId: string;
+  workflowId?: string;
   stepId: string;
   functionName: string;
   stepType: 'trigger' | 'action';
   currentValues?: Record<string, unknown>;
+  missingParameters?: string[];
+  lastPrompted?: string;
 }
 
 export interface ParameterCollectionResult {
@@ -20,6 +22,11 @@ export interface ParameterCollectionResult {
   parameters: Record<string, unknown>;
   missingParameters: string[];
   validationErrors: string[];
+}
+
+interface ValidationResult {
+  isValid: boolean;
+  error?: string;
 }
 
 export interface ParameterChoice {
@@ -540,7 +547,78 @@ What would you like to do?`,
   private getFunctionDefinition(functionName: string): FunctionDefinition | null {
     // Remove 'functions.' prefix if present
     const cleanName = functionName.replace(/^functions\./, '');
-    return enhancedFunctionsLibrary.functions[cleanName] || null;
+    
+    // First check the enhanced functions library
+    const libraryFunction = enhancedFunctionsLibrary.functions[cleanName];
+    if (libraryFunction) {
+      return libraryFunction;
+    }
+    
+    // Then check trigger functions from autocomplete system
+    try {
+      // Dynamic import to avoid circular dependencies
+      const { getTriggerFunctionAutocomplete } = eval('require')('@/app/data/workflow-conversation-autocomplete');
+      const triggerFunctions = getTriggerFunctionAutocomplete();
+      const triggerFunction = triggerFunctions.find((f: unknown) => (f as { name: string }).name === cleanName);
+      
+      if (triggerFunction) {
+        const func = triggerFunction as {
+          id: string;
+          name: string;
+          description: string;
+          tags?: string[];
+          parameters?: unknown[];
+          examples?: string[];
+          llmInstructions?: { usage?: string };
+        };
+        
+        // Convert autocomplete format to FunctionDefinition format
+        return {
+          id: func.id,
+          name: func.name,
+          description: func.description,
+          version: '1.0.0',
+          namespace: 'triggers',
+          category: 'trigger',
+          tags: func.tags || ['trigger'],
+          parameters: (func.parameters || []).reduce((acc: Record<string, FunctionParameter>, param: unknown) => {
+            const p = param as {
+              name: string;
+              type: string;
+              required: boolean;
+              description: string;
+              defaultValue?: unknown;
+              placeholder?: string;
+              validation?: unknown;
+            };
+            acc[p.name] = {
+              type: p.type,
+              required: p.required,
+              description: p.description,
+              default: p.defaultValue,
+              examples: p.placeholder ? [p.placeholder] : []
+              // Note: validation field omitted as it requires specific Zod schema
+            };
+            return acc;
+          }, {}),
+          returnType: 'void',
+          examples: [],
+          documentation: {
+            description: func.description,
+            usage: func.llmInstructions?.usage || '',
+            aiPromptHints: [],
+            commonUseCases: func.examples || []
+          },
+          lifecycle: 'active' as const,
+          compatibleVersions: ['1.0.0']
+        };
+      }
+    } catch {
+      // Fallback if autocomplete system is not available
+      console.warn(`Could not load trigger function: ${cleanName}`);
+    }
+    
+    return null;
   }
 
   /**

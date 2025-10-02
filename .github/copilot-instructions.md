@@ -245,6 +245,12 @@ import "@fontsource/roboto/700.css";
 - Use ES2017 target for broad compatibility
 - Prefer explicit typing over `any`
 
+### Development Server Guidelines
+- **CRITICAL: Never automatically start server runtimes** - AI tools should NOT use `npm run dev`, `npm start`, or similar commands to start development servers
+- **Ask developer to test**: When code changes are complete, instruct the developer to start the server manually to test the updates
+- **Exception**: Only use `run_in_terminal` for server commands if explicitly requested by the developer
+- **Testing**: Use `npm test` for automated testing, but avoid starting long-running processes automatically
+
 ## Migration Context
 
 ### Rails Integration Points

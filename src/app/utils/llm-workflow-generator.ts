@@ -214,8 +214,8 @@ WORKFLOW SCHEMA:
   "steps": {
     "stepName": {
       "name": "Display Name",
-      "type": "trigger|condition|action|end",
-      "action": "function.name", // for trigger/action steps
+      "type": "trigger|condition|action|end|branch|merge",
+      "action": "function.name", // for trigger/action/branch/merge steps
       "condition": { // for condition steps - json-rules-engine format
         "all": [{"fact": "string", "operator": "string", "value": any}],
         "any": [{"fact": "string", "operator": "string", "value": any}]
@@ -223,13 +223,36 @@ WORKFLOW SCHEMA:
       "params": {}, // parameters for actions
       "nextSteps": ["array"], // for linear flow
       "onSuccess": "stepName", // for conditional flow
-      "onFailure": "stepName"  // for conditional flow
+      "onFailure": "stepName", // for conditional flow
+      // Enhanced condition outputs:
+      "onApproval": "stepName", // for approval conditions
+      "onYes": "stepName", // for yes/no conditions
+      "onReject": "stepName", // for rejection conditions
+      "onNo": "stepName", // for no conditions
+      // Branch/merge properties:
+      "branches": ["stepName1", "stepName2"], // for branch steps
+      "waitForSteps": ["stepName1", "stepName2"], // for merge steps
+      "requireAllSuccess": true, // for merge steps
+      "timeout": 60 // for merge steps (minutes)
     }
   }
 }
 
+FUNCTION TYPES:
+- ACTION: Can lead to single or multiple next steps (onSuccess/onFailure)
+- CONDITION: Decision points with enhanced outputs (onSuccess/onFailure, onApproval/onYes, onReject/onNo)
+- TRIGGER: Workflow entry points (onMRFSubmit, onRequest, onScheduledEvent)
+- BRANCH: Split workflow into parallel paths (fnBranchWorkflow)
+- MERGE: Wait for multiple steps to complete (fnMergeWorkflow)
+
 AVAILABLE FUNCTIONS:
 ${context.availableFunctions.map(fn => `- ${fn}`).join('\n')}
+
+ENHANCED FUNCTIONS:
+- fnBranchWorkflow: Split into parallel execution paths
+- fnMergeWorkflow: Wait for multiple steps to complete before proceeding
+- fnRequestApproval: Enhanced approval with onApproval/onYes and onReject/onNo outputs
+- fnEnhancedCondition: Advanced conditions with multiple output paths
 
 JSON-RULES-ENGINE OPERATORS:
 - equal, notEqual
@@ -246,11 +269,15 @@ FACT PATTERNS:
 RULES:
 1. ALWAYS return valid JSON only - no explanations
 2. Use json-rules-engine condition format exactly
-3. Reference available functions only
-4. Use provided fact patterns
-5. If currentWorkflow is provided, MODIFY and EXTEND it rather than creating from scratch
-6. Maintain existing step connections and references when modifying workflows
-7. Build upon existing workflow structure intelligently
+3. CRITICAL: For trigger steps, use ONLY the trigger functions listed above (onRequest, onMRF)
+4. CRITICAL: If trigger functions have parameters, include them in the params object
+5. For APPROVAL workflows, use onApproval/onYes for approval, onReject/onNo for rejection
+6. For PARALLEL execution, use fnBranchWorkflow with branches array
+7. For SYNCHRONIZATION, use fnMergeWorkflow with waitForSteps array
+8. If currentWorkflow is provided, MODIFY and EXTEND it rather than creating from scratch
+9. Maintain existing step connections and references when modifying workflows
+10. Build upon existing workflow structure intelligently
+11. When using trigger functions with optional parameters, set appropriate defaults (requestType: 'all', mrfTemplateName: 'all')
 
 ${currentWorkflow ? `
 CURRENT WORKFLOW TO MODIFY:

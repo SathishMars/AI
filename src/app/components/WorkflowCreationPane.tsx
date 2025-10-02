@@ -1,4 +1,3 @@
-// src/app/components/WorkflowCreationPane.tsx
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
@@ -32,10 +31,26 @@ import {
 import { ConversationMessage } from '@/app/types/conversation';
 import { WorkflowCreationFlow } from '@/app/utils/workflow-creation-flow';
 import { createEmptyConversationState, ConversationStateManager } from '@/app/utils/conversation-manager';
-import { SmartAutocomplete } from './ConversationPane';
-import { populateFunctionSchemas, DEFAULT_REFERENCE_DATA } from '@/app/utils/function-schemas';
+import { SmartAutocomplete } from './SmartAutocomplete';
+import { generateLLMWorkflowContext } from '@/app/utils/llm-workflow-context';
 import { ConversationHistoryMessage } from '@/app/utils/llm-workflow-generator';
-import { useAccount } from '@/app/hooks/useAccount';
+import { WorkflowAutocompleteItem } from '@/app/types/workflow-conversation-autocomplete';
+
+// Helper to fetch available functions from unified API
+const fetchAvailableFunctions = async (): Promise<string[]> => {
+  try {
+    const response = await fetch('/api/workflow-autocomplete?category=function&includeMetadata=false');
+    if (response.ok) {
+      const { data } = await response.json();
+      return data.autocompleteItems?.map((item: WorkflowAutocompleteItem) => item.name) || [];
+    }
+  } catch (error) {
+    console.warn('Could not fetch available functions, using fallback:', error);
+  }
+  
+  // Fallback to basic function list
+  return ['sendEmail', 'requestApproval', 'createEvent'];
+};
 
 // Memoized message item component to prevent unnecessary re-renders
 const MessageItem = memo(({ message, isStreaming }: { message: ConversationMessage; isStreaming: boolean }) => (
@@ -145,6 +160,7 @@ export default function WorkflowCreationPane({
   const [conversationManager, setConversationManager] = useState<ConversationStateManager | null>(null);
   const [currentMessage, setCurrentMessage] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+  const [conversationContext, setConversationContext] = useState<CreationContext | null>(null);
   
   // UI state
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -158,17 +174,23 @@ export default function WorkflowCreationPane({
         
         const workflowId = workflow.metadata?.id || 'new-workflow';
         
+        // Fetch available functions from API
+        const availableFunctions = await fetchAvailableFunctions();
+        
         // Create conversation context
         const context: CreationContext = {
           workflowId,
           workflowName: workflow.metadata?.name || 'New Workflow',
           userRole: 'admin',
           userDepartment: 'IT',
-          availableFunctions: [],
+          availableFunctions,
           conversationGoal: isNewWorkflow ? 'create' : 'edit',
           currentWorkflowSteps: Object.keys(workflow.steps || {}),
           mrfData
         };
+        
+        // Set the context state
+        setConversationContext(context);
         
         // Try to load existing conversation first
         const existingConversationKey = `conversation_${workflowId}`;
@@ -275,33 +297,6 @@ export default function WorkflowCreationPane({
     return history;
   }, [conversationManager]);
 
-  // Get current conversation context
-  const getCurrentContext = useCallback((): CreationContext => {
-    if (currentSession) {
-      return currentSession.context;
-    }
-    
-    // Default context with enhanced data
-    return {
-      workflowId: workflow.metadata?.id || 'new-workflow',
-      workflowName: workflow.metadata?.name || 'New Workflow',
-      userRole: 'admin',
-      userDepartment: 'IT',
-      availableFunctions: [
-        'onMRFSubmit',
-        'requestApproval', 
-        'createEvent',
-        'sendNotification',
-        'onScheduledEvent',
-        'onApprovalReceived',
-        'updateMRFStatus'
-      ],
-      conversationGoal: isNewWorkflow ? 'create' : 'edit',
-      currentWorkflowSteps: Object.keys(workflow.steps || {}),
-      mrfData
-    };
-  }, [currentSession, workflow, isNewWorkflow, mrfData]);
-  
   // Helper function to add a message and update state properly
   const addMessage = useCallback((content: string, sender: 'user' | 'aime', type: 'text' | 'workflow_generated' = 'text') => {
     if (!conversationManager) return;
@@ -391,16 +386,21 @@ export default function WorkflowCreationPane({
       addMessage(processingMessage, 'aime');
       
       // Call backend API for workflow generation with enhanced context
-      const baseContext = getCurrentContext();
+      if (!conversationContext) {
+        console.error('Conversation context not available');
+        setIsCreating(false);
+        return;
+      }
+      
+      const baseContext = conversationContext;
       const conversationHistory = getConversationHistory();
-      const functionSchemas = populateFunctionSchemas(DEFAULT_REFERENCE_DATA);
+      const workflowContext = generateLLMWorkflowContext();
       
       const enhancedContext = {
         ...baseContext,
         // Add enhanced data for LLM context
         conversationHistory,
-        functionSchemas,
-        referenceData: DEFAULT_REFERENCE_DATA
+        workflowContext // Unified context for functions, variables, etc.
       };
       
       const response = await fetch('/api/generate-workflow', {
@@ -661,7 +661,7 @@ export default function WorkflowCreationPane({
             placeholder="Describe what you want to build... Use @ for functions, # for steps, mrf. for form fields, user. for user info"
             disabled={isStreaming || isCreating}
             inputRef={inputRef}
-            context={getCurrentContext()}
+            context={conversationContext || undefined}
           />
           
           <Tooltip title="Send message">
