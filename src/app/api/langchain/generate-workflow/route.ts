@@ -1,6 +1,7 @@
 // src/app/api/langchain/generate-workflow/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { createLangChainWorkflowGenerator } from '@/app/utils/langchain/langchain-workflow-generator';
+import { getLLMFactory } from '@/app/utils/langchain/providers/llm-factory';
 import type { 
   LangChainWorkflowConfig, 
   WorkflowGenerationContext, 
@@ -50,6 +51,17 @@ export async function POST(request: NextRequest) {
 
     console.log(`🎯 Generating workflow for session: ${config.sessionId}`);
 
+    // Get current LLM factory to detect provider information
+    const llmFactory = getLLMFactory();
+    const availableProviders = llmFactory.getAvailableProviders();
+    const currentProvider = config.provider || llmFactory.getDefaultProvider();
+
+    console.log(`🤖 Using LLM provider: ${currentProvider}`);
+    if (currentProvider === 'lmstudio') {
+      console.log(`🏠 LM Studio endpoint: ${process.env.LMSTUDIO_BASE_URL || 'http://localhost:1234/v1'}`);
+      console.log(`🎯 LM Studio model: ${process.env.LMSTUDIO_MODEL || 'llama-3.1-8b-instruct'}`);
+    }
+
     // Create LangChain workflow generator (factory function handles initialization)
     const generator = await createLangChainWorkflowGenerator(config);
 
@@ -68,10 +80,19 @@ export async function POST(request: NextRequest) {
         metadata: {
           sessionId: config.sessionId,
           workflowId: config.workflowId,
-          provider: config.provider || 'default',
+          provider: currentProvider,
+          availableProviders: availableProviders,
           conversationalMode: config.conversationalMode || false,
           generatedAt: new Date().toISOString(),
-          availableTools: generator.getAvailableTools().length
+          availableTools: generator.getAvailableTools().length,
+          // LM Studio specific metadata
+          ...(currentProvider === 'lmstudio' && {
+            lmstudio: {
+              endpoint: process.env.LMSTUDIO_BASE_URL || 'http://localhost:1234/v1',
+              model: process.env.LMSTUDIO_MODEL || 'llama-3.1-8b-instruct',
+              enabled: process.env.LMSTUDIO_ENABLED === 'true'
+            }
+          })
         }
       }
     };
@@ -118,14 +139,34 @@ export async function GET() {
 
     const generator = await createLangChainWorkflowGenerator(testConfig);
     const availableTools = generator.getAvailableTools();
+    
+    // Get provider information
+    const llmFactory = getLLMFactory();
+    const availableProviders = llmFactory.getAvailableProviders();
+    const defaultProvider = llmFactory.getDefaultProvider();
 
     const healthStatus = {
       status: 'healthy',
       langchain: {
         available: true,
         toolsLoaded: availableTools.length,
-        providers: ['openai', 'anthropic'],
-        memoryEnabled: true
+        providers: {
+          available: availableProviders,
+          default: defaultProvider,
+          configured: {
+            openai: !!process.env.OPENAI_API_KEY,
+            anthropic: !!process.env.ANTHROPIC_API_KEY,
+            lmstudio: process.env.LMSTUDIO_ENABLED === 'true' || !!process.env.LMSTUDIO_BASE_URL
+          }
+        },
+        memoryEnabled: true,
+        ...(availableProviders.includes('lmstudio') && {
+          lmstudio: {
+            endpoint: process.env.LMSTUDIO_BASE_URL || 'http://localhost:1234/v1',
+            model: process.env.LMSTUDIO_MODEL || 'llama-3.1-8b-instruct',
+            enabled: process.env.LMSTUDIO_ENABLED === 'true'
+          }
+        })
       },
       timestamp: new Date().toISOString()
     };

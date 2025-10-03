@@ -8,7 +8,7 @@ import { createWorkflowMemory } from "./memory/mongodb-memory";
 import { WorkflowJSON, ValidationResult } from "@/app/types/workflow";
 
 export interface LangChainWorkflowConfig {
-  provider?: 'openai' | 'anthropic';
+  provider?: 'openai' | 'anthropic' | 'lmstudio';
   sessionId: string;
   workflowId: string;
   userId?: string;

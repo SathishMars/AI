@@ -3,7 +3,7 @@ import { ChatOpenAI } from "@langchain/openai";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { BaseChatModel } from "@langchain/core/language_models/chat_models";
 
-export type LLMProvider = 'openai' | 'anthropic';
+export type LLMProvider = 'openai' | 'anthropic' | 'lmstudio';
 
 export interface LLMConfig {
   provider: LLMProvider;
@@ -12,6 +12,9 @@ export interface LLMConfig {
   maxTokens?: number;
   streaming?: boolean;
   apiKey?: string;
+  // LM Studio specific config
+  baseURL?: string;
+  endpoint?: string;
 }
 
 export interface LLMModelConfig {
@@ -96,6 +99,32 @@ export const DEFAULT_MODEL_CONFIGS: Record<LLMProvider, LLMModelConfig> = {
       maxTokens: 3000,
       streaming: true
     }
+  },
+  lmstudio: {
+    workflow_build: {
+      model: process.env.LMSTUDIO_MODEL || 'llama-3.1-8b-instruct',
+      temperature: 0.1,
+      maxTokens: 4000,
+      streaming: true
+    },
+    workflow_edit: {
+      model: process.env.LMSTUDIO_MODEL || 'llama-3.1-8b-instruct',
+      temperature: 0.1,
+      maxTokens: 4000,
+      streaming: true
+    },
+    mermaid_generate: {
+      model: process.env.LMSTUDIO_MODEL || 'llama-3.1-8b-instruct',
+      temperature: 0.1,
+      maxTokens: 2000,
+      streaming: false
+    },
+    conversation: {
+      model: process.env.LMSTUDIO_MODEL || 'llama-3.1-8b-instruct',
+      temperature: 0.3,
+      maxTokens: 3000,
+      streaming: true
+    }
   }
 };
 
@@ -138,9 +167,17 @@ export class LLMFactory {
       }
     }
 
+    // Check for LM Studio configuration
+    if (process.env.LMSTUDIO_ENABLED === 'true' || process.env.LMSTUDIO_BASE_URL) {
+      this.availableProviders.add('lmstudio');
+      if (!this.defaultProvider) {
+        this.defaultProvider = 'lmstudio';
+      }
+    }
+
     if (this.availableProviders.size === 0) {
       throw new Error(
-        'No LLM providers available. Please set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variables.'
+        'No LLM providers available. Please set OPENAI_API_KEY, ANTHROPIC_API_KEY, or LMSTUDIO_ENABLED=true environment variables.'
       );
     }
 
@@ -208,6 +245,26 @@ export class LLMFactory {
           }
         });
 
+      case 'lmstudio':
+        // LM Studio uses OpenAI-compatible API
+        const baseURL = process.env.LMSTUDIO_BASE_URL || 'http://localhost:1234/v1';
+        const apiKey = process.env.LMSTUDIO_API_KEY || 'lm-studio'; // LM Studio doesn't require real API key
+        
+        console.log(`🏠 Creating LM Studio model: ${config.model} at ${baseURL}`);
+        
+        return new ChatOpenAI({
+          apiKey: apiKey,
+          model: config.model,
+          temperature: config.temperature,
+          maxTokens: config.maxTokens,
+          streaming: config.streaming,
+          timeout: 60000, // LM Studio might be slower
+          maxRetries: 2,
+          configuration: {
+            baseURL: baseURL
+          }
+        });
+
       default:
         throw new Error(`Unsupported LLM provider: ${selectedProvider}`);
     }
@@ -250,6 +307,8 @@ export class LLMFactory {
         return !!process.env.OPENAI_API_KEY;
       case 'anthropic':
         return !!process.env.ANTHROPIC_API_KEY;
+      case 'lmstudio':
+        return process.env.LMSTUDIO_ENABLED === 'true' || !!process.env.LMSTUDIO_BASE_URL;
       default:
         return false;
     }
