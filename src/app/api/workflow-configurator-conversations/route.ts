@@ -138,13 +138,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
  */
 async function handleCreateConversation(data: {
   templateName?: string;
-  conversationId?: string;
   initialMessage?: ConfiguratorMessage;
   userAgent?: string;
   account: string;
   organization?: string | null;
 }): Promise<NextResponse> {
-  const { templateName, conversationId, initialMessage, userAgent, account, organization } = data;
+  const { templateName, initialMessage, userAgent, account, organization } = data;
 
   if (!templateName) {
     return NextResponse.json(
@@ -158,7 +157,6 @@ async function handleCreateConversation(data: {
     account,
     organization: organization || null,
     workflowTemplateName: templateName,
-    conversationId,
     initialMessage,
     userAgent
   });
@@ -174,14 +172,13 @@ async function handleCreateConversation(data: {
  */
 async function handleAddMessage(data: {
   templateName?: string;
-  conversationId?: string;
   role?: string;
   content?: string;
   metadata?: ConfiguratorMessageMetadata;
   account: string;
   organization?: string | null;
 }): Promise<NextResponse> {
-  const { templateName, conversationId, role, content, metadata, account, organization } = data;
+  const { templateName, role, content, metadata, account, organization } = data;
 
   if (!templateName) {
     return NextResponse.json(
@@ -205,15 +202,20 @@ async function handleAddMessage(data: {
   }
 
   // Add message to conversation
-  const message = await addMessageToConversation({
+  const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
+  const message = await addMessageToConversation(
     account,
-    organization: organization || null,
-    workflowTemplateName: templateName,
-    conversationId,
-    role: role as ConfiguratorMessageRole,
-    content,
-    metadata
-  });
+    organization || null,
+    templateName,
+    {
+      messageId,
+      role: role as ConfiguratorMessageRole,
+      content,
+      timestamp: new Date(),
+      ...(metadata && { metadata })
+    }
+  );
 
   return NextResponse.json({
     success: true,
@@ -226,11 +228,10 @@ async function handleAddMessage(data: {
  */
 async function handleUpdateActivity(data: {
   templateName?: string;
-  conversationId?: string;
   account: string;
   organization?: string | null;
 }): Promise<NextResponse> {
-  const { templateName, conversationId, account, organization } = data;
+  const { templateName, account, organization } = data;
 
   if (!templateName) {
     return NextResponse.json(
@@ -239,15 +240,8 @@ async function handleUpdateActivity(data: {
     );
   }
 
-  if (!conversationId) {
-    return NextResponse.json(
-      { error: 'Conversation ID is required' },
-      { status: 400 }
-    );
-  }
-
   // Update conversation activity
-  await updateConversationActivity(account, templateName, conversationId, organization);
+  await updateConversationActivity(account, templateName, organization);
 
   return NextResponse.json({
     success: true,

@@ -237,10 +237,21 @@ export const MRF_CONTEXT_PROPERTIES = [
 ] as const;
 
 // Helper functions
-export function createEmptyConversationState(workflowId: string, context: ConversationContext): ConversationState {
+export function createEmptyConversationState(
+  workflowId: string, 
+  context: ConversationContext,
+  workflowContext?: { account: string; organization?: string | null; workflowTemplateName: string }
+): ConversationState {
+  // Generate conversation ID based on context if available, otherwise use random
+  const conversationId = workflowContext 
+    ? (workflowContext.organization 
+        ? `${workflowContext.account}-${workflowContext.organization}-${workflowContext.workflowTemplateName}`
+        : `${workflowContext.account}-${workflowContext.workflowTemplateName}`)
+    : `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
   return {
     workflowId,
-    conversationId: `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    conversationId,
     messages: [],
     isStreaming: false,
     context,

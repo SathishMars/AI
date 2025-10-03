@@ -196,7 +196,7 @@ db.createCollection('workflowConfiguratorConversations', {
   validator: {
     $jsonSchema: {
       bsonType: "object",
-      required: ["account", "workflowTemplateName", "conversationId", "sessionInfo"],
+      required: ["account", "workflowTemplateName", "sessionInfo"],
       properties: {
         account: {
           bsonType: "string",
@@ -209,10 +209,6 @@ db.createCollection('workflowConfiguratorConversations', {
         workflowTemplateName: {
           bsonType: "string",
           description: "Name of the workflow template this conversation belongs to"
-        },
-        conversationId: {
-          bsonType: "string",
-          description: "Unique conversation identifier"
         },
         sessionInfo: {
           bsonType: "object",
@@ -279,9 +275,9 @@ print('📊 Creating indexes for workflowConfiguratorConversations...');
 
 // Primary lookup index - one conversation per template per account/organization
 db.workflowConfiguratorConversations.createIndex(
-  { account: 1, organization: 1, workflowTemplateName: 1, conversationId: 1 },
+  { account: 1, organization: 1, workflowTemplateName: 1 },
   { 
-    name: "idx_account_org_template_conversation",
+    name: "idx_account_org_template_unique",
     unique: true,
     background: true 
   }

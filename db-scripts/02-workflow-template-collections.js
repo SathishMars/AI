@@ -257,7 +257,7 @@ if (!collections.includes('workflowConfiguratorConversations')) {
       validator: {
         $jsonSchema: {
           bsonType: "object",
-          required: ["account", "workflowTemplateName", "conversationId", "sessionInfo"],
+          required: ["account", "workflowTemplateName", "sessionInfo"],
           properties: {
             account: {
               bsonType: "string",
@@ -270,10 +270,6 @@ if (!collections.includes('workflowConfiguratorConversations')) {
             workflowTemplateName: {
               bsonType: "string",
               description: "Name of the workflow template this conversation belongs to"
-            },
-            conversationId: {
-              bsonType: "string",
-              description: "Unique conversation identifier"
             },
             messages: {
               bsonType: "array",
@@ -316,9 +312,9 @@ if (!collections.includes('workflowConfiguratorConversations')) {
   
   // Create new indexes
   createIndexSafely(conversationCollection,
-    { account: 1, organization: 1, workflowTemplateName: 1, conversationId: 1 },
+    { account: 1, organization: 1, workflowTemplateName: 1 },
     { 
-      name: "idx_account_org_template_conversation",
+      name: "idx_account_org_template_unique",
       unique: true,
       background: true 
     }

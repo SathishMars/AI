@@ -246,7 +246,7 @@ describe('Workflow Template Database Operations', () => {
 
       expect(result.status).toBe('published');
       expect(mockTemplatesCollection.findOneAndUpdate).toHaveBeenCalledWith(
-        { name: 'test-workflow', version: '1.0.0' },
+        { account: 'test-account', name: 'test-workflow', version: '1.0.0' },
         { 
           $set: { 
             status: 'published',
@@ -464,7 +464,7 @@ describe('Workflow Template Database Operations', () => {
 
       await listWorkflowTemplates('test-account', { status: 'published' }, 1, 10);
 
-      expect(mockTemplatesCollection.find).toHaveBeenCalledWith({ status: 'published' });
+      expect(mockTemplatesCollection.find).toHaveBeenCalledWith({ account: 'test-account', status: 'published' });
     });
   });
 
@@ -480,6 +480,7 @@ describe('Workflow Template Database Operations', () => {
 
       expect(result).toBe(true);
       expect(mockTemplatesCollection.deleteOne).toHaveBeenCalledWith({
+        account: 'test-account',
         name: 'test-workflow',
         version: '1.0.0'
       });
@@ -506,14 +507,13 @@ describe('Workflow Template Database Operations', () => {
         const input = {
           account: 'test-account',
           workflowTemplateName: 'test-workflow',
-          conversationId: 'conv-123',
           userAgent: 'test-browser'
         };
 
         const result = await createConfiguratorConversation(input);
 
         expect(result.workflowTemplateName).toBe(input.workflowTemplateName);
-        expect(result.conversationId).toBe(input.conversationId);
+        expect(result.conversationId).toBe('test-account--test-workflow'); // Generated deterministically
         expect(result._id).toBe('mock-conversation-id');
         expect(mockConversationsCollection.insertOne).toHaveBeenCalled();
       });
@@ -523,43 +523,44 @@ describe('Workflow Template Database Operations', () => {
       it('should add message to existing conversation', async () => {
         const mockConversation = {
           _id: 'conv-id',
+          account: 'test-account',
+          organization: null,
           workflowTemplateName: 'test-workflow',
-          conversationId: 'conv-123',
           messages: []
         };
 
+        mockConversationsCollection.updateOne.mockResolvedValue({ modifiedCount: 1 });
         mockConversationsCollection.findOne.mockResolvedValue(mockConversation);
 
-        const input = {
-          account: 'test-account',
-          workflowTemplateName: 'test-workflow',
-          conversationId: 'conv-123',
+        const message = {
+          messageId: 'msg_123',
           role: 'user' as const,
-          content: 'Hello, aime!'
+          content: 'Hello, aime!',
+          timestamp: new Date()
         };
 
-        const result = await addMessageToConversation(input);
+        const result = await addMessageToConversation('test-account', null, 'test-workflow', message);
 
-        expect(result.role).toBe('user');
-        expect(result.content).toBe('Hello, aime!');
+        expect(result).toBeTruthy();
+        expect(result!.workflowTemplateName).toBe('test-workflow');
         expect(mockConversationsCollection.updateOne).toHaveBeenCalled();
+        expect(mockConversationsCollection.findOne).toHaveBeenCalled();
       });
 
-      it('should create new conversation if none exists', async () => {
-        mockConversationsCollection.findOne.mockResolvedValue(null);
+      it('should return null if conversation not found', async () => {
+        mockConversationsCollection.updateOne.mockResolvedValue({ modifiedCount: 0 });
 
-        const input = {
-          account: 'test-account',
-          workflowTemplateName: 'test-workflow',
-          conversationId: 'conv-123',
+        const message = {
+          messageId: 'msg_123',
           role: 'user' as const,
-          content: 'Hello, aime!'
+          content: 'Hello, aime!',
+          timestamp: new Date()
         };
 
-        const result = await addMessageToConversation(input);
+        const result = await addMessageToConversation('test-account', null, 'test-workflow', message);
 
-        expect(result.content).toBe('Hello, aime!');
-        expect(mockConversationsCollection.insertOne).toHaveBeenCalled();
+        expect(result).toBeNull();
+        expect(mockConversationsCollection.updateOne).toHaveBeenCalled();
       });
     });
 
@@ -568,8 +569,9 @@ describe('Workflow Template Database Operations', () => {
         const mockConversations = [
           {
             _id: { toString: () => 'conv-1' },
+            account: 'test-account',
+            organization: null,
             workflowTemplateName: 'test-workflow',
-            conversationId: 'conv-1',
             messages: []
           }
         ];
@@ -586,6 +588,7 @@ describe('Workflow Template Database Operations', () => {
 
         expect(result).toHaveLength(1);
         expect(result[0].workflowTemplateName).toBe('test-workflow');
+        expect(result[0].conversationId).toBe('test-account--test-workflow'); // Generated deterministically
       });
     });
   });

@@ -1,5 +1,6 @@
 // src/app/utils/workflow-template-database.ts
 import { getMongoDatabase } from './mongodb-connection';
+import { generateConversationId } from './conversation-id-generator';
 import {
   WorkflowTemplate,
   ConfiguratorConversation,
@@ -9,7 +10,6 @@ import {
   TemplateListResponse,
   TemplateResolutionResult,
   CreateConversationInput,
-  AddMessageInput,
   ConfiguratorMessage,
   TemplateStateManager,
   TemplateError,
@@ -541,9 +541,6 @@ export async function createConfiguratorConversation(
     const db = await getMongoDatabase();
     const collection = db.collection(COLLECTION_CONVERSATIONS);
 
-    // Generate conversation ID if not provided
-    const conversationId = input.conversationId || `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
     // Calculate retention expiry (5 years from now)
     const expiresAt = new Date();
     expiresAt.setFullYear(expiresAt.getFullYear() + 5);
@@ -553,7 +550,6 @@ export async function createConfiguratorConversation(
       account: input.account,
       organization: input.organization || null, // Set to null if not provided for account-wide templates
       workflowTemplateName: input.workflowTemplateName,
-      conversationId,
       messages: input.initialMessage ? [input.initialMessage] : [],
       sessionInfo: {
         startedAt: new Date(),
@@ -583,10 +579,19 @@ export async function createConfiguratorConversation(
     // Insert conversation
     const result = await collection.insertOne(conversationDoc);
     
-    return {
+    // Return conversation with generated conversationId for frontend compatibility
+    const resultConversation: ConfiguratorConversation = {
       ...conversationDoc,
-      _id: result.insertedId.toString()
+      _id: result.insertedId.toString(),
+      // Add deterministic conversationId for API compatibility
+      conversationId: generateConversationId(
+        conversationDoc.account,
+        conversationDoc.organization,
+        conversationDoc.workflowTemplateName
+      )
     };
+    
+    return resultConversation;
 
   } catch (error) {
     if (error instanceof ConversationError) throw error;
@@ -604,77 +609,65 @@ export async function createConfiguratorConversation(
  * Add a message to an existing conversation
  */
 export async function addMessageToConversation(
-  input: AddMessageInput
-): Promise<ConfiguratorMessage> {
+  account: string,
+  organization: string | null,
+  workflowTemplateName: string,
+  message: ConfiguratorMessage
+): Promise<ConfiguratorConversation | null> {
   try {
     const db = await getMongoDatabase();
-    const collection = db.collection(COLLECTION_CONVERSATIONS);
-
-    // Generate message ID
-    const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-    // Build message
-    const message: ConfiguratorMessage = {
-      messageId,
-      role: input.role,
-      content: input.content,
-      timestamp: new Date(),
-      metadata: input.metadata
-    };
-
-    // Find conversation (create if not exists)
-    const conversation = await collection.findOne({ 
-      account: input.account,
-      organization: input.organization || null,
-      workflowTemplateName: input.workflowTemplateName,
-      conversationId: input.conversationId || { $exists: true }
-    });
-
-    if (!conversation) {
-      // Create new conversation
-      await createConfiguratorConversation({
-        account: input.account,
-        organization: input.organization,
-        workflowTemplateName: input.workflowTemplateName,
-        conversationId: input.conversationId,
-        initialMessage: message
-      });
-      return message;
-    }
-
-    // Add message to existing conversation
-    // Use a two-step approach to avoid TypeScript conflicts with MongoDB operations
     
-    // First, update the session info
-    await collection.updateOne(
-      { _id: conversation._id },
-      {
-        $set: {
-          'sessionInfo.lastActivity': new Date(),
-          'sessionInfo.isActive': true
-        }
+    // Convert message to plain object for MongoDB
+    const messageDoc = {
+      messageId: message.messageId,
+      role: message.role,
+      content: message.content,
+      timestamp: message.timestamp,
+      ...(message.metadata && { metadata: message.metadata })
+    };
+    
+    // Use updateOne and then find to avoid complex type issues
+    const updateResult = await db.collection('workflowConfiguratorConversations').updateOne(
+      { 
+        account, 
+        organization,
+        workflowTemplateName
+      },
+      { 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        $push: { messages: messageDoc } as any,
+        $set: { lastUpdated: new Date() }
       }
     );
 
-    // Then, push the message
-    await collection.updateOne(
-      { _id: conversation._id },
-      {
-        $push: { messages: message }
-      } as Record<string, unknown>
-    );
+    if (updateResult.modifiedCount === 0) {
+      return null;
+    }
 
-    return message;
+    // Fetch the updated document
+    const result = await db.collection('workflowConfiguratorConversations').findOne({
+      account, 
+      organization,
+      workflowTemplateName
+    });
 
+    if (!result) {
+      return null;
+    }
+
+    return {
+      ...result,
+      _id: result._id.toString(),
+      // Add deterministic conversationId for frontend compatibility
+      conversationId: generateConversationId(
+        result.account,
+        result.organization,
+        result.workflowTemplateName
+      )
+    } as ConfiguratorConversation;
   } catch (error) {
-    if (error instanceof ConversationError) throw error;
-    
-    console.error('Failed to add message to conversation:', error);
-    throw new ConversationError(
-      'Failed to add message to conversation',
-      'ADD_MESSAGE_ERROR',
-      { originalError: error instanceof Error ? error.message : String(error) }
-    );
+    console.error('Error adding message to conversation:', error);
+    throw error;
   }
 }
 
@@ -710,7 +703,13 @@ export async function getConversationHistory(
 
     return conversations.map(conv => ({
       ...conv,
-      _id: conv._id.toString()
+      _id: conv._id.toString(),
+      // Add deterministic conversationId for frontend compatibility
+      conversationId: generateConversationId(
+        conv.account,
+        conv.organization,
+        conv.workflowTemplateName
+      )
     })) as ConfiguratorConversation[];
 
   } catch (error) {
@@ -729,7 +728,6 @@ export async function getConversationHistory(
 export async function updateConversationActivity(
   account: string,
   workflowTemplateName: string,
-  conversationId: string,
   organization?: string | null
 ): Promise<void> {
   try {
@@ -739,8 +737,7 @@ export async function updateConversationActivity(
     // Build filter
     const filter: Record<string, string | null> = { 
       account, 
-      workflowTemplateName, 
-      conversationId 
+      workflowTemplateName
     };
     
     // Include organization if provided

@@ -257,8 +257,12 @@ export class MultiConversationStateManager implements MultiConversationManager {
   private conversationManagers: Record<string, ConversationStateManager> = {};
   
   // Conversation lifecycle
-  createConversation(workflowId: string, context: ConversationContext): ConversationState {
-    const conversationState = createEmptyConversationState(workflowId, context);
+  createConversation(
+    workflowId: string, 
+    context: ConversationContext, 
+    workflowContext?: { account: string; organization?: string | null; workflowTemplateName: string }
+  ): ConversationState {
+    const conversationState = createEmptyConversationState(workflowId, context, workflowContext);
     
     this.activeConversations[conversationState.conversationId] = conversationState;
     this.conversationManagers[conversationState.conversationId] = new ConversationStateManager(conversationState);
@@ -271,6 +275,29 @@ export class MultiConversationStateManager implements MultiConversationManager {
     this.enforceMaxConversations();
     
     return conversationState;
+  }
+  
+  // Create or retrieve conversation with workflow context support
+  createOrRetrieveConversation(
+    workflowId: string, 
+    context: ConversationContext,
+    workflowContext?: { account: string; organization?: string | null; workflowTemplateName: string }
+  ): ConversationState {
+    // Generate consistent ID if we have workflow context
+    const targetId = workflowContext 
+      ? (workflowContext.organization 
+          ? `${workflowContext.account}-${workflowContext.organization}-${workflowContext.workflowTemplateName}`
+          : `${workflowContext.account}-${workflowContext.workflowTemplateName}`)
+      : null;
+    
+    // If we have a target ID and conversation exists, return existing
+    if (targetId && this.activeConversations[targetId]) {
+      this.currentConversationId = targetId;
+      return this.activeConversations[targetId];
+    }
+    
+    // Create new conversation
+    return this.createConversation(workflowId, context, workflowContext);
   }
   
   switchConversation(conversationId: string): boolean {

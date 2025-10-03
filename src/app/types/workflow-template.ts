@@ -144,7 +144,7 @@ export interface ConfiguratorConversation {
   account: string; // Account identifier matching template
   organization?: string | null; // Organization identifier within account (null for account-wide templates)
   workflowTemplateName: string; // Name of the workflow template this conversation belongs to
-  conversationId: string; // Unique conversation identifier
+  conversationId?: string; // Generated deterministic ID for frontend (computed from account+org+template)
   messages: ConfiguratorMessage[];
   sessionInfo: ConversationSessionInfo;
   retentionPolicy?: ConversationRetentionPolicy;
@@ -155,7 +155,6 @@ export interface CreateConversationInput {
   account: string;
   organization?: string | null; // Organization identifier (null for account-wide templates)
   workflowTemplateName: string; // Name of the workflow template
-  conversationId?: string; // Generated if not provided
   initialMessage?: ConfiguratorMessage;
   userAgent?: string;
 }
@@ -165,7 +164,6 @@ export interface AddMessageInput {
   account: string;
   organization?: string | null; // Organization identifier (null for account-wide templates)
   workflowTemplateName: string; // Name of the workflow template
-  conversationId?: string;
   role: ConfiguratorMessageRole;
   content: string;
   metadata?: ConfiguratorMessageMetadata;
@@ -256,7 +254,6 @@ export const ConfiguratorConversationSchema = z.object({
   account: z.string().min(1).max(100),
   organization: z.string().nullable().optional(), // Organization identifier (null for account-wide templates)
   workflowTemplateName: z.string().min(1), // Name of the workflow template this conversation belongs to
-  conversationId: z.string().min(1),
   messages: z.array(ConfiguratorMessageSchema),
   sessionInfo: z.object({
     startedAt: z.date(),
