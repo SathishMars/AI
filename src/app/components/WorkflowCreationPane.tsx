@@ -38,20 +38,42 @@ import { generateLLMWorkflowContext } from '@/app/utils/llm-workflow-context';
 import { ConversationHistoryMessage } from '@/app/utils/llm-workflow-generator';
 import { WorkflowAutocompleteItem } from '@/app/types/workflow-conversation-autocomplete';
 
+// Cache for available functions to prevent constant API calls
+let availableFunctionsCache: string[] | null = null;
+let cacheTimestamp = 0;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
 // Helper to fetch available functions from unified API
 const fetchAvailableFunctions = async (): Promise<string[]> => {
+  // Return cached result if still valid
+  const now = Date.now();
+  if (availableFunctionsCache && (now - cacheTimestamp) < CACHE_DURATION) {
+    return availableFunctionsCache;
+  }
+  
   try {
     const response = await fetch('/api/workflow-autocomplete?category=function&includeMetadata=false');
     if (response.ok) {
       const { data } = await response.json();
-      return data.autocompleteItems?.map((item: WorkflowAutocompleteItem) => item.name) || [];
+      const functions = data.autocompleteItems?.map((item: WorkflowAutocompleteItem) => item.name) || [];
+      
+      // Cache the result
+      availableFunctionsCache = functions;
+      cacheTimestamp = now;
+      
+      return functions;
     }
   } catch (error) {
     console.warn('Could not fetch available functions, using fallback:', error);
   }
   
   // Fallback to basic function list
-  return ['sendEmail', 'requestApproval', 'createEvent'];
+  const fallback = ['sendEmail', 'requestApproval', 'createEvent'];
+  if (!availableFunctionsCache) {
+    availableFunctionsCache = fallback;
+    cacheTimestamp = now;
+  }
+  return fallback;
 };
 
 // Memoized message item component to prevent unnecessary re-renders
@@ -169,29 +191,44 @@ export default function WorkflowCreationPane({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   
+  // Stable references to prevent re-renders
+  const workflowIdRef = useRef<string>('');
+  const workflowNameRef = useRef<string>('');
+  
   // Initialize creation session
   useEffect(() => {
+    const currentWorkflowId = workflow.metadata?.id || 'new-workflow';
+    const currentWorkflowName = workflow.metadata?.name || 'New Workflow';
+    
+    // Only reinitialize if the core identifiers have actually changed
+    if (workflowIdRef.current === currentWorkflowId && 
+        workflowNameRef.current === currentWorkflowName &&
+        conversationManager) {
+      return;
+    }
+    
+    workflowIdRef.current = currentWorkflowId;
+    workflowNameRef.current = currentWorkflowName;
+    
     const initializeSession = async () => {
       try {
         console.log('🚀 Initializing workflow creation session');
-        
-        const workflowId = workflow.metadata?.id || 'new-workflow';
         
         // Create workflow context for database integration
         const workflowContextForDb: WorkflowContext = {
           account: 'groupize-demos', // TODO: Get from user context
           organization: null, // TODO: Get from user context if needed
-          workflowTemplateName: workflow.metadata?.name || generateUniqueTemplateName()
+          workflowTemplateName: currentWorkflowName || generateUniqueTemplateName()
         };
         setWorkflowContext(workflowContextForDb);
         
-        // Fetch available functions from API
+        // Fetch available functions from API - cache this to prevent constant calls
         const availableFunctions = await fetchAvailableFunctions();
         
         // Create conversation context
         const context: CreationContext = {
-          workflowId,
-          workflowName: workflow.metadata?.name || 'New Workflow',
+          workflowId: currentWorkflowId,
+          workflowName: currentWorkflowName,
           userRole: 'admin',
           userDepartment: 'IT',
           availableFunctions,
@@ -204,7 +241,7 @@ export default function WorkflowCreationPane({
         setConversationContext(context);
         
         // Try to load existing conversation first
-        const existingConversationKey = `conversation_${workflowId}`;
+        const existingConversationKey = `conversation_${currentWorkflowId}`;
         let manager: ConversationStateManager | null = null;
         
         if (typeof window !== 'undefined' && window.localStorage) {
@@ -233,7 +270,7 @@ export default function WorkflowCreationPane({
         
         // Create new conversation if no existing one found
         if (!manager) {
-          const conversationState = createEmptyConversationState(workflowId, context);
+          const conversationState = createEmptyConversationState(currentWorkflowId, context);
           manager = new ConversationStateManager(conversationState, workflowContextForDb);
           
           // Add combined welcome and guidance message only for new conversations
@@ -250,7 +287,7 @@ export default function WorkflowCreationPane({
         
         // Initialize creation session
         const session = await creationFlow.initiateCreation(
-          workflowId,
+          currentWorkflowId,
           manager.getState().conversationId,
           context,
           mrfData
@@ -266,7 +303,8 @@ export default function WorkflowCreationPane({
     };
     
     initializeSession();
-  }, [workflow.metadata?.id, workflow.metadata?.name, workflow.steps, isNewWorkflow, mrfData, creationFlow]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isNewWorkflow, mrfData]); // Only depend on props that should trigger reinitialization
   
   // Handle auto-save status events
   useEffect(() => {

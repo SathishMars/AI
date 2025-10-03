@@ -60,8 +60,10 @@ export default function ConfigureMyWorkflowPage({ params }: PageProps) {
       }
     };
     
+    
     resolveParams();
-  }, [params, loadTemplate, updateWorkflow]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params]); // Remove function dependencies to prevent infinite loops
 
   const handleSaveTemplate = async (workflowData: WorkflowJSON) => {
     try {
@@ -69,9 +71,7 @@ export default function ConfigureMyWorkflowPage({ params }: PageProps) {
     } catch (err) {
       console.error('Failed to save template:', err);
     }
-  };
-
-  // Show loading state
+  };  // Show loading state
   if (isLoading) {
     return (
       <Container maxWidth="xl" sx={{ py: 4 }}>
