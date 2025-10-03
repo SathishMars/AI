@@ -26,6 +26,7 @@ export default function ConfigureMyWorkflowPage({ params }: PageProps) {
     workflow,
     isLoading,
     error,
+    isAutoSaving,
     isNewTemplate,
     hasUnsavedChanges,
     loadTemplate,
@@ -33,7 +34,9 @@ export default function ConfigureMyWorkflowPage({ params }: PageProps) {
     clearError
   } = useWorkflowTemplate({
     templateName: templateId || undefined,
-    autoLoad: false
+    autoLoad: false,
+    autoSave: true, // Enable auto-save to database
+    autoSaveDelay: 2000 // Auto-save 2 seconds after changes
   });
 
   useEffect(() => {
@@ -119,6 +122,12 @@ export default function ConfigureMyWorkflowPage({ params }: PageProps) {
       {hasUnsavedChanges && (
         <Alert severity="warning" sx={{ mb: 2 }}>
           You have unsaved changes. Make sure to save your work.
+        </Alert>
+      )}
+      
+      {isAutoSaving && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Auto-saving workflow to database...
         </Alert>
       )}
       

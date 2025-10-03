@@ -11,6 +11,11 @@ import {
   ProactiveSuggestion,
   ImplicitBehaviorMetrics
 } from '@/app/types/conversation';
+import { 
+  createConversationApiData, 
+  WorkflowContext,
+  shouldUseDatabaseConversations 
+} from './frontend-conversation-helpers';
 
 export { createEmptyConversationState } from '@/app/types/conversation';
 
@@ -19,9 +24,18 @@ export class ConversationStateManager {
   private autosaveEnabled: boolean = true;
   private autosaveDelay: number = 2000; // 2 seconds after last activity
   private autosaveTimeout: NodeJS.Timeout | null = null;
+  private workflowContext: WorkflowContext | null = null;
   
-  constructor(initialState: ConversationState) {
+  constructor(initialState: ConversationState, workflowContext?: WorkflowContext) {
     this.state = initialState;
+    this.workflowContext = workflowContext || null;
+  }
+  
+  /**
+   * Set the workflow context for database operations
+   */
+  setWorkflowContext(context: WorkflowContext): void {
+    this.workflowContext = context;
   }
   
   // Message management
@@ -178,11 +192,21 @@ export class ConversationStateManager {
     this.state.lastActivity = new Date();
     
     try {
-      // In real implementation, save to backend
       const conversationData = this.getState();
+      
+      // Save to database if we have workflow context
+      if (this.workflowContext && shouldUseDatabaseConversations(
+        this.workflowContext.account, 
+        this.workflowContext.workflowTemplateName
+      )) {
+        await this.saveToDatabaseAPI(conversationData);
+      }
+      
+      // Always save to localStorage as fallback
       if (typeof window !== 'undefined' && window.localStorage) {
         localStorage.setItem(`conversation_${this.state.conversationId}`, JSON.stringify(conversationData));
       }
+      
       console.log('Conversation autosaved:', this.state.conversationId);
     } catch (error) {
       console.error('Failed to autosave conversation:', error);
@@ -191,29 +215,96 @@ export class ConversationStateManager {
     }
   }
   
+  /**
+   * Save conversation to database via API
+   */
+  private async saveToDatabaseAPI(conversationData: ConversationState): Promise<void> {
+    if (!this.workflowContext) return;
+    
+    const apiData = createConversationApiData(this.workflowContext, {
+      conversation: conversationData
+    });
+    
+    const response = await fetch('/api/workflow-configurator-conversations', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(apiData)
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to save conversation: ${response.statusText}`);
+    }
+  }
+  
   async loadConversation(conversationId: string): Promise<boolean> {
     try {
+      // Try to load from database first if we have workflow context
+      if (this.workflowContext && shouldUseDatabaseConversations(
+        this.workflowContext.account, 
+        this.workflowContext.workflowTemplateName
+      )) {
+        const databaseData = await this.loadFromDatabaseAPI();
+        if (databaseData) {
+          this.restoreConversationState(databaseData);
+          return true;
+        }
+      }
+      
+      // Fallback to localStorage
       const savedData = localStorage.getItem(`conversation_${conversationId}`);
       if (!savedData) return false;
       
       const parsedState = JSON.parse(savedData) as ConversationState;
-      
-      // Validate and restore state
-      this.state = {
-        ...parsedState,
-        // Restore Date objects
-        messages: parsedState.messages.map(msg => ({
-          ...msg,
-          timestamp: new Date(msg.timestamp)
-        })),
-        lastActivity: new Date(parsedState.lastActivity)
-      };
-      
+      this.restoreConversationState(parsedState);
       return true;
     } catch (error) {
       console.error('Failed to load conversation:', error);
       return false;
     }
+  }
+  
+  /**
+   * Load conversation from database via API
+   */
+  private async loadFromDatabaseAPI(): Promise<ConversationState | null> {
+    if (!this.workflowContext) return null;
+    
+    const params = new URLSearchParams(createConversationApiData(this.workflowContext) as Record<string, string>);
+    
+    const response = await fetch(`/api/workflow-configurator-conversations?${params}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    });
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null; // No conversation found, that's okay
+      }
+      throw new Error(`Failed to load conversation: ${response.statusText}`);
+    }
+    
+    const result = await response.json();
+    return result.data?.conversation || null;
+  }
+  
+  /**
+   * Restore conversation state from loaded data
+   */
+  private restoreConversationState(parsedState: ConversationState): void {
+    // Validate and restore state
+    this.state = {
+      ...parsedState,
+      // Restore Date objects
+      messages: parsedState.messages.map(msg => ({
+        ...msg,
+        timestamp: new Date(msg.timestamp)
+      })),
+      lastActivity: new Date(parsedState.lastActivity)
+    };
   }
   
   // State access

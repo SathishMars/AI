@@ -31,6 +31,8 @@ import {
 import { ConversationMessage } from '@/app/types/conversation';
 import { WorkflowCreationFlow } from '@/app/utils/workflow-creation-flow';
 import { createEmptyConversationState, ConversationStateManager } from '@/app/utils/conversation-manager';
+import { WorkflowContext } from '@/app/utils/frontend-conversation-helpers';
+import { generateUniqueTemplateName } from '@/app/utils/template-name-generator';
 import { SmartAutocomplete } from './SmartAutocomplete';
 import { generateLLMWorkflowContext } from '@/app/utils/llm-workflow-context';
 import { ConversationHistoryMessage } from '@/app/utils/llm-workflow-generator';
@@ -161,6 +163,7 @@ export default function WorkflowCreationPane({
   const [currentMessage, setCurrentMessage] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [conversationContext, setConversationContext] = useState<CreationContext | null>(null);
+  const [workflowContext, setWorkflowContext] = useState<WorkflowContext | null>(null);
   
   // UI state
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -173,6 +176,14 @@ export default function WorkflowCreationPane({
         console.log('🚀 Initializing workflow creation session');
         
         const workflowId = workflow.metadata?.id || 'new-workflow';
+        
+        // Create workflow context for database integration
+        const workflowContextForDb: WorkflowContext = {
+          account: 'groupize-demos', // TODO: Get from user context
+          organization: null, // TODO: Get from user context if needed
+          workflowTemplateName: workflow.metadata?.name || generateUniqueTemplateName()
+        };
+        setWorkflowContext(workflowContextForDb);
         
         // Fetch available functions from API
         const availableFunctions = await fetchAvailableFunctions();
@@ -212,7 +223,7 @@ export default function WorkflowCreationPane({
                 context: { ...context, ...parsedState.context } // Merge with current context
               };
               
-              manager = new ConversationStateManager(restoredState);
+              manager = new ConversationStateManager(restoredState, workflowContextForDb);
               console.log('✅ Loaded existing conversation with', restoredState.messages.length, 'messages');
             } catch (error) {
               console.warn('⚠️ Failed to restore conversation, creating new one:', error);
@@ -223,7 +234,7 @@ export default function WorkflowCreationPane({
         // Create new conversation if no existing one found
         if (!manager) {
           const conversationState = createEmptyConversationState(workflowId, context);
-          manager = new ConversationStateManager(conversationState);
+          manager = new ConversationStateManager(conversationState, workflowContextForDb);
           
           // Add combined welcome and guidance message only for new conversations
           const welcomeMessage = mrfData 

@@ -29,6 +29,7 @@
     "openai": "^5.23.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "short-unique-id": "^5.3.2",
     "zod": "^4.1.11"
   },
   "devDependencies": {

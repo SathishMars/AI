@@ -11,10 +11,13 @@ import {
 import { WorkflowJSON } from '@/app/types/workflow';
 import { WorkflowTemplateService } from '@/app/services/workflow-template-service';
 import { useUnifiedUserContext } from '@/app/contexts/UnifiedUserContext';
+import { generateUniqueTemplateName } from '@/app/utils/template-name-generator';
 
 interface UseWorkflowTemplateOptions {
   templateName?: string;
   autoLoad?: boolean;
+  autoSave?: boolean; // Enable auto-save to database
+  autoSaveDelay?: number; // Delay in ms before auto-saving
 }
 
 interface UseWorkflowTemplateReturn {
@@ -22,10 +25,12 @@ interface UseWorkflowTemplateReturn {
   template: WorkflowTemplate | null;
   templateResult: TemplateResolutionResult | null;
   workflow: WorkflowJSON | null;
+  currentTemplateName: string | null; // Current template name (generated or provided)
   
   // Loading and error states
   isLoading: boolean;
   error: string | null;
+  isAutoSaving: boolean;
   
   // Template state info
   isNewTemplate: boolean;
@@ -43,13 +48,19 @@ interface UseWorkflowTemplateReturn {
   // Workflow operations
   updateWorkflow: (workflow: WorkflowJSON) => void;
   resetChanges: () => void;
+  saveWorkflowNow: () => Promise<void>; // Force immediate save
   
   // Utility
   clearError: () => void;
 }
 
 export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): UseWorkflowTemplateReturn {
-  const { templateName, autoLoad = true } = options;
+  const { 
+    templateName, 
+    autoLoad = true, 
+    autoSave = true, 
+    autoSaveDelay = 3000 
+  } = options;
   const { account, currentOrganization, isLoading: contextLoading } = useUnifiedUserContext();
   const accountId = account?.id;
   const organizationId = currentOrganization?.id || null;
@@ -64,6 +75,9 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
   const [originalWorkflow, setOriginalWorkflow] = useState<WorkflowJSON | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentTemplateName, setCurrentTemplateName] = useState<string | null>(templateName || null);
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
+  const [autoSaveTimeout, setAutoSaveTimeout] = useState<NodeJS.Timeout | null>(null);
   
   // Set account and organization on service
   useEffect(() => {
@@ -275,10 +289,93 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
     }
   }, [template, templateService]);
   
-  // Update workflow in memory
+  // Save workflow to database immediately
+  const saveWorkflowToDatabase = useCallback(async () => {
+    if (!workflow || !accountId || isAutoSaving) return;
+    
+    try {
+      setIsAutoSaving(true);
+      
+      // Generate template name if needed
+      let templateNameToUse = currentTemplateName;
+      if (!templateNameToUse) {
+        templateNameToUse = generateUniqueTemplateName();
+        setCurrentTemplateName(templateNameToUse);
+      }
+      
+      const templateInput: CreateWorkflowTemplateInput = {
+        account: accountId,
+        organization: organizationId || undefined,
+        name: templateNameToUse,
+        workflowDefinition: workflow,
+        category: 'ai-generated',
+        tags: ['auto-generated'],
+        author: account?.name || 'AI Assistant',
+        description: 'Workflow created through AI conversation'
+      };
+      
+      if (template) {
+        // Update existing template
+        const updates: UpdateWorkflowTemplateInput = {
+          workflowDefinition: workflow
+        };
+        await templateService.updateTemplate(templateNameToUse, template.version, updates);
+      } else {
+        // Create new template
+        const newTemplate = await templateService.createTemplate(templateInput);
+        setTemplate(newTemplate);
+        setOriginalWorkflow(workflow);
+      }
+      
+      console.log('Workflow auto-saved to database:', templateNameToUse);
+    } catch (err) {
+      console.warn('Auto-save failed, workflow preserved in memory:', err);
+      // Don't set error state for auto-save failures to avoid disrupting user
+    } finally {
+      setIsAutoSaving(false);
+    }
+  }, [workflow, accountId, organizationId, isAutoSaving, currentTemplateName, template, templateService, account, setCurrentTemplateName, setIsAutoSaving, setTemplate, setOriginalWorkflow]);
+  
+  // Auto-save workflow to database
+  const scheduleAutoSave = useCallback(() => {
+    if (!autoSave || !workflow || !accountId) return;
+    
+    // Clear existing timeout
+    if (autoSaveTimeout) {
+      clearTimeout(autoSaveTimeout);
+    }
+    
+    // Schedule new auto-save
+    const timeout = setTimeout(async () => {
+      await saveWorkflowToDatabase();
+    }, autoSaveDelay);
+    
+    setAutoSaveTimeout(timeout);
+  }, [autoSave, workflow, accountId, autoSaveTimeout, autoSaveDelay, saveWorkflowToDatabase, setAutoSaveTimeout]);
+  
+  // Force immediate save
+  const saveWorkflowNow = useCallback(async () => {
+    if (autoSaveTimeout) {
+      clearTimeout(autoSaveTimeout);
+      setAutoSaveTimeout(null);
+    }
+    await saveWorkflowToDatabase();
+  }, [autoSaveTimeout, saveWorkflowToDatabase, setAutoSaveTimeout]);
+  
+  // Update workflow in memory and schedule auto-save
   const updateWorkflow = useCallback((newWorkflow: WorkflowJSON) => {
     setWorkflow(newWorkflow);
-  }, []);
+    scheduleAutoSave();
+  }, [scheduleAutoSave]);
+  
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimeout) {
+        clearTimeout(autoSaveTimeout);
+      }
+    };
+  }, [autoSaveTimeout]);
   
   // Reset changes to original
   const resetChanges = useCallback(() => {
@@ -297,10 +394,12 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
     template,
     templateResult,
     workflow,
+    currentTemplateName,
     
     // State
     isLoading: isLoading || contextLoading,
     error,
+    isAutoSaving,
     isNewTemplate,
     hasUnsavedChanges,
     suggestCreateDraft,
@@ -316,6 +415,7 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
     // Workflow operations
     updateWorkflow,
     resetChanges,
+    saveWorkflowNow,
     
     // Utility
     clearError,
