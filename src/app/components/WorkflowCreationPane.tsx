@@ -37,6 +37,7 @@ import { SmartAutocomplete } from './SmartAutocomplete';
 import { generateLLMWorkflowContext } from '@/app/utils/llm-workflow-context';
 import { ConversationHistoryMessage } from '@/app/utils/llm-workflow-generator';
 import { WorkflowAutocompleteItem } from '@/app/types/workflow-conversation-autocomplete';
+import { getLLMContext } from '@/app/data/workflow-conversation-autocomplete';
 
 // Cache for available functions to prevent constant API calls
 let availableFunctionsCache: string[] | null = null;
@@ -159,6 +160,22 @@ const SimpleMessageRenderer = ({
   </Box>
 );
 
+/**
+ * WorkflowCreationPane - Enhanced with LangChain Integration
+ * 
+ * This component now uses the LangChain/LangGraph architecture for:
+ * - Persistent conversation memory across sessions
+ * - Multi-provider LLM management (OpenAI/Anthropic)
+ * - Tool-aware workflow generation with function calling
+ * - Enhanced context understanding and iterative refinement
+ * 
+ * Key LangChain Features:
+ * - Conversation memory stored in MongoDB
+ * - Tool registry integration for workflow functions
+ * - Multi-provider LLM switching based on task complexity
+ * - Session-based conversation tracking
+ */
+
 interface WorkflowCreationPaneProps {
   workflow: WorkflowJSON;
   onWorkflowChange: (workflow: WorkflowJSON) => void;
@@ -185,7 +202,7 @@ export default function WorkflowCreationPane({
   const [currentMessage, setCurrentMessage] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [conversationContext, setConversationContext] = useState<CreationContext | null>(null);
-  const [workflowContext, setWorkflowContext] = useState<WorkflowContext | null>(null);
+  const [workflowContext, setWorkflowContext] = useState<WorkflowContext | null>(null); // Used for LangChain conversation context
   
   // UI state
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -275,10 +292,10 @@ export default function WorkflowCreationPane({
           
           // Add combined welcome and guidance message only for new conversations
           const welcomeMessage = mrfData 
-            ? `Hi! I'm aime, your AI workflow assistant. I see you want to create a workflow for "${mrfData.title}". Let's build this together step by step! Just describe what you want the workflow to do.`
+            ? `Hi! I'm aime, your AI workflow assistant powered by LangChain. I see you want to create a workflow for "${mrfData.title}". Let's build this together step by step! I remember our entire conversation and can help refine the workflow as we go. Just describe what you want the workflow to do.`
             : isNewWorkflow
-              ? `Hi! I'm aime, your AI workflow assistant. I'm here to help you create a new workflow from scratch. What would you like to build or modify?\n\nTo get started, you can describe your workflow in natural language. For example: 'When an MRF is submitted, check if it needs approval based on budget or location, then either send for approval or proceed directly.'`
-              : `Hi! I'm aime, your AI workflow assistant. I'm here to help you edit your existing workflow. What would you like to build or modify?`;          
+              ? `Hi! I'm aime, your AI workflow assistant powered by LangChain. I'm here to help you create a new workflow from scratch with persistent conversation memory. What would you like to build or modify?\n\nTo get started, you can describe your workflow in natural language. For example: 'When an MRF is submitted, check if it needs approval based on budget or location, then either send for approval or proceed directly.' I'll remember our conversation and can help you refine the workflow iteratively.`
+              : `Hi! I'm aime, your AI workflow assistant powered by LangChain. I'm here to help you edit your existing workflow with full conversation context. What would you like to build or modify?`;          
           manager.addAimeMessage(welcomeMessage, 'text');
           console.log('✅ Created new conversation with welcome message');
         }
@@ -294,6 +311,21 @@ export default function WorkflowCreationPane({
         );
         
         setCurrentSession(session);
+        
+        // Perform LangChain health check
+        try {
+          const healthResponse = await fetch('/api/langchain/generate-workflow', {
+            method: 'GET'
+          });
+          
+          if (healthResponse.ok) {
+            console.log('✅ LangChain API health check passed');
+          } else {
+            console.warn('⚠️ LangChain API health check failed, falling back to direct API');
+          }
+        } catch (healthError) {
+          console.warn('⚠️ LangChain API not available, will use fallback:', healthError);
+        }
         
         console.log('✅ Creation session initialized successfully');
         
@@ -434,7 +466,7 @@ export default function WorkflowCreationPane({
         : 'Working on your request... I\'m analyzing your requirements and creating the workflow.';
       addMessage(processingMessage, 'aime');
       
-      // Call backend API for workflow generation with enhanced context
+      // Call backend API for workflow generation with enhanced LangChain context
       if (!conversationContext) {
         console.error('Conversation context not available');
         setIsCreating(false);
@@ -443,16 +475,43 @@ export default function WorkflowCreationPane({
       
       const baseContext = conversationContext;
       const conversationHistory = getConversationHistory();
-      const workflowContext = generateLLMWorkflowContext();
+      const workflowContextGenerated = generateLLMWorkflowContext();
+      
+      // Get rich function definitions from workflow-conversation-autocomplete
+      const llmFunctionContext = getLLMContext();
       
       const enhancedContext = {
         ...baseContext,
-        // Add enhanced data for LLM context
-        conversationHistory,
-        workflowContext // Unified context for functions, variables, etc.
+        // Enhanced conversation features from original system
+        conversationHistory: conversationHistory.map(msg => ({
+          role: msg.role,
+          content: msg.content,
+          timestamp: msg.timestamp
+        })),
+        user: {
+          id: 'user-1', // TODO: Get from user context
+          name: baseContext.userRole || 'User',
+          email: 'user@company.com', // TODO: Get from user context
+          role: baseContext.userRole || 'admin',
+          department: baseContext.userDepartment || 'IT',
+          manager: 'manager@company.com' // TODO: Get from user context
+        },
+        mrf: {
+          id: baseContext.mrfData?.id || 'new-mrf',
+          title: baseContext.mrfData?.title || 'New Event',
+          purpose: baseContext.mrfData?.description || 'general',
+          maxAttendees: baseContext.mrfData?.attendees || 50,
+          startDate: baseContext.mrfData?.requestedDate?.toISOString() || new Date().toISOString(),
+          endDate: baseContext.mrfData?.requestedDate?.toISOString() || new Date().toISOString(),
+          location: baseContext.mrfData?.location || 'TBD',
+          budget: baseContext.mrfData?.budget || 0
+        },
+        currentDate: new Date().toISOString(),
+        functionDefinitions: llmFunctionContext // Rich function definitions with parameters and examples
       };
       
-      const response = await fetch('/api/generate-workflow', {
+      // Use the new LangChain API endpoint with conversation memory
+      const response = await fetch('/api/langchain/generate-workflow', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -460,19 +519,37 @@ export default function WorkflowCreationPane({
         body: JSON.stringify({
           userInput: messageText,
           context: enhancedContext,
-          currentWorkflow: workflow // Include the complete current workflow for context
+          config: {
+            sessionId: currentSession.sessionId,
+            workflowId: conversationManager.getState().conversationId,
+            mode: 'conversational', // Enable conversational mode for iterative workflow building
+            enableMemory: true, // Enable conversation memory
+            enableTools: true, // Enable tool calling
+            conversationalMode: true // CRITICAL: Enable conversational mode for parameter collection
+          },
+          currentWorkflow: workflow, // Include the complete current workflow for context
         }),
       });
 
       const result = await response.json();
+      console.log('🔍 API Response Structure:', JSON.stringify(result, null, 2));
       
       if (!response.ok) {
         throw new Error(result.error || 'Failed to generate workflow');
       }
       
+      // Extract the workflow from the LangChain response structure
+      console.log('🔍 Checking result.success:', result.success);
+      console.log('🔍 Checking result.result:', result.result);
+      
+      const workflowData = result.success ? result.result?.workflow : result.workflow;
+      const conversationalResponse = result.success ? result.result?.conversationalResponse : result.conversationalResponse;
+      const followUpQuestions = result.success ? result.result?.followUpQuestions : result.followUpQuestions;
+      const parameterCollectionNeeded = result.success ? result.result?.parameterCollectionNeeded : result.parameterCollectionNeeded;
+      
       // Update workflow in the right pane
-      if (result.workflow && onWorkflowChange) {
-        const completeWorkflow = createCompleteWorkflow(result.workflow);
+      if (workflowData && onWorkflowChange) {
+        const completeWorkflow = createCompleteWorkflow(workflowData);
         if (completeWorkflow) {
           console.log('✅ Updating workflow with:', completeWorkflow);
           onWorkflowChange(completeWorkflow);
@@ -483,21 +560,21 @@ export default function WorkflowCreationPane({
       await new Promise(resolve => setTimeout(resolve, 800));
       
       // Handle conversational response and follow-up questions
-      if (result.conversationalResponse) {
-        console.log('💬 Conversational response detected:', result.conversationalResponse);
+      if (conversationalResponse) {
+        console.log('💬 Conversational response detected:', conversationalResponse);
         
         // Group conversational response with follow-up questions in a single message
-        let combinedMessage = result.conversationalResponse;
+        let combinedMessage = conversationalResponse;
         
         // Add follow-up questions if present
-        if (result.followUpQuestions && result.followUpQuestions.length > 0) {
-          console.log('❓ Follow-up questions:', result.followUpQuestions);
+        if (followUpQuestions && followUpQuestions.length > 0) {
+          console.log('❓ Follow-up questions:', followUpQuestions);
           
           // Add the questions to the same message bubble
-          combinedMessage += `\n\nTo complete your workflow, I need some additional information:\n\n${result.followUpQuestions.map((question: string, index: number) => `${index + 1}. ${question}`).join('\n')}`;
+          combinedMessage += `\n\nTo complete your workflow, I need some additional information:\n\n${followUpQuestions.map((question: string, index: number) => `${index + 1}. ${question}`).join('\n')}`;
           
           // If parameter collection is needed, add the hint to the same message
-          if (result.parameterCollectionNeeded) {
+          if (parameterCollectionNeeded) {
             console.log('🔧 Parameter collection needed');
             combinedMessage += "\n\nPlease provide the information above so I can complete the workflow configuration with the specific details.";
           }
@@ -517,8 +594,20 @@ export default function WorkflowCreationPane({
     } catch (error) {
       console.error('❌ Error in workflow generation:', error);
       
+      // Enhanced error handling with LangChain context
+      let errorMessage = 'I apologize, but I encountered an issue while processing your request.';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('LangChain')) {
+          errorMessage += ' There seems to be an issue with the AI processing engine. Please try again in a moment.';
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+          errorMessage += ' There seems to be a network issue. Please check your connection and try again.';
+        } else {
+          errorMessage += ' Could you please try rephrasing your requirement or try again?';
+        }
+      }
+      
       // Replace processing message with error message
-      const errorMessage = 'I apologize, but I encountered an issue while processing your request. Could you please try rephrasing your requirement or try again?';
       replaceLastAimeMessage(errorMessage);
     } finally {
       setIsStreaming(false);

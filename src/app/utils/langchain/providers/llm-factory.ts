@@ -1,0 +1,317 @@
+// src/app/utils/langchain/providers/llm-factory.ts
+import { ChatOpenAI } from "@langchain/openai";
+import { ChatAnthropic } from "@langchain/anthropic";
+import { BaseChatModel } from "@langchain/core/language_models/chat_models";
+
+export type LLMProvider = 'openai' | 'anthropic';
+
+export interface LLMConfig {
+  provider: LLMProvider;
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+  streaming?: boolean;
+  apiKey?: string;
+}
+
+export interface LLMModelConfig {
+  workflow_build: {
+    model: string;
+    temperature: number;
+    maxTokens: number;
+    streaming: boolean;
+  };
+  workflow_edit: {
+    model: string;
+    temperature: number;
+    maxTokens: number;
+    streaming: boolean;
+  };
+  mermaid_generate: {
+    model: string;
+    temperature: number;
+    maxTokens: number;
+    streaming: boolean;
+  };
+  conversation: {
+    model: string;
+    temperature: number;
+    maxTokens: number;
+    streaming: boolean;
+  };
+}
+
+/**
+ * Default model configurations for different LLM providers
+ */
+export const DEFAULT_MODEL_CONFIGS: Record<LLMProvider, LLMModelConfig> = {
+  openai: {
+    workflow_build: {
+      model: 'gpt-4-turbo-preview',
+      temperature: 0.1,
+      maxTokens: 4000,
+      streaming: true
+    },
+    workflow_edit: {
+      model: 'gpt-4-turbo-preview',
+      temperature: 0.1,
+      maxTokens: 4000,
+      streaming: true
+    },
+    mermaid_generate: {
+      model: 'gpt-4',
+      temperature: 0.1,
+      maxTokens: 2000,
+      streaming: false
+    },
+    conversation: {
+      model: 'gpt-4-turbo-preview',
+      temperature: 0.3,
+      maxTokens: 3000,
+      streaming: true
+    }
+  },
+  anthropic: {
+    workflow_build: {
+      model: 'claude-3-5-sonnet-20240620',
+      temperature: 0.1,
+      maxTokens: 4000,
+      streaming: true
+    },
+    workflow_edit: {
+      model: 'claude-3-5-sonnet-20240620',
+      temperature: 0.1,
+      maxTokens: 4000,
+      streaming: true
+    },
+    mermaid_generate: {
+      model: 'claude-3-haiku-20240307',
+      temperature: 0.1,
+      maxTokens: 2000,
+      streaming: false
+    },
+    conversation: {
+      model: 'claude-3-5-sonnet-20240620',
+      temperature: 0.3,
+      maxTokens: 3000,
+      streaming: true
+    }
+  }
+};
+
+/**
+ * Environment-based LLM configuration loader
+ */
+export class LLMFactory {
+  private static instance: LLMFactory;
+  private availableProviders: Set<LLMProvider> = new Set();
+  private defaultProvider: LLMProvider | null = null;
+
+  private constructor() {
+    this.detectAvailableProviders();
+  }
+
+  public static getInstance(): LLMFactory {
+    if (!LLMFactory.instance) {
+      LLMFactory.instance = new LLMFactory();
+    }
+    return LLMFactory.instance;
+  }
+
+  /**
+   * Detect which LLM providers are available based on environment variables
+   */
+  private detectAvailableProviders(): void {
+    // Check for OpenAI API key
+    if (process.env.OPENAI_API_KEY) {
+      this.availableProviders.add('openai');
+      if (!this.defaultProvider) {
+        this.defaultProvider = 'openai';
+      }
+    }
+
+    // Check for Anthropic API key
+    if (process.env.ANTHROPIC_API_KEY) {
+      this.availableProviders.add('anthropic');
+      if (!this.defaultProvider) {
+        this.defaultProvider = 'anthropic';
+      }
+    }
+
+    if (this.availableProviders.size === 0) {
+      throw new Error(
+        'No LLM providers available. Please set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variables.'
+      );
+    }
+
+    console.log(`🤖 LLM Factory initialized with providers: ${Array.from(this.availableProviders).join(', ')}`);
+    console.log(`🎯 Default provider: ${this.defaultProvider}`);
+  }
+
+  /**
+   * Get available LLM providers
+   */
+  public getAvailableProviders(): LLMProvider[] {
+    return Array.from(this.availableProviders);
+  }
+
+  /**
+   * Get default LLM provider
+   */
+  public getDefaultProvider(): LLMProvider {
+    if (!this.defaultProvider) {
+      throw new Error('No default LLM provider available');
+    }
+    return this.defaultProvider;
+  }
+
+  /**
+   * Create a chat model instance for a specific provider and task
+   */
+  public createChatModel(
+    provider?: LLMProvider,
+    taskType: keyof LLMModelConfig = 'conversation',
+    customConfig?: Partial<LLMConfig>
+  ): BaseChatModel {
+    const selectedProvider = provider || this.getDefaultProvider();
+    
+    if (!this.availableProviders.has(selectedProvider)) {
+      throw new Error(`Provider ${selectedProvider} is not available. Available providers: ${Array.from(this.availableProviders).join(', ')}`);
+    }
+
+    const modelConfig = DEFAULT_MODEL_CONFIGS[selectedProvider][taskType];
+    const config = { ...modelConfig, ...customConfig };
+
+    switch (selectedProvider) {
+      case 'openai':
+        return new ChatOpenAI({
+          apiKey: process.env.OPENAI_API_KEY,
+          model: config.model,
+          temperature: config.temperature,
+          maxTokens: config.maxTokens,
+          streaming: config.streaming,
+          timeout: 30000,
+          maxRetries: 3
+        });
+
+      case 'anthropic':
+        return new ChatAnthropic({
+          apiKey: process.env.ANTHROPIC_API_KEY,
+          model: config.model,
+          temperature: config.temperature,
+          maxTokens: config.maxTokens,
+          streaming: config.streaming,
+          maxRetries: 3,
+          // Anthropic client handles timeout internally
+          clientOptions: {
+            timeout: 30000
+          }
+        });
+
+      default:
+        throw new Error(`Unsupported LLM provider: ${selectedProvider}`);
+    }
+  }
+
+  /**
+   * Create a chat model for workflow building
+   */
+  public createWorkflowBuildModel(provider?: LLMProvider): BaseChatModel {
+    return this.createChatModel(provider, 'workflow_build');
+  }
+
+  /**
+   * Create a chat model for workflow editing
+   */
+  public createWorkflowEditModel(provider?: LLMProvider): BaseChatModel {
+    return this.createChatModel(provider, 'workflow_edit');
+  }
+
+  /**
+   * Create a chat model for Mermaid diagram generation
+   */
+  public createMermaidModel(provider?: LLMProvider): BaseChatModel {
+    return this.createChatModel(provider, 'mermaid_generate');
+  }
+
+  /**
+   * Create a chat model for conversation
+   */
+  public createConversationModel(provider?: LLMProvider): BaseChatModel {
+    return this.createChatModel(provider, 'conversation');
+  }
+
+  /**
+   * Validate provider configuration
+   */
+  public validateProvider(provider: LLMProvider): boolean {
+    switch (provider) {
+      case 'openai':
+        return !!process.env.OPENAI_API_KEY;
+      case 'anthropic':
+        return !!process.env.ANTHROPIC_API_KEY;
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * Get provider health status
+   */
+  public async getProviderHealth(): Promise<Record<LLMProvider, boolean>> {
+    const health: Record<LLMProvider, boolean> = {} as Record<LLMProvider, boolean>;
+
+    for (const provider of this.availableProviders) {
+      try {
+        const model = this.createChatModel(provider, 'conversation');
+        // Simple health check with minimal token usage
+        await model.invoke("Hi");
+        health[provider] = true;
+      } catch (error) {
+        console.warn(`Provider ${provider} health check failed:`, error);
+        health[provider] = false;
+      }
+    }
+
+    return health;
+  }
+}
+
+/**
+ * Convenience functions for quick access
+ */
+
+/**
+ * Get the default LLM factory instance
+ */
+export function getLLMFactory(): LLMFactory {
+  return LLMFactory.getInstance();
+}
+
+/**
+ * Create a chat model with default provider
+ */
+export function createDefaultChatModel(taskType: keyof LLMModelConfig = 'conversation'): BaseChatModel {
+  return getLLMFactory().createChatModel(undefined, taskType);
+}
+
+/**
+ * Create a workflow building model
+ */
+export function createWorkflowBuildModel(provider?: LLMProvider): BaseChatModel {
+  return getLLMFactory().createWorkflowBuildModel(provider);
+}
+
+/**
+ * Create a conversation model
+ */
+export function createConversationModel(provider?: LLMProvider): BaseChatModel {
+  return getLLMFactory().createConversationModel(provider);
+}
+
+/**
+ * Create a Mermaid generation model
+ */
+export function createMermaidModel(provider?: LLMProvider): BaseChatModel {
+  return getLLMFactory().createMermaidModel(provider);
+}

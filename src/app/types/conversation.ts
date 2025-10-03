@@ -1,5 +1,6 @@
 // src/app/types/conversation.ts
 import { z } from 'zod';
+import { generateObjectId } from '@/app/utils/mongodb-objectid';
 
 // Message types and status
 export type MessageSender = 'user' | 'aime';
@@ -242,12 +243,12 @@ export function createEmptyConversationState(
   context: ConversationContext,
   workflowContext?: { account: string; organization?: string | null; workflowTemplateName: string }
 ): ConversationState {
-  // Generate conversation ID based on context if available, otherwise use random
+  // Generate conversation ID based on context if available, otherwise use MongoDB ObjectID
   const conversationId = workflowContext 
     ? (workflowContext.organization 
         ? `${workflowContext.account}-${workflowContext.organization}-${workflowContext.workflowTemplateName}`
         : `${workflowContext.account}-${workflowContext.workflowTemplateName}`)
-    : `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    : generateObjectId(); // Use proper MongoDB ObjectID format
 
   return {
     workflowId,
@@ -274,7 +275,7 @@ export function createEmptyConversationState(
 }
 
 export function generateMessageId(): string {
-  return `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  return generateObjectId(); // Use proper MongoDB ObjectID format
 }
 
 export function createUserMessage(content: string): Omit<ConversationMessage, 'id' | 'timestamp'> {

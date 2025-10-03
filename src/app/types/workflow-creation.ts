@@ -1,6 +1,8 @@
 // src/app/types/workflow-creation.ts
 import { WorkflowJSON, ValidationResult } from './workflow';
+import { ConversationMessage } from './conversation';
 import { ConversationContext } from './conversation';
+import { generateSessionId } from '@/app/utils/mongodb-objectid';
 
 // Creation phases that guide users through structured workflow building
 export type CreationPhase = 
@@ -250,7 +252,7 @@ export function createEmptyCreationSession(
   conversationId: string,
   context: CreationContext
 ): CreationSession {
-  const sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  const sessionId = generateSessionId(); // Use proper MongoDB ObjectID format
   
   return {
     sessionId,
