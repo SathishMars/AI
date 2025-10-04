@@ -1,0 +1,21 @@
+{
+  "_id": "67890abcdef1234567890abc",
+  "conversationId": "conv_user_789_org_456_Event_Approval_Workflow",
+  "account": "user_789",
+  "organization": "org_456",
+  "workflowTemplateName": "Event Approval Workflow",
+  "id": "msg_001",
+  "role": "user",
+  "content": "I need to create a workflow that sends approval emails when an event has more than 100 attendees.",
+  "timestamp": "2025-10-03T10:15:30.000Z",
+  "metadata": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+    "ipAddress": "192.168.1.100",
+    "model": null,
+    "provider": null,
+    "tokensUsed": null,
+    "suggestedActions": null,
+    "workflowGenerated": false,
+    "mermaidDiagram": false
+  }
+}

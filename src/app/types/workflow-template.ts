@@ -115,8 +115,23 @@ export interface ConfiguratorMessageMetadata {
   editIntent?: boolean; // True if message indicates edit intent
 }
 
-// Configurator conversation message
+// Configurator conversation message (flat document structure)
+// Each message is stored as a separate document in the database
 export interface ConfiguratorMessage {
+  _id?: string; // MongoDB ObjectId
+  conversationId: string; // Deterministic ID for the conversation
+  account: string; // Account identifier
+  organization: string | null; // Organization identifier (null for account-wide)
+  workflowTemplateName: string; // Name of the workflow template
+  id: string; // Unique message ID within conversation (messageId)
+  role: ConfiguratorMessageRole;
+  content: string;
+  timestamp: Date;
+  metadata?: ConfiguratorMessageMetadata;
+}
+
+// Legacy message structure (for nested conversations - deprecated)
+export interface LegacyConfiguratorMessage {
   messageId: string;
   role: ConfiguratorMessageRole;
   content: string;
@@ -138,14 +153,15 @@ export interface ConversationRetentionPolicy {
   archived: boolean;
 }
 
-// Complete configurator conversation record
+// Complete configurator conversation record (legacy - for backward compatibility)
+// NOTE: New implementation uses flat message documents, not nested conversations
 export interface ConfiguratorConversation {
   _id?: string; // MongoDB ObjectId
   account: string; // Account identifier matching template
   organization?: string | null; // Organization identifier within account (null for account-wide templates)
   workflowTemplateName: string; // Name of the workflow template this conversation belongs to
   conversationId?: string; // Generated deterministic ID for frontend (computed from account+org+template)
-  messages: ConfiguratorMessage[];
+  messages: LegacyConfiguratorMessage[]; // Array of messages (legacy format)
   sessionInfo: ConversationSessionInfo;
   retentionPolicy?: ConversationRetentionPolicy;
 }
@@ -231,8 +247,38 @@ export const UpdateWorkflowTemplateInputSchema = z.object({
   tags: z.array(z.string().max(30)).max(10).optional()
 });
 
-// Configurator message validation
+// Flat message document validation (new structure)
 export const ConfiguratorMessageSchema = z.object({
+  _id: z.string().optional(),
+  conversationId: z.string().min(1),
+  account: z.string().min(1).max(100),
+  organization: z.string().nullable(),
+  workflowTemplateName: z.string().min(1),
+  id: z.string().min(1), // messageId
+  role: z.enum(['user', 'assistant', 'system']),
+  content: z.string().min(1),
+  timestamp: z.date(),
+  metadata: z.object({
+    userAgent: z.string().nullable().optional(),
+    ipAddress: z.string().nullable().optional(),
+    model: z.string().nullable().optional(),
+    provider: z.string().nullable().optional(),
+    tokensUsed: z.number().int().min(0).nullable().optional(),
+    suggestedActions: z.array(z.string()).nullable().optional(),
+    workflowGenerated: z.boolean().nullable().optional(),
+    mermaidDiagram: z.boolean().nullable().optional(),
+    // Legacy fields
+    templateVersion: z.string().optional(),
+    tokenCount: z.number().int().min(0).optional(),
+    workflowStepGenerated: z.string().optional(),
+    functionsCalled: z.array(z.string()).optional(),
+    validationErrors: z.array(z.string()).optional(),
+    editIntent: z.boolean().optional()
+  }).optional()
+});
+
+// Legacy message validation (for backward compatibility)
+export const LegacyConfiguratorMessageSchema = z.object({
   messageId: z.string().min(1),
   role: z.enum(['user', 'assistant', 'system']),
   content: z.string().min(1),
@@ -248,13 +294,13 @@ export const ConfiguratorMessageSchema = z.object({
   }).optional()
 });
 
-// Configurator conversation validation
+// Legacy conversation validation (for backward compatibility)
 export const ConfiguratorConversationSchema = z.object({
   _id: z.string().optional(),
   account: z.string().min(1).max(100),
   organization: z.string().nullable().optional(), // Organization identifier (null for account-wide templates)
   workflowTemplateName: z.string().min(1), // Name of the workflow template this conversation belongs to
-  messages: z.array(ConfiguratorMessageSchema),
+  messages: z.array(LegacyConfiguratorMessageSchema),
   sessionInfo: z.object({
     startedAt: z.date(),
     lastActivity: z.date(),

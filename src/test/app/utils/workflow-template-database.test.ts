@@ -13,7 +13,8 @@ import {
 } from '@/app/utils/workflow-template-database';
 import {
   TemplateError,
-  CreateWorkflowTemplateInput
+  CreateWorkflowTemplateInput,
+  ConfiguratorMessage
 } from '@/app/types/workflow-template';
 import { getMongoDatabase } from '@/app/utils/mongodb-connection';
 
@@ -78,7 +79,7 @@ describe('Workflow Template Database Operations', () => {
     mockDb = {
       collection: jest.fn((name: string) => {
         if (name === 'workflowTemplates') return mockTemplatesCollection;
-        if (name === 'workflowConfiguratorConversations') return mockConversationsCollection;
+        if (name === 'aimeWorkflowConversations') return mockConversationsCollection;
         return {};
       })
     };
@@ -532,8 +533,12 @@ describe('Workflow Template Database Operations', () => {
         mockConversationsCollection.updateOne.mockResolvedValue({ modifiedCount: 1 });
         mockConversationsCollection.findOne.mockResolvedValue(mockConversation);
 
-        const message = {
-          messageId: 'msg_123',
+        const message: ConfiguratorMessage = {
+          conversationId: 'conv_test-account_account-wide_test-workflow',
+          account: 'test-account',
+          organization: null,
+          workflowTemplateName: 'test-workflow',
+          id: 'msg_123',
           role: 'user' as const,
           content: 'Hello, aime!',
           timestamp: new Date()
@@ -550,8 +555,12 @@ describe('Workflow Template Database Operations', () => {
       it('should return null if conversation not found', async () => {
         mockConversationsCollection.updateOne.mockResolvedValue({ modifiedCount: 0 });
 
-        const message = {
-          messageId: 'msg_123',
+        const message: ConfiguratorMessage = {
+          conversationId: 'conv_test-account_account-wide_test-workflow',
+          account: 'test-account',
+          organization: null,
+          workflowTemplateName: 'test-workflow',
+          id: 'msg_123',
           role: 'user' as const,
           content: 'Hello, aime!',
           timestamp: new Date()

@@ -16,6 +16,7 @@ import {
   ConversationError,
   WorkflowTemplateSchema,
   ConfiguratorConversationSchema,
+  ConfiguratorMessageSchema,
   generateNextVersion,
   getLatestVersion
 } from '@/app/types/workflow-template';
@@ -31,7 +32,7 @@ import {
  */
 
 const COLLECTION_TEMPLATES = 'workflowTemplates';
-const COLLECTION_CONVERSATIONS = 'workflowConfiguratorConversations';
+const COLLECTION_CONVERSATIONS = 'aimeWorkflowConversations';
 
 // ===========================================
 // Template Database Operations
@@ -533,6 +534,7 @@ export async function deleteWorkflowTemplate(
 
 /**
  * Create a new configurator conversation
+ * @deprecated Use saveMessage() instead for flat message architecture
  */
 export async function createConfiguratorConversation(
   input: CreateConversationInput
@@ -580,7 +582,7 @@ export async function createConfiguratorConversation(
     const result = await collection.insertOne(conversationDoc);
     
     // Return conversation with generated conversationId for frontend compatibility
-    const resultConversation: ConfiguratorConversation = {
+    const resultConversation = {
       ...conversationDoc,
       _id: result.insertedId.toString(),
       // Add deterministic conversationId for API compatibility
@@ -591,7 +593,7 @@ export async function createConfiguratorConversation(
       )
     };
     
-    return resultConversation;
+    return resultConversation as unknown as ConfiguratorConversation;
 
   } catch (error) {
     if (error instanceof ConversationError) throw error;
@@ -607,6 +609,7 @@ export async function createConfiguratorConversation(
 
 /**
  * Add a message to an existing conversation
+ * @deprecated Use saveMessage() instead for flat message architecture
  */
 export async function addMessageToConversation(
   account: string,
@@ -617,9 +620,9 @@ export async function addMessageToConversation(
   try {
     const db = await getMongoDatabase();
     
-    // Convert message to plain object for MongoDB
+    // Convert message to plain object for MongoDB (legacy format)
     const messageDoc = {
-      messageId: message.messageId,
+      messageId: message.id, // Use id field from new structure
       role: message.role,
       content: message.content,
       timestamp: message.timestamp,
@@ -627,7 +630,7 @@ export async function addMessageToConversation(
     };
     
     // Use updateOne and then find to avoid complex type issues
-    const updateResult = await db.collection('workflowConfiguratorConversations').updateOne(
+    const updateResult = await db.collection('aimeWorkflowConversations').updateOne(
       { 
         account, 
         organization,
@@ -645,7 +648,7 @@ export async function addMessageToConversation(
     }
 
     // Fetch the updated document
-    const result = await db.collection('workflowConfiguratorConversations').findOne({
+    const result = await db.collection('aimeWorkflowConversations').findOne({
       account, 
       organization,
       workflowTemplateName
@@ -758,5 +761,156 @@ export async function updateConversationActivity(
   } catch (error) {
     console.error('Failed to update conversation activity:', error);
     // Non-critical operation, don't throw
+  }
+}
+
+// ===========================================
+// Flat Message Database Operations (New Architecture)
+// ===========================================
+
+/**
+ * Save a single message to the database
+ * Each message is stored as a separate document
+ */
+export async function saveMessage(
+  message: Omit<ConfiguratorMessage, '_id'>
+): Promise<ConfiguratorMessage> {
+  try {
+    const db = await getMongoDatabase();
+    const collection = db.collection(COLLECTION_CONVERSATIONS);
+
+    // Validate message
+    const validationResult = ConfiguratorMessageSchema.safeParse(message);
+    if (!validationResult.success) {
+      throw new ConversationError(
+        'Message validation failed',
+        'VALIDATION_ERROR',
+        { errors: validationResult.error.issues }
+      );
+    }
+
+    // Insert message document
+    const result = await collection.insertOne(message);
+    
+    return {
+      ...message,
+      _id: result.insertedId.toString()
+    };
+
+  } catch (error) {
+    if (error instanceof ConversationError) throw error;
+    
+    console.error('Failed to save message:', error);
+    throw new ConversationError(
+      'Failed to save message',
+      'SAVE_ERROR',
+      { originalError: error instanceof Error ? error.message : String(error) }
+    );
+  }
+}
+
+/**
+ * Get all messages for a conversation
+ * Returns messages ordered by timestamp ascending
+ */
+export async function getMessages(
+  account: string,
+  organization: string | null,
+  workflowTemplateName: string
+): Promise<ConfiguratorMessage[]> {
+  try {
+    const db = await getMongoDatabase();
+    const collection = db.collection(COLLECTION_CONVERSATIONS);
+
+    const messages = await collection
+      .find({
+        account,
+        organization,
+        workflowTemplateName
+      })
+      .sort({ timestamp: 1 }) // Order by timestamp ascending
+      .toArray();
+
+    return messages.map(msg => ({
+      ...msg,
+      _id: msg._id?.toString()
+    })) as ConfiguratorMessage[];
+
+  } catch (error) {
+    console.error('Failed to get messages:', error);
+    throw new ConversationError(
+      'Failed to get messages',
+      'GET_ERROR',
+      { originalError: error instanceof Error ? error.message : String(error) }
+    );
+  }
+}
+
+/**
+ * Get a single message by ID
+ */
+export async function getMessageById(
+  account: string,
+  organization: string | null,
+  workflowTemplateName: string,
+  messageId: string
+): Promise<ConfiguratorMessage | null> {
+  try {
+    const db = await getMongoDatabase();
+    const collection = db.collection(COLLECTION_CONVERSATIONS);
+
+    const message = await collection.findOne({
+      account,
+      organization,
+      workflowTemplateName,
+      id: messageId
+    });
+
+    if (!message) {
+      return null;
+    }
+
+    return {
+      ...message,
+      _id: message._id?.toString()
+    } as ConfiguratorMessage;
+
+  } catch (error) {
+    console.error('Failed to get message by ID:', error);
+    throw new ConversationError(
+      'Failed to get message',
+      'GET_ERROR',
+      { originalError: error instanceof Error ? error.message : String(error) }
+    );
+  }
+}
+
+/**
+ * Delete all messages for a conversation
+ */
+export async function deleteConversationMessages(
+  account: string,
+  organization: string | null,
+  workflowTemplateName: string
+): Promise<number> {
+  try {
+    const db = await getMongoDatabase();
+    const collection = db.collection(COLLECTION_CONVERSATIONS);
+
+    const result = await collection.deleteMany({
+      account,
+      organization,
+      workflowTemplateName
+    });
+
+    return result.deletedCount;
+
+  } catch (error) {
+    console.error('Failed to delete conversation messages:', error);
+    throw new ConversationError(
+      'Failed to delete messages',
+      'DELETE_ERROR',
+      { originalError: error instanceof Error ? error.message : String(error) }
+    );
   }
 }

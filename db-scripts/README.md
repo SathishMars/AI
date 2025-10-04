@@ -28,7 +28,7 @@ Scripts are numbered to indicate their proper execution sequence:
 **Complete database initialization from scratch**
 Sets up the entire database with:
 - **Database**: `groupize-workflows`
-- **Collections**: `workflowTemplates` and `workflowConfiguratorConversations`
+- **Collections**: `workflowTemplates` and `aimeWorkflowConversations`
 - **Schema Validation**: Full JSON schema validation for both collections
 - **Indexes**: Optimized indexes for account+organization+name uniqueness and query performance
 - **Sample Data**: Demo account with organizations and sample templates
