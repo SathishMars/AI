@@ -1,11 +1,12 @@
 // src/app/utils/langchain/langchain-workflow-generator.ts
 import { BaseChatModel } from "@langchain/core/language_models/chat_models";
-import { HumanMessage, SystemMessage, AIMessage } from "@langchain/core/messages";
+import { HumanMessage, SystemMessage, AIMessage, BaseMessage } from "@langchain/core/messages";
 import { BufferMemory } from "langchain/memory";
 import { createWorkflowBuildModel, createConversationModel } from "./providers/llm-factory";
 import { getWorkflowToolRegistry, WorkflowToolRegistry } from "./tools/workflow-tools";
 import { createWorkflowMemory } from "./memory/mongodb-memory";
 import { WorkflowJSON, ValidationResult } from "@/app/types/workflow";
+import { getLLMFactory, LLMProvider } from "./providers/llm-factory";
 
 export interface LangChainWorkflowConfig {
   provider?: 'openai' | 'anthropic' | 'lmstudio';
@@ -96,14 +97,41 @@ export class LangChainWorkflowGenerator {
   private toolRegistry: WorkflowToolRegistry;
   private memory?: BufferMemory;
   private config: LangChainWorkflowConfig;
+  private currentProvider: LLMProvider;
 
   constructor(config: LangChainWorkflowConfig) {
     this.config = config;
+    const factory = getLLMFactory();
+    this.currentProvider = factory.getDefaultProvider();
     this.llm = createWorkflowBuildModel(config.provider);
     this.conversationModel = createConversationModel(config.provider);
     this.toolRegistry = getWorkflowToolRegistry();
     
     console.log(`🚀 LangChain Workflow Generator initialized with ${config.provider || 'default'} provider`);
+  }
+
+  /**
+   * Format messages for LM Studio compatibility
+   * LM Studio with certain models only supports 'user' and 'assistant' roles
+   */
+  private formatMessagesForLMStudio(messages: BaseMessage[]): BaseMessage[] {
+    if (this.currentProvider !== 'lmstudio') {
+      return messages;
+    }
+
+    const formattedMessages: BaseMessage[] = [];
+    
+    for (const message of messages) {
+      if (message instanceof SystemMessage) {
+        // Convert system message to user message with clear instruction formatting
+        const systemContent = `SYSTEM INSTRUCTIONS: ${message.content}\n\nPlease follow these instructions when responding.`;
+        formattedMessages.push(new HumanMessage(systemContent));
+      } else {
+        formattedMessages.push(message);
+      }
+    }
+    
+    return formattedMessages;
   }
 
   /**
@@ -188,8 +216,11 @@ export class LangChainWorkflowGenerator {
     // Add current user message
     messages.push(new HumanMessage(userInput));
 
+    // Format messages for LM Studio compatibility
+    const formattedMessages = this.formatMessagesForLMStudio(messages);
+
     try {
-      const result = await this.conversationModel.invoke(messages);
+      const result = await this.conversationModel.invoke(formattedMessages);
       const response = typeof result.content === 'string' ? result.content : JSON.stringify(result.content);
       
       // Save to memory
