@@ -85,14 +85,28 @@ export async function POST(request: NextRequest) {
           conversationalMode: config.conversationalMode || false,
           generatedAt: new Date().toISOString(),
           availableTools: generator.getAvailableTools().length,
-          // LM Studio specific metadata
-          ...(currentProvider === 'lmstudio' && {
+          // Provider-specific model configurations
+          modelConfiguration: {
+            openai: {
+              workflow: process.env.OPENAI_MODEL_WORKFLOW || 'gpt-4-turbo-preview',
+              conversation: process.env.OPENAI_MODEL_CONVERSATION || 'gpt-4-turbo-preview',
+              mermaid: process.env.OPENAI_MODEL_MERMAID || 'gpt-4',
+              enabled: !!process.env.OPENAI_API_KEY
+            },
+            anthropic: {
+              workflow: process.env.ANTHROPIC_MODEL_WORKFLOW || 'claude-3-5-sonnet-20240620',
+              conversation: process.env.ANTHROPIC_MODEL_CONVERSATION || 'claude-3-5-sonnet-20240620',
+              mermaid: process.env.ANTHROPIC_MODEL_MERMAID || 'claude-3-haiku-20240307',
+              enabled: !!process.env.ANTHROPIC_API_KEY
+            },
             lmstudio: {
+              workflow: process.env.LMSTUDIO_MODEL || 'llama-3.1-8b-instruct',
+              conversation: process.env.LMSTUDIO_MODEL || 'llama-3.1-8b-instruct', 
+              mermaid: process.env.LMSTUDIO_MODEL || 'llama-3.1-8b-instruct',
               endpoint: process.env.LMSTUDIO_BASE_URL || 'http://localhost:1234/v1',
-              model: process.env.LMSTUDIO_MODEL || 'llama-3.1-8b-instruct',
               enabled: process.env.LMSTUDIO_ENABLED === 'true'
             }
-          })
+          }
         }
       }
     };

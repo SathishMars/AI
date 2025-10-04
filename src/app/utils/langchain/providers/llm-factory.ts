@@ -50,25 +50,25 @@ export interface LLMModelConfig {
 export const DEFAULT_MODEL_CONFIGS: Record<LLMProvider, LLMModelConfig> = {
   openai: {
     workflow_build: {
-      model: 'gpt-4-turbo-preview',
+      model: process.env.OPENAI_MODEL_WORKFLOW || 'gpt-4-turbo-preview',
       temperature: 0.1,
       maxTokens: 4000,
       streaming: true
     },
     workflow_edit: {
-      model: 'gpt-4-turbo-preview',
+      model: process.env.OPENAI_MODEL_WORKFLOW || 'gpt-4-turbo-preview',
       temperature: 0.1,
       maxTokens: 4000,
       streaming: true
     },
     mermaid_generate: {
-      model: 'gpt-4',
+      model: process.env.OPENAI_MODEL_MERMAID || 'gpt-4',
       temperature: 0.1,
       maxTokens: 2000,
       streaming: false
     },
     conversation: {
-      model: 'gpt-4-turbo-preview',
+      model: process.env.OPENAI_MODEL_CONVERSATION || 'gpt-4-turbo-preview',
       temperature: 0.3,
       maxTokens: 3000,
       streaming: true
@@ -76,25 +76,25 @@ export const DEFAULT_MODEL_CONFIGS: Record<LLMProvider, LLMModelConfig> = {
   },
   anthropic: {
     workflow_build: {
-      model: 'claude-3-5-sonnet-20240620',
+      model: process.env.ANTHROPIC_MODEL_WORKFLOW || 'claude-3-5-sonnet-20240620',
       temperature: 0.1,
       maxTokens: 4000,
       streaming: true
     },
     workflow_edit: {
-      model: 'claude-3-5-sonnet-20240620',
+      model: process.env.ANTHROPIC_MODEL_WORKFLOW || 'claude-3-5-sonnet-20240620',
       temperature: 0.1,
       maxTokens: 4000,
       streaming: true
     },
     mermaid_generate: {
-      model: 'claude-3-haiku-20240307',
+      model: process.env.ANTHROPIC_MODEL_MERMAID || 'claude-3-haiku-20240307',
       temperature: 0.1,
       maxTokens: 2000,
       streaming: false
     },
     conversation: {
-      model: 'claude-3-5-sonnet-20240620',
+      model: process.env.ANTHROPIC_MODEL_CONVERSATION || 'claude-3-5-sonnet-20240620',
       temperature: 0.3,
       maxTokens: 3000,
       streaming: true
@@ -175,6 +175,15 @@ export class LLMFactory {
       }
     }
 
+    // Override default provider if explicitly configured
+    const explicitDefaultProvider = process.env.DEFAULT_LLM_PROVIDER as LLMProvider;
+    if (explicitDefaultProvider && this.availableProviders.has(explicitDefaultProvider)) {
+      this.defaultProvider = explicitDefaultProvider;
+      console.log(`🎯 Explicit default provider configured: ${explicitDefaultProvider}`);
+    } else if (explicitDefaultProvider) {
+      console.warn(`⚠️  Configured default provider '${explicitDefaultProvider}' is not available. Available providers: ${Array.from(this.availableProviders).join(', ')}`);
+    }
+
     if (this.availableProviders.size === 0) {
       throw new Error(
         'No LLM providers available. Please set OPENAI_API_KEY, ANTHROPIC_API_KEY, or LMSTUDIO_ENABLED=true environment variables.'
@@ -219,6 +228,21 @@ export class LLMFactory {
     const modelConfig = DEFAULT_MODEL_CONFIGS[selectedProvider][taskType];
     const config = { ...modelConfig, ...customConfig };
 
+    // Enhanced logging when detailed logging is enabled
+    const isDetailedLogging = process.env.LLM_DETAILED_LOGGING === 'true';
+    if (isDetailedLogging) {
+      console.log(`🚀 Creating LLM model:
+        📡 Provider: ${selectedProvider}
+        🎯 Task Type: ${taskType}
+        🤖 Model: ${config.model}
+        🌡️  Temperature: ${config.temperature}
+        📊 Max Tokens: ${config.maxTokens}
+        🌊 Streaming: ${config.streaming}
+        ⏱️  Timestamp: ${new Date().toISOString()}`);
+    } else {
+      console.log(`🤖 Using ${selectedProvider} (${config.model}) for ${taskType}`);
+    }
+
     switch (selectedProvider) {
       case 'openai':
         return new ChatOpenAI({
@@ -250,7 +274,13 @@ export class LLMFactory {
         const baseURL = process.env.LMSTUDIO_BASE_URL || 'http://localhost:1234/v1';
         const apiKey = process.env.LMSTUDIO_API_KEY || 'lm-studio'; // LM Studio doesn't require real API key
         
-        console.log(`🏠 Creating LM Studio model: ${config.model} at ${baseURL}`);
+        if (isDetailedLogging) {
+          console.log(`🏠 LM Studio Configuration:
+            🌐 Endpoint: ${baseURL}
+            🔑 API Key: ${apiKey}
+            📡 Model: ${config.model}
+            ⚙️  Local Server: ${process.env.LMSTUDIO_ENABLED === 'true' ? 'Enabled' : 'Auto-detected'}`);
+        }
         
         return new ChatOpenAI({
           apiKey: apiKey,
