@@ -65,7 +65,7 @@ export class WorkflowMemoryManager {
    */
   private async createWorkflowMemory(config: WorkflowMemoryConfig): Promise<BufferMemory> {
     const db = await getMongoDatabase();
-    const collection = db.collection('workflow_conversations');
+    const collection = db.collection('aimeWorkflowConversations');
     
     // Create MongoDB message history
     const messageHistory = new MongoDBChatMessageHistory({
@@ -282,7 +282,7 @@ export class WorkflowMemoryManager {
    */
   public async cleanupExpiredSessions(): Promise<void> {
     const db = await getMongoDatabase();
-    const collection = db.collection('workflow_conversations');
+    const collection = db.collection('aimeWorkflowConversations');
     
     // Remove expired documents (MongoDB TTL will handle this automatically)
     const expiredCount = await collection.countDocuments({
