@@ -37,8 +37,12 @@ db.createCollection('workflowTemplates', {
   validator: {
     $jsonSchema: {
       bsonType: "object",
-      required: ["account", "name", "status", "version", "workflowDefinition", "metadata"],
+      required: ["id","account", "name", "status", "version", "workflowDefinition", "metadata"],
       properties: {
+        id: {
+          bsonType: "string",
+          description: "identifier for the template (UUID or similar)"
+        },
         account: {
           bsonType: "string",
           description: "Account identifier for multi-tenancy"
@@ -63,7 +67,89 @@ db.createCollection('workflowTemplates', {
         },
         workflowDefinition: {
           bsonType: "object",
-          description: "Complete json-rules-engine compatible workflow JSON"
+          required: ["steps"],
+          description: "Complete workflow definition with nested array structure",
+          properties: {
+            steps: {
+              bsonType: "array",
+              description: "Array of workflow steps (nested array architecture)",
+              items: {
+                bsonType: "object",
+                required: ["id", "name", "type"],
+                properties: {
+                  id: {
+                    bsonType: "string",
+                    pattern: "^[a-z][a-zA-Z0-9]*$",
+                    minLength: 3,
+                    maxLength: 50,
+                    description: "Human-readable step ID in camelCase format"
+                  },
+                  name: {
+                    bsonType: "string",
+                    description: "Step display name"
+                  },
+                  type: {
+                    bsonType: "string",
+                    enum: ["trigger", "condition", "action", "end", "branch", "merge", "workflow"],
+                    description: "Step type"
+                  },
+                  action: {
+                    bsonType: "string",
+                    description: "Function name to execute"
+                  },
+                  params: {
+                    bsonType: "object",
+                    description: "Function parameters"
+                  },
+                  condition: {
+                    bsonType: "object",
+                    description: "json-rules-engine condition"
+                  },
+                  children: {
+                    bsonType: "array",
+                    description: "Sequential child steps (nested array)"
+                  },
+                  onSuccess: {
+                    bsonType: "object",
+                    description: "Inline step to execute on success"
+                  },
+                  onFailure: {
+                    bsonType: "object",
+                    description: "Inline step to execute on failure"
+                  },
+                  onSuccessGoTo: {
+                    bsonType: "string",
+                    description: "Step ID to jump to on success"
+                  },
+                  onFailureGoTo: {
+                    bsonType: "string",
+                    description: "Step ID to jump to on failure"
+                  },
+                  result: {
+                    bsonType: "string",
+                    enum: ["success", "failure", "cancelled", "timeout"],
+                    description: "End step result"
+                  },
+                  workflowId: {
+                    bsonType: "string",
+                    description: "ID of workflow to trigger (for workflow type steps)"
+                  },
+                  workflowParams: {
+                    bsonType: "object",
+                    description: "Parameters to pass to triggered workflow"
+                  }
+                }
+              }
+            },
+            schemaVersion: {
+              bsonType: "string",
+              description: "Schema version for backward compatibility"
+            },
+            metadata: {
+              bsonType: "object",
+              description: "Workflow metadata (legacy - will be removed)"
+            }
+          }
         },
         mermaidDiagram: {
           bsonType: "string",
@@ -104,32 +190,24 @@ db.createCollection('workflowTemplates', {
 // Create indexes for workflowTemplates collection
 print('📊 Creating indexes for workflowTemplates...');
 
-// Primary lookup index - template name and status
+// Primary lookup index - template id and status
 db.workflowTemplates.createIndex(
-  { name: 1, status: 1 },
+  { id: 1, status: 1 },
   { 
-    name: "idx_name_status",
+    name: "idx_id_status",
     background: true 
   }
 );
 
 // Version management index - status and version for latest queries
 db.workflowTemplates.createIndex(
-  { status: 1, version: -1 },
+  { id: 1, status: 1, version: -1 },
   { 
-    name: "idx_status_version_desc",
+    name: "idx_id_status_version_desc",
     background: true 
   }
 );
 
-// Template search index - category and tags
-db.workflowTemplates.createIndex(
-  { category: 1, "metadata.tags": 1 },
-  { 
-    name: "idx_category_tags",
-    background: true 
-  }
-);
 
 // Usage analytics index
 db.workflowTemplates.createIndex(
@@ -143,9 +221,9 @@ db.workflowTemplates.createIndex(
 // Unique constraint for account + organization + name + version combination
 // This handles both organization-specific templates and account-wide templates (organization: null)
 db.workflowTemplates.createIndex(
-  { account: 1, organization: 1, name: 1, version: 1 },
+  { account: 1, organization: 1, id: 1, version: 1 },
   { 
-    name: "idx_account_org_name_version_unique",
+    name: "idx_account_org_id_version_unique",
     unique: true,
     background: true 
   }
@@ -153,29 +231,21 @@ db.workflowTemplates.createIndex(
 
 // Additional partial index for account-wide templates (organization is null)
 db.workflowTemplates.createIndex(
-  { account: 1, name: 1, version: 1 },
+  { account: 1, id: 1, version: 1 },
   { 
-    name: "idx_account_name_version_null_org",
+    name: "idx_account_id_version_null_org",
     unique: true,
     partialFilterExpression: { organization: { $eq: null } },
     background: true 
   }
 );
 
-// Account-based queries index
-db.workflowTemplates.createIndex(
-  { account: 1, status: 1, "metadata.createdAt": -1 },
-  { 
-    name: "idx_account_status_created",
-    background: true 
-  }
-);
 
 // Organization-based queries index (includes null organization for account-wide templates)
 db.workflowTemplates.createIndex(
-  { account: 1, organization: 1, status: 1, "metadata.createdAt": -1 },
+  { account: 1, organization: 1, status: 1, version: 1, "metadata.createdAt": -1 },
   { 
-    name: "idx_account_org_status_created",
+    name: "idx_account_org_status_version_created",
     background: true 
   }
 );
@@ -183,20 +253,19 @@ db.workflowTemplates.createIndex(
 print('✅ workflowTemplates collection and indexes created successfully');
 
 // ===========================================
-// 2. Create workflowConfiguratorConversations Collection
+// 2. Create aimeWorkflowConversations Collection
 // ===========================================
 
-print('\n💬 Creating workflowConfiguratorConversations collection...');
+print('\n💬 Creating aimeWorkflowConversations collection...');
 
 // Drop existing collection if it exists
-db.workflowConfiguratorConversations.drop();
-
+db.aimeWorkflowConversations.drop();
 // Create the collection with schema validation
-db.createCollection('workflowConfiguratorConversations', {
+db.createCollection('aimeWorkflowConversations', {
   validator: {
     $jsonSchema: {
       bsonType: "object",
-      required: ["account", "workflowTemplateName", "sessionInfo"],
+      required: ["account", "workflowTemplateID", "id", "message"],
       properties: {
         account: {
           bsonType: "string",
@@ -206,18 +275,15 @@ db.createCollection('workflowConfiguratorConversations', {
           bsonType: "string",
           description: "Organization identifier within account (optional - null for account-wide templates)"
         },
-        workflowTemplateName: {
+        workflowTemplateID: {
           bsonType: "string",
-          description: "Name of the workflow template this conversation belongs to"
+          description: "ID of the workflow template this conversation belongs to"
         },
-        sessionInfo: {
-          bsonType: "object",
-          description: "Session information for the conversation"
+        id: {
+          bsonType: "string",
+          description: "Unique conversation ID"
         },
-        messages: {
-          bsonType: "array",
-          description: "Array of conversation messages",
-          items: {
+        message: {
             bsonType: "object",
             required: ["role", "content", "timestamp"],
             properties: {
@@ -236,46 +302,69 @@ db.createCollection('workflowConfiguratorConversations', {
               },
               metadata: {
                 bsonType: "object",
-                description: "Additional message metadata"
+                description: "Additional message metadata",
+                properties: {
+                  userAgent: {
+                    bsonType: "string",
+                    description: "User agent string of the sender"
+                  },
+                  source: {
+                    bsonType: "string",
+                    description: "Source of the message (e.g., web, mobile)"
+                  },
+                  ipAddress: {
+                    bsonType: "string",
+                    description: "IP address of the sender"
+                  },
+                  model: {
+                    bsonType: "string",
+                    description: "Model used for the message"
+                  },
+                  provider: {
+                    bsonType: "string",
+                    description: "Provider of the messaging service"
+                  },
+                  tokensUsed: {
+                    bsonType: "number",
+                    description: "Number of tokens used in the message"
+                  },
+                  suggestedActions: {
+                    bsonType: "array",
+                    items: {
+                      bsonType: "string"
+                    },
+                    description: "List of suggested actions for the message"
+                  },
+                  workflowGenerated: {
+                    bsonType: "boolean",
+                    description: "Indicates if the message was generated by a workflow"
+                  },
+                  mermaidDiagram: {
+                    bsonType: "boolean",
+                    description: "Indicates if the message contains a mermaid diagram"
+                  },
+                  suggestedActions: {
+                    bsonType: "array",
+                    items: {
+                      bsonType: "string"
+                    },
+                    description: "List of suggested actions for the message"
+                  }
+                }
               }
             }
-          }
-        },
-        currentWorkflow: {
-          bsonType: "object",
-          description: "Current state of the workflow being built"
-        },
-        generatedMermaid: {
-          bsonType: "string",
-          description: "Generated Mermaid diagram"
-        },
-        collectedParameters: {
-          bsonType: "object",
-          description: "Parameters collected during conversation"
-        },
-        metadata: {
-          bsonType: "object",
-          required: ["createdAt", "updatedAt"],
-          properties: {
-            createdAt: { bsonType: "date" },
-            updatedAt: { bsonType: "date" },
-            completedAt: { bsonType: "date" },
-            userId: { bsonType: "string" },
-            userAgent: { bsonType: "string" },
-            source: { bsonType: "string" }
-          }
         }
       }
     }
   }
 });
 
-// Create indexes for workflowConfiguratorConversations collection
-print('📊 Creating indexes for workflowConfiguratorConversations...');
+// Create indexes for aimeWorkflowConversations collection
+print('📊 Creating indexes for aimeWorkflowConversations...');
 
 // Primary lookup index - one conversation per template per account/organization
-db.workflowConfiguratorConversations.createIndex(
-  { account: 1, organization: 1, workflowTemplateName: 1 },
+db.aimeWorkflowConversations.createIndex(
+  { account: 1, organization: 1, workflowTemplateID: 1 },
   { 
     name: "idx_account_org_template_unique",
     unique: true,
@@ -284,260 +373,23 @@ db.workflowConfiguratorConversations.createIndex(
 );
 
 // Template-based lookup (organization can be null for account-wide templates)
-db.workflowConfiguratorConversations.createIndex(
-  { account: 1, workflowTemplateName: 1, "sessionInfo.lastActivity": -1 },
+db.aimeWorkflowConversations.createIndex(
+  { account: 1, workflowTemplateID: 1, "sessionInfo.lastActivity": -1 },
   { 
     name: "idx_account_template_activity",
     background: true 
   }
 );
 
-// Session activity queries
-db.workflowConfiguratorConversations.createIndex(
-  { account: 1, organization: 1, "sessionInfo.isActive": 1, "sessionInfo.startedAt": -1 },
-  { 
-    name: "idx_account_org_session_activity",
-    background: true 
-  }
-);
 
-// User activity tracking
-db.workflowConfiguratorConversations.createIndex(
-  { "sessionInfo.userId": 1, "sessionInfo.startedAt": -1 },
-  { 
-    name: "idx_user_activity",
-    background: true 
-  }
-);
-
-print('✅ workflowConfiguratorConversations collection and indexes created successfully');
-
-// ===========================================
-// 3. Create Demo Account and Organizations
-// ===========================================
-
-print('\n🏢 Setting up demo account and organizations...');
-
-// Demo account setup
-const demoAccount = "groupize-demos";
-const organizations = [
-  {
-    id: "hr-department",
-    name: "Human Resources",
-    type: "department"
-  },
-  {
-    id: "it-department", 
-    name: "Information Technology",
-    type: "department"
-  },
-  {
-    id: "finance-department",
-    name: "Finance",
-    type: "department"
-  }
-];
-
-print(`✅ Demo account "${demoAccount}" configured with ${organizations.length} organizations`);
-
-// ===========================================
-// 4. Insert Sample Workflow Templates
-// ===========================================
-
-print('\n📋 Inserting sample workflow templates...');
-
-// Account-wide template (organization: null)
-const accountWideTemplate = {
-  account: demoAccount,
-  organization: null, // Account-wide template
-  name: "Employee Onboarding",
-  status: "published",
-  version: "1.0.0",
-  workflowDefinition: {
-    steps: {
-      start: {
-        name: "New Employee Request",
-        type: "trigger",
-        action: "onRequest",
-        params: { requestType: "employee_onboarding" },
-        nextSteps: ["checkDepartment"]
-      },
-      checkDepartment: {
-        name: "Check Department Requirements",
-        type: "condition",
-        condition: {
-          all: [
-            { fact: "employee.department", operator: "in", value: ["IT", "Finance"] }
-          ]
-        },
-        onSuccess: "requireApproval",
-        onFailure: "autoApprove"
-      },
-      requireApproval: {
-        name: "Request Manager Approval",
-        type: "action",
-        action: "requestApproval",
-        params: { approverRole: "department_manager" },
-        onSuccess: "createAccounts",
-        onFailure: "notifyRejection"
-      },
-      autoApprove: {
-        name: "Auto Approve",
-        type: "action",
-        action: "autoApprove",
-        params: { reason: "Standard department onboarding" },
-        nextSteps: ["createAccounts"]
-      },
-      createAccounts: {
-        name: "Create User Accounts",
-        type: "action",
-        action: "createUserAccounts",
-        params: { systems: ["AD", "Email", "Groupize"] },
-        nextSteps: ["end"]
-      },
-      notifyRejection: {
-        name: "Notify Rejection",
-        type: "action", 
-        action: "sendEmail",
-        params: { template: "onboarding_rejected" },
-        nextSteps: ["end"]
-      },
-      end: { type: "end", result: "success" }
-    }
-  },
-  mermaidDiagram: "flowchart TD\n    A[New Employee Request] --> B{Check Department}\n    B -->|IT/Finance| C[Require Approval]\n    B -->|Other| D[Auto Approve]\n    C --> E[Create Accounts]\n    D --> E\n    C -->|Rejected| F[Notify Rejection]\n    E --> G[End]\n    F --> G",
-  metadata: {
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    publishedAt: new Date(),
-    author: "system",
-    description: "Standard employee onboarding workflow for all departments",
-    category: "HR",
-    tags: ["onboarding", "employee", "approval", "accounts"]
-  },
-  usageStats: {
-    instanceCount: 0,
-    lastUsed: null
-  }
-};
-
-// Organization-specific template
-const hrSpecificTemplate = {
-  account: demoAccount,
-  organization: "hr-department",
-  name: "Performance Review Workflow",
-  status: "published", 
-  version: "1.0.0",
-  workflowDefinition: {
-    steps: {
-      start: {
-        name: "Performance Review Due",
-        type: "trigger",
-        action: "onMRF",
-        params: { mrfTemplateName: "Performance Review" },
-        nextSteps: ["notifyEmployee"]
-      },
-      notifyEmployee: {
-        name: "Notify Employee",
-        type: "action",
-        action: "sendEmail",
-        params: { template: "performance_review_notification" },
-        nextSteps: ["collectSelfAssessment"]
-      },
-      collectSelfAssessment: {
-        name: "Collect Self Assessment",
-        type: "action",
-        action: "collectForm",
-        params: { formType: "self_assessment" },
-        nextSteps: ["managerReview"]
-      },
-      managerReview: {
-        name: "Manager Review",
-        type: "action",
-        action: "assignTask",
-        params: { assigneeRole: "direct_manager", taskType: "performance_review" },
-        nextSteps: ["finalizeReview"]
-      },
-      finalizeReview: {
-        name: "Finalize Review",
-        type: "action",
-        action: "generateDocument",
-        params: { documentType: "performance_review_summary" },
-        nextSteps: ["end"]
-      },
-      end: { type: "end", result: "success" }
-    }
-  },
-  mermaidDiagram: "flowchart TD\n    A[Performance Review Due] --> B[Notify Employee]\n    B --> C[Collect Self Assessment]\n    C --> D[Manager Review]\n    D --> E[Finalize Review]\n    E --> F[End]",
-  metadata: {
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    publishedAt: new Date(),
-    author: "hr-admin",
-    description: "HR department specific performance review workflow",
-    category: "HR",
-    tags: ["performance", "review", "assessment", "manager"]
-  },
-  usageStats: {
-    instanceCount: 0,
-    lastUsed: null
-  }
-};
-
-// Insert templates
-try {
-  db.workflowTemplates.insertOne(accountWideTemplate);
-  print('✅ Account-wide template "Employee Onboarding" inserted');
-  
-  db.workflowTemplates.insertOne(hrSpecificTemplate);
-  print('✅ HR-specific template "Performance Review Workflow" inserted');
-} catch (error) {
-  print('❌ Error inserting templates:', error.message);
-}
-
-// ===========================================
-// 5. Create MongoDB User (if needed)
-// ===========================================
-
-print('\n👤 Setting up database user...');
-
-try {
-  db.createUser({
-    user: "groupize-workflows-app",
-    pwd: "secure-password-change-in-production",
-    roles: [
-      { role: "readWrite", db: "groupize-workflows" },
-      { role: "dbAdmin", db: "groupize-workflows" }
-    ]
-  });
-  print('✅ Database user "groupize-workflows-app" created');
-} catch (error) {
-  if (error.message.includes("already exists")) {
-    print('ℹ️  Database user already exists');
-  } else {
-    print('❌ Error creating user:', error.message);
-  }
-}
-
-// ===========================================
-// 6. Verification
-// ===========================================
-
-print('\n🔍 Verifying database setup...');
-
-const templateCount = db.workflowTemplates.countDocuments();
-const conversationCount = db.workflowConfiguratorConversations.countDocuments();
-
-print(`📊 Database Statistics:`);
-print(`   - workflowTemplates: ${templateCount} documents`);
-print(`   - workflowConfiguratorConversations: ${conversationCount} documents`);
+print('✅ aimeWorkflowConversations collection and indexes created successfully');
 
 const templateIndexes = db.workflowTemplates.getIndexes();
-const conversationIndexes = db.workflowConfiguratorConversations.getIndexes();
+const conversationIndexes = db.aimeWorkflowConversations.getIndexes();
 
 print(`📈 Indexes Created:`);
 print(`   - workflowTemplates: ${templateIndexes.length} indexes`);
-print(`   - workflowConfiguratorConversations: ${conversationIndexes.length} indexes`);
+print(`   - aimeWorkflowConversations: ${conversationIndexes.length} indexes`);
 
 print('\n' + '='.repeat(60));
 print('✅ FRESH DATABASE INITIALIZATION COMPLETE');

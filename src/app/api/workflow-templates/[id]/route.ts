@@ -8,6 +8,7 @@ import {
   deleteWorkflowTemplate
 } from '@/app/utils/workflow-template-database';
 import { TemplateError } from '@/app/types/workflow-template';
+import { WorkflowTemplateService } from '@/app/services/workflow-template-service';
 
 /**
  * Workflow Template API Routes
@@ -20,7 +21,7 @@ import { TemplateError } from '@/app/types/workflow-template';
 
 interface RouteParams {
   params: Promise<{
-    templateName: string;
+    id: string;
   }>;
 }
 
@@ -33,24 +34,25 @@ export async function GET(
   { params }: RouteParams
 ): Promise<NextResponse> {
   try {
-    const { templateName } = await params;
+    const { id } = await params;
 
-    if (!templateName) {
+    if (!id) {
       return NextResponse.json(
-        { error: 'Template name is required' },
+        { error: 'Template ID is required' },
         { status: 400 }
       );
     }
 
-    // Decode URL-encoded template name
-    const decodedTemplateName = decodeURIComponent(templateName);
-    
+    // Decode URL-encoded template ID
+    const decodedTemplateId = decodeURIComponent(id);
+
     // Get account from headers or query params
     const url = new URL(request.url);
     const account = url.searchParams.get('account') || request.headers.get('x-account') || 'groupize-demos';
+    const organization = url.searchParams.get('organization') || request.headers.get('x-organization') || null;
 
     // Get template with conversation history
-    const result = await getWorkflowTemplate(account, decodedTemplateName);
+    const result = await getWorkflowTemplate(account, organization,decodedTemplateId);
 
     return NextResponse.json({
       success: true,
@@ -88,7 +90,7 @@ export async function PUT(
   { params }: RouteParams
 ): Promise<NextResponse> {
   try {
-    const { templateName } = await params;
+    const { id: templateName } = await params;
     const body = await request.json();
 
     if (!templateName) {
@@ -128,6 +130,24 @@ export async function PUT(
             { status: 400 }
           );
         }
+        
+        // Validate workflow structure if workflowDefinition is being updated
+        if (updates.workflowDefinition) {
+          const service = new WorkflowTemplateService();
+          const workflowValidation = service.validateWorkflow(updates.workflowDefinition);
+          
+          if (!workflowValidation.isValid) {
+            return NextResponse.json(
+              { 
+                error: 'Invalid workflow structure',
+                code: 'INVALID_WORKFLOW',
+                details: workflowValidation.errors
+              },
+              { status: 400 }
+            );
+          }
+        }
+        
         result = await updateWorkflowTemplate(account, decodedTemplateName, version, updates);
         break;
 
@@ -174,7 +194,7 @@ export async function POST(
   { params }: RouteParams
 ): Promise<NextResponse> {
   try {
-    const { templateName } = await params;
+    const { id: templateName } = await params;
     const body = await request.json();
 
     if (!templateName) {
@@ -251,7 +271,7 @@ export async function DELETE(
   { params }: RouteParams
 ): Promise<NextResponse> {
   try {
-    const { templateName } = await params;
+    const { id: templateName } = await params;
     const { searchParams } = new URL(request.url);
     const version = searchParams.get('version');
 

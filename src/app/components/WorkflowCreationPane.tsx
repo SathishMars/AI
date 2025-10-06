@@ -22,7 +22,7 @@ import {
   Error as ErrorIcon,
   HelpOutline as HelpOutlineIcon
 } from '@mui/icons-material';
-import { WorkflowJSON, ValidationResult } from '@/app/types/workflow';
+import { WorkflowJSON, WorkflowStep } from '@/app/types/workflow';
 import { 
   CreationSession, 
   CreationContext, 
@@ -34,10 +34,12 @@ import { createEmptyConversationState, ConversationStateManager } from '@/app/ut
 import { WorkflowContext } from '@/app/utils/frontend-conversation-helpers';
 import { generateUniqueTemplateName } from '@/app/utils/template-name-generator';
 import { SmartAutocomplete } from './SmartAutocomplete';
-import { generateLLMWorkflowContext } from '@/app/utils/llm-workflow-context';
 import { ConversationHistoryMessage } from '@/app/utils/llm-workflow-generator';
 import { WorkflowAutocompleteItem } from '@/app/types/workflow-conversation-autocomplete';
 import { getLLMContext } from '@/app/data/workflow-conversation-autocomplete';
+// Phase 4: Frontend validation integration
+import { useWorkflowValidation } from '@/app/hooks/useWorkflowValidation';
+import { WorkflowValidationFeedback } from './WorkflowValidationFeedback';
 
 // Cache for available functions to prevent constant API calls
 let availableFunctionsCache: string[] | null = null;
@@ -179,7 +181,6 @@ const SimpleMessageRenderer = ({
 interface WorkflowCreationPaneProps {
   workflow: WorkflowJSON;
   onWorkflowChange: (workflow: WorkflowJSON) => void;
-  validationResult: ValidationResult | null;
   isNewWorkflow: boolean;
   mrfData?: MRFData;
 }
@@ -187,7 +188,6 @@ interface WorkflowCreationPaneProps {
 export default function WorkflowCreationPane({
   workflow,
   onWorkflowChange,
-  validationResult, // eslint-disable-line @typescript-eslint/no-unused-vars
   isNewWorkflow,
   mrfData
 }: WorkflowCreationPaneProps) {
@@ -197,11 +197,31 @@ export default function WorkflowCreationPane({
   const [isCreating, setIsCreating] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState<'saving' | 'saved' | 'error' | 'idle'>('idle');
   
+  // Phase 4: Real-time workflow validation
+  const {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    isValid: isWorkflowValid,
+    errors: validationErrors,
+    warnings: validationWarnings,
+    validate: validateWorkflow,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    getStepErrors,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    hasStepErrors
+  } = useWorkflowValidation({
+    debounceMs: 500,
+    onValidationComplete: (state) => {
+      console.log('🔍 Validation complete:', state.isValid ? 'PASS' : 'FAIL', 
+                  `- ${state.errors.length} errors, ${state.warnings.length} warnings`);
+    }
+  });
+  
   // Conversation state
   const [conversationManager, setConversationManager] = useState<ConversationStateManager | null>(null);
   const [currentMessage, setCurrentMessage] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [conversationContext, setConversationContext] = useState<CreationContext | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [workflowContext, setWorkflowContext] = useState<WorkflowContext | null>(null); // Used for LangChain conversation context
   
   // UI state
@@ -337,6 +357,33 @@ export default function WorkflowCreationPane({
     initializeSession();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isNewWorkflow, mrfData]); // Only depend on props that should trigger reinitialization
+  
+  // Update conversation manager with current workflow for validation
+  useEffect(() => {
+    if (conversationManager) {
+      // Convert array-based steps to object format for conversation manager compatibility
+      const stepsAsObject = Array.isArray(workflow.steps)
+        ? workflow.steps.reduce((acc: Record<string, unknown>, step: unknown, index: number) => {
+            acc[`step${index}`] = step;
+            return acc;
+          }, {})
+        : workflow.steps as Record<string, unknown>;
+      
+      conversationManager.setCurrentWorkflow({ steps: stepsAsObject });
+    }
+  }, [conversationManager, workflow]);
+  
+  // Phase 4: Validate workflow steps when they change
+  useEffect(() => {
+    // Only validate if we have a valid array of steps
+    if (workflow.steps && Array.isArray(workflow.steps) && workflow.steps.length > 0) {
+      console.log('🔍 Validating workflow with', workflow.steps.length, 'steps');
+      // Type assertion safe here because we check Array.isArray above
+      validateWorkflow(workflow.steps as WorkflowStep[]);
+    }
+    // Note: If steps is empty/undefined/not-an-array, validation hook will keep previous state
+    // The hook's internal logic handles empty arrays gracefully
+  }, [workflow.steps, validateWorkflow]);
   
   // Handle auto-save status events
   useEffect(() => {
@@ -475,7 +522,6 @@ export default function WorkflowCreationPane({
       
       const baseContext = conversationContext;
       const conversationHistory = getConversationHistory();
-      const workflowContextGenerated = generateLLMWorkflowContext();
       
       // Get rich function definitions from workflow-conversation-autocomplete
       const llmFunctionContext = getLLMContext();
@@ -788,6 +834,19 @@ export default function WorkflowCreationPane({
           </Box>
         )}
       </Box>
+      
+      {/* Phase 4: Validation Feedback */}
+      {(validationErrors.length > 0 || validationWarnings.length > 0) && (
+        <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider', maxHeight: '300px', overflow: 'auto' }}>
+          <WorkflowValidationFeedback
+            errors={validationErrors}
+            warnings={validationWarnings}
+            groupByType={true}
+            showWarnings={true}
+            showSuccessState={false}
+          />
+        </Box>
+      )}
       
       {/* Input Area with Enhanced Features */}
       <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>

@@ -18,22 +18,30 @@ import {
 import { WorkflowJSON, ValidationResult } from '@/app/types/workflow';
 import WorkflowCreationPane from './WorkflowCreationPane';
 import VisualizationPane from './VisualizationPane';
+import WorkflowTemplateSelector from './WorkflowTemplateSelector';
+import WorkflowTemplateNameDialog from './WorkflowTemplateNameDialog';
 
 interface WorkflowConfiguratorProps {
   workflow: WorkflowJSON;
   onWorkflowChange: (workflow: WorkflowJSON) => void;
   validationResult: ValidationResult | null;
   isNewWorkflow: boolean;
+  currentTemplateName?: string;
+  onTemplateNameChange?: (name: string) => Promise<void>;
 }
 
 export default function WorkflowConfigurator({
   workflow,
   onWorkflowChange,
   validationResult,
-  isNewWorkflow
+  isNewWorkflow,
+  currentTemplateName = 'new',
+  onTemplateNameChange
 }: WorkflowConfiguratorProps) {
   const [showFullVisualization, setShowFullVisualization] = useState(false);
   const [showRawJSON, setShowRawJSON] = useState(false);
+  const [showNameDialog, setShowNameDialog] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   
   const handleSave = () => {
     // Update metadata
@@ -61,14 +69,26 @@ export default function WorkflowConfigurator({
     }
   };
   
+  const handleTemplateNameSubmit = async (name: string) => {
+    if (onTemplateNameChange) {
+      await onTemplateNameChange(name);
+    }
+    setShowNameDialog(false);
+    // Small delay to ensure database write completes, then trigger refresh
+    setTimeout(() => {
+      setRefreshTrigger(prev => prev + 1);
+    }, 300);
+  };
+  
   return (
     <Box sx={{ height: 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column' }}>
       {/* Toolbar */}
       <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6" component="h2">
-            Workflow Configurator
-          </Typography>
+          <WorkflowTemplateSelector
+            currentTemplateName={currentTemplateName}
+            refreshTrigger={refreshTrigger}
+          />
           
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Button
@@ -159,6 +179,15 @@ export default function WorkflowConfigurator({
           </Box>
         )}
       </Box>
+      
+      {/* Template Name Dialog */}
+      <WorkflowTemplateNameDialog
+        open={showNameDialog}
+        onClose={() => setShowNameDialog(false)}
+        onSubmit={handleTemplateNameSubmit}
+        currentName={currentTemplateName === 'new' || currentTemplateName === 'create' ? '' : currentTemplateName}
+        mode={isNewWorkflow ? 'create' : 'rename'}
+      />
     </Box>
   );
 }

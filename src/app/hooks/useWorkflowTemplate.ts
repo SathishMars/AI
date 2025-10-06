@@ -11,7 +11,8 @@ import {
 import { WorkflowJSON } from '@/app/types/workflow';
 import { WorkflowTemplateService } from '@/app/services/workflow-template-service';
 import { useUnifiedUserContext } from '@/app/contexts/UnifiedUserContext';
-import { generateUniqueTemplateName } from '@/app/utils/template-name-generator';
+import { validateForAutoSave } from '@/app/utils/workflow-validation';
+import { WorkflowStep } from '@/app/types/workflow';
 
 interface UseWorkflowTemplateOptions {
   templateName?: string;
@@ -96,12 +97,12 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
   const suggestCreateDraft = templateResult?.suggestCreateDraft || false;
   
   // Load template by name
-  const loadTemplate = useCallback(async (name: string) => {
+  const loadTemplate = useCallback(async (id: string) => {
     try {
       setIsLoading(true);
       setError(null);
       
-      const result = await templateService.getTemplate(name);
+      const result = await templateService.getTemplate(id);
       setTemplateResult(result);
       setTemplate(result.template);
       
@@ -293,20 +294,27 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
   const saveWorkflowToDatabase = useCallback(async () => {
     if (!workflow || !accountId || isAutoSaving) return;
     
+    // CRITICAL: Don't save if template name is not set (new/create)
+    if (!currentTemplateName || currentTemplateName === 'new' || currentTemplateName === 'create') {
+      console.log('Skipping auto-save: workflow not named yet');
+      return;
+    }
+    
+    // CRITICAL: Use validateForAutoSave to check if workflow has real steps
+    // This validates the workflow structure is ready for saving
+    const autoSaveValidation = validateForAutoSave(workflow.steps as WorkflowStep[]);
+    if (!autoSaveValidation.shouldSave) {
+      console.log('Skipping auto-save:', autoSaveValidation.reasons.join(', '));
+      return;
+    }
+    
     try {
       setIsAutoSaving(true);
-      
-      // Generate template name if needed
-      let templateNameToUse = currentTemplateName;
-      if (!templateNameToUse) {
-        templateNameToUse = generateUniqueTemplateName();
-        setCurrentTemplateName(templateNameToUse);
-      }
       
       const templateInput: CreateWorkflowTemplateInput = {
         account: accountId,
         organization: organizationId || undefined,
-        name: templateNameToUse,
+        name: currentTemplateName,
         workflowDefinition: workflow,
         category: 'ai-generated',
         tags: ['auto-generated'],
@@ -319,7 +327,7 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
         const updates: UpdateWorkflowTemplateInput = {
           workflowDefinition: workflow
         };
-        await templateService.updateTemplate(templateNameToUse, template.version, updates);
+        await templateService.updateTemplate(currentTemplateName, template.version, updates);
       } else {
         // Create new template
         const newTemplate = await templateService.createTemplate(templateInput);
@@ -327,14 +335,14 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
         setOriginalWorkflow(workflow);
       }
       
-      console.log('Workflow auto-saved to database:', templateNameToUse);
+      console.log('Workflow auto-saved to database:', currentTemplateName);
     } catch (err) {
       console.warn('Auto-save failed, workflow preserved in memory:', err);
       // Don't set error state for auto-save failures to avoid disrupting user
     } finally {
       setIsAutoSaving(false);
     }
-  }, [workflow, accountId, organizationId, isAutoSaving, currentTemplateName, template, templateService, account, setCurrentTemplateName, setIsAutoSaving, setTemplate, setOriginalWorkflow]);
+  }, [workflow, accountId, organizationId, isAutoSaving, currentTemplateName, template, templateService, account]);
   
   // Auto-save workflow to database
   const scheduleAutoSave = useCallback(() => {
@@ -365,8 +373,14 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
   // Update workflow in memory and schedule auto-save
   const updateWorkflow = useCallback((newWorkflow: WorkflowJSON) => {
     setWorkflow(newWorkflow);
+    
+    // Sync template name from workflow metadata if it has changed
+    if (newWorkflow.metadata?.name && newWorkflow.metadata.name !== currentTemplateName) {
+      setCurrentTemplateName(newWorkflow.metadata.name);
+    }
+    
     scheduleAutoSave();
-  }, [scheduleAutoSave]);
+  }, [scheduleAutoSave, currentTemplateName]);
   
   // Cleanup timeout on unmount
   useEffect(() => {

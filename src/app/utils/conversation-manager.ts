@@ -25,6 +25,7 @@ export class ConversationStateManager {
   private autosaveDelay: number = 2000; // 2 seconds after last activity
   private autosaveTimeout: NodeJS.Timeout | null = null;
   private workflowContext: WorkflowContext | null = null;
+  private currentWorkflow: { steps?: Record<string, unknown> } | null = null;
   
   constructor(initialState: ConversationState, workflowContext?: WorkflowContext) {
     this.state = initialState;
@@ -36,6 +37,25 @@ export class ConversationStateManager {
    */
   setWorkflowContext(context: WorkflowContext): void {
     this.workflowContext = context;
+  }
+  
+  /**
+   * Set the current workflow for validation before saving
+   */
+  setCurrentWorkflow(workflow: { steps?: Record<string, unknown> } | null): void {
+    this.currentWorkflow = workflow;
+  }
+  
+  /**
+   * Check if the workflow has real steps (excluding 'start' and 'end')
+   */
+  private hasWorkflowSteps(): boolean {
+    if (!this.currentWorkflow?.steps) return false;
+    
+    const stepKeys = Object.keys(this.currentWorkflow.steps);
+    const realSteps = stepKeys.filter(key => key !== 'start' && key !== 'end');
+    
+    return realSteps.length > 0;
   }
   
   // Message management
@@ -187,6 +207,12 @@ export class ConversationStateManager {
   
   private async saveConversation(): Promise<void> {
     if (this.state.isAutoSaving) return;
+    
+    // CRITICAL: Don't save conversation if workflow has no steps yet
+    if (!this.hasWorkflowSteps()) {
+      console.log('⏭️ Skipping conversation save: workflow has no steps yet');
+      return;
+    }
     
     this.state.isAutoSaving = true;
     this.state.lastActivity = new Date();

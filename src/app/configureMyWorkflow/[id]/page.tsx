@@ -71,6 +71,30 @@ export default function ConfigureMyWorkflowPage({ params }: PageProps) {
     } catch (err) {
       console.error('Failed to save template:', err);
     }
+  };
+  
+  const handleTemplateNameChange = async (newName: string) => {
+    try {
+      // Update the template name in the workflow metadata
+      if (workflow) {
+        const updatedWorkflow: WorkflowJSON = {
+          ...workflow,
+          metadata: {
+            ...workflow.metadata,
+            name: newName
+          }
+        };
+        await updateWorkflow(updatedWorkflow);
+      }
+      
+      // Update the local template ID state to reflect the new name
+      setTemplateId(newName);
+      
+      // Note: No page redirect - stay on current page with updated name
+    } catch (err) {
+      console.error('Failed to change template name:', err);
+      throw err;
+    }
   };  // Show loading state
   if (isLoading) {
     return (
@@ -136,6 +160,8 @@ export default function ConfigureMyWorkflowPage({ params }: PageProps) {
         onWorkflowChange={handleSaveTemplate}
         validationResult={null}
         isNewWorkflow={isNewTemplate}
+        currentTemplateName={templateId || 'new'}
+        onTemplateNameChange={handleTemplateNameChange}
       />
     </Container>
   );

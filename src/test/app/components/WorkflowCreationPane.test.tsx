@@ -79,6 +79,8 @@ jest.mock('@/app/utils/conversation-manager', () => ({
   ConversationStateManager: jest.fn().mockImplementation(() => ({
     addUserMessage: jest.fn(),
     addAimeMessage: jest.fn(),
+    setCurrentWorkflow: jest.fn(),
+    setWorkflowContext: jest.fn(),
     getMessages: jest.fn().mockReturnValue([
       {
         id: 'msg-1',
@@ -129,7 +131,7 @@ const mockWorkflow: WorkflowJSON = {
     status: 'draft',
     tags: ['test']
   },
-  steps: {}
+  steps: [] // Empty array for nested array architecture
 };
 
 const mockValidationResult: ValidationResult = {

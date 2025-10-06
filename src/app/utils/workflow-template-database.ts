@@ -342,7 +342,7 @@ export async function createDraftFromPublished(
 /**
  * Get workflow template by name (with draft/published priority)
  */
-export async function getWorkflowTemplate(account: string, name: string): Promise<TemplateResolutionResult> {
+export async function getWorkflowTemplate(account: string, organization: string | null, workflowTemplateID: string): Promise<TemplateResolutionResult> {
   try {
     const db = await getMongoDatabase();
     const templatesCollection = db.collection(COLLECTION_TEMPLATES);
@@ -350,7 +350,7 @@ export async function getWorkflowTemplate(account: string, name: string): Promis
 
     // Get all versions of the template
     const templates = await templatesCollection
-      .find({ account, name })
+      .find({ account, organization, name: workflowTemplateID })
       .sort({ version: -1 })
       .toArray();
 
@@ -362,8 +362,8 @@ export async function getWorkflowTemplate(account: string, name: string): Promis
 
     // Get conversation history
     const conversations = await conversationsCollection
-      .find({ account, workflowTemplateName: name })
-      .sort({ 'sessionInfo.startedAt': -1 })
+      .find({ account, organization, workflowTemplateID })
+      .sort({ 'timestamp': 1 })
       .toArray();
 
     // Convert to ConfiguratorConversation objects

@@ -10,6 +10,7 @@ import {
   TemplateStatus,
   TemplateQueryFilters
 } from '@/app/types/workflow-template';
+import { WorkflowTemplateService } from '@/app/services/workflow-template-service';
 
 /**
  * Workflow Templates API Routes
@@ -129,6 +130,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const templateInput = validationResult.data;
+
+    // Validate workflow structure if workflowDefinition is provided
+    if (templateInput.workflowDefinition) {
+      const service = new WorkflowTemplateService();
+      const workflowValidation = service.validateWorkflow(templateInput.workflowDefinition);
+      
+      if (!workflowValidation.isValid) {
+        return NextResponse.json(
+          { 
+            error: 'Invalid workflow structure',
+            code: 'INVALID_WORKFLOW',
+            details: workflowValidation.errors
+          },
+          { status: 400 }
+        );
+      }
+    }
 
     // Create template
     const result = await createWorkflowTemplate(templateInput);

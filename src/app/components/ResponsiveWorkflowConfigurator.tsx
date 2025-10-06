@@ -28,6 +28,8 @@ import WorkflowCreationPane from './WorkflowCreationPane';
 import VisualizationPane from './VisualizationPane';
 import HistoryPanel from './HistoryPanel';
 import EditModeIndicator from './EditModeIndicator';
+import WorkflowTemplateSelector from './WorkflowTemplateSelector';
+import WorkflowTemplateNameDialog from './WorkflowTemplateNameDialog';
 
 interface ConversationState {
   activeConversationId: string;
@@ -51,13 +53,17 @@ interface ResponsiveWorkflowConfiguratorProps {
   onWorkflowChange: (workflow: WorkflowJSON) => void;
   validationResult: ValidationResult | null;
   isNewWorkflow: boolean;
+  currentTemplateName?: string;
+  onTemplateNameChange?: (name: string) => Promise<void>;
 }
 
 export default function ResponsiveWorkflowConfigurator({
   workflow,
   onWorkflowChange,
   validationResult,
-  isNewWorkflow
+  isNewWorkflow,
+  currentTemplateName = 'new',
+  onTemplateNameChange
 }: ResponsiveWorkflowConfiguratorProps) {
   // Custom breakpoints: Mobile ≤767px, Tablet 768px-1199px, Desktop ≥1200px
   const isDesktop = useMediaQuery('(min-width: 1200px)');
@@ -71,6 +77,17 @@ export default function ResponsiveWorkflowConfigurator({
   const [activeTab, setActiveTab] = useState(0); // For mobile tab navigation
   const [conversationPaneWidth, setConversationPaneWidth] = useState(400); // Default 400px
   const [isDragging, setIsDragging] = useState(false);
+  
+  // Template naming state
+  const [showNameDialog, setShowNameDialog] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  
+  // Auto-show dialog for new templates
+  useEffect(() => {
+    if (isNewWorkflow && (currentTemplateName === 'new' || currentTemplateName === 'create')) {
+      setShowNameDialog(true);
+    }
+  }, [isNewWorkflow, currentTemplateName]);
   
   // Conversation continuity state
   const conversationStateRef = useRef<ConversationState | null>(null);
@@ -163,6 +180,18 @@ export default function ResponsiveWorkflowConfigurator({
     setActiveTab(newValue);
   }, []);
   
+  // Handle template naming
+  const handleTemplateNameSubmit = useCallback(async (name: string) => {
+    if (onTemplateNameChange) {
+      await onTemplateNameChange(name);
+    }
+    setShowNameDialog(false);
+    // Small delay to ensure database write completes, then trigger refresh
+    setTimeout(() => {
+      setRefreshTrigger(prev => prev + 1);
+    }, 300);
+  }, [onTemplateNameChange]);
+  
   // Render toolbar
   const renderToolbar = () => (
     <Box sx={{ 
@@ -179,9 +208,10 @@ export default function ResponsiveWorkflowConfigurator({
         gap: { xs: 2, sm: 1 }
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-          <Typography variant="h6" component="h1" sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
-            Workflow Configurator
-          </Typography>
+          <WorkflowTemplateSelector
+            currentTemplateName={currentTemplateName}
+            refreshTrigger={refreshTrigger}
+          />
           
           <EditModeIndicator 
             workflow={workflow}
@@ -441,6 +471,15 @@ export default function ResponsiveWorkflowConfigurator({
           </Box>
         </Box>
       )}
+      
+      {/* Template Name Dialog */}
+      <WorkflowTemplateNameDialog
+        open={showNameDialog}
+        onClose={() => setShowNameDialog(false)}
+        onSubmit={handleTemplateNameSubmit}
+        currentName={currentTemplateName === 'new' || currentTemplateName === 'create' ? '' : currentTemplateName}
+        mode={isNewWorkflow ? 'create' : 'rename'}
+      />
     </Container>
   );
 }

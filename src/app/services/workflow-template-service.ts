@@ -7,6 +7,13 @@ import {
   TemplateListResponse,
   TemplateQueryFilters
 } from '@/app/types/workflow-template';
+import { WorkflowJSON, WorkflowStep } from '@/app/types/workflow';
+import {
+  validateStepIds,
+  validateStepReferences,
+  validateWorkflowStructure,
+  detectCircularReferences
+} from '@/app/utils/workflow-validation';
 
 /**
  * Service for interacting with workflow template API endpoints
@@ -95,8 +102,8 @@ export class WorkflowTemplateService {
   /**
    * Get a specific workflow template by name
    */
-  async getTemplate(name: string): Promise<TemplateResolutionResult> {
-    const response = await fetch(`${this.baseUrl}/${encodeURIComponent(name)}`, {
+  async getTemplate(id: string): Promise<TemplateResolutionResult> {
+    const response = await fetch(`${this.baseUrl}/${encodeURIComponent(id)}`, {
       method: 'GET',
       headers: this.getHeaders(),
     });
@@ -213,5 +220,46 @@ export class WorkflowTemplateService {
     const names = new Set<string>();
     response.templates.forEach(template => names.add(template.name));
     return Array.from(names).sort();
+  }
+
+  /**
+   * Validate workflow structure before saving
+   * Uses Phase 1 nested array validation utilities
+   */
+  validateWorkflow(workflow: WorkflowJSON): {
+    isValid: boolean;
+    errors: string[];
+  } {
+    const errors: string[] = [];
+    const steps = workflow.steps as WorkflowStep[];
+
+    // Validate step IDs
+    const idErrors = validateStepIds(steps);
+    if (idErrors.length > 0) {
+      errors.push(...idErrors.map(e => `${e.fieldPath || e.stepId || 'unknown'}: ${e.technicalMessage}`));
+    }
+
+    // Validate step references
+    const refErrors = validateStepReferences(steps);
+    if (refErrors.length > 0) {
+      errors.push(...refErrors.map(e => `${e.fieldPath || e.stepId || 'unknown'}: ${e.technicalMessage}`));
+    }
+
+    // Validate workflow structure
+    const structureErrors = validateWorkflowStructure(steps);
+    if (structureErrors.length > 0) {
+      errors.push(...structureErrors.map(e => `${e.fieldPath || e.stepId || 'unknown'}: ${e.technicalMessage}`));
+    }
+
+    // Check for circular references
+    const circularRefs = detectCircularReferences(steps);
+    if (circularRefs.length > 0) {
+      errors.push(`Circular reference detected: ${circularRefs.join(' -> ')}`);
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
   }
 }

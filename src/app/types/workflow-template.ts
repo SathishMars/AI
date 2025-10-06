@@ -32,15 +32,16 @@ export interface TemplateUsageStats {
   lastUsed?: Date;
 }
 
-// Core workflow template interface
+// Core workflow template interface (UPDATED with short-id and WorkflowDefinition)
 export interface WorkflowTemplate {
   _id?: string; // MongoDB ObjectId
+  id: string; // 10-char short-id (auto-generated, e.g., "a1b2c3d4e5")
   account: string; // Account identifier for multi-tenancy
   organization?: string; // Organization identifier within account (optional - if null, template is shared across all organizations in account)
-  name: string; // Template name (unique within account+organization combination)
+  name: string; // Template name (user-editable, NOT part of composite key)
   status: TemplateStatus;
   version: string; // Semantic version (major.minor.patch)
-  workflowDefinition: WorkflowJSON; // Complete workflow JSON
+  workflowDefinition: WorkflowJSON; // Complete workflow JSON (will use WorkflowDefinition in future)
   mermaidDiagram?: string; // Generated Mermaid diagram
   metadata: TemplateMetadata;
   parentVersion?: string; // Reference to parent version

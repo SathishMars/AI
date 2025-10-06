@@ -37,30 +37,44 @@ export const ConditionSchema: z.ZodType<WorkflowCondition> = z.lazy(() =>
   )
 );
 
-// Workflow step types
-export const WorkflowStepSchema = z.object({
-  name: z.string(),
-  type: z.enum(['trigger', 'condition', 'action', 'end', 'branch', 'merge']),
-  action: z.string().optional(),
-  params: z.record(z.string(), z.any()).optional(),
-  condition: ConditionSchema.optional(),
-  nextSteps: z.array(z.string()).optional(),
-  onSuccess: z.string().optional(),
-  onFailure: z.string().optional(),
-  // Enhanced condition outputs
-  onApproval: z.string().optional(),
-  onYes: z.string().optional(), 
-  onReject: z.string().optional(),
-  onNo: z.string().optional(),
-  // Branching properties
-  branches: z.array(z.string()).optional(),
-  waitForSteps: z.array(z.string()).optional(),
-  // Merge properties
-  requireAllSuccess: z.boolean().optional(),
-  timeout: z.number().optional(),
-  // End state
-  result: z.string().optional()
-});
+// Workflow step types (NESTED ARRAY ARCHITECTURE with Human-Readable IDs)
+// Define the base schema without type annotation to avoid circular reference
+export const WorkflowStepSchema: z.ZodSchema = z.lazy(() =>
+  z.object({
+    // Required fields
+    id: z.string()
+      .regex(/^[a-zA-Z][a-zA-Z0-9]*$/, 'Step ID must be camelCase (only letters and numbers, start with letter)')
+      .min(3, 'Step ID must be at least 3 characters')
+      .max(50, 'Step ID must be at most 50 characters'),
+    name: z.string().min(1, 'Step name is required'),
+    type: z.enum(['trigger', 'condition', 'action', 'end', 'branch', 'merge', 'workflow']),
+    
+    // Optional fields
+    action: z.string().optional(),
+    params: z.record(z.string(), z.any()).optional(),
+    
+    // For condition steps
+    condition: ConditionSchema.optional(),
+    
+    // Sequential children (nested array)
+    children: z.array(z.lazy(() => WorkflowStepSchema)).optional(),
+    
+    // Conditional paths - inline steps (full step objects)
+    onSuccess: z.lazy(() => WorkflowStepSchema).optional(),
+    onFailure: z.lazy(() => WorkflowStepSchema).optional(),
+    
+    // Conditional paths - references to other steps (by human-readable ID)
+    onSuccessGoTo: z.string().optional(),
+    onFailureGoTo: z.string().optional(),
+    
+    // For end steps
+    result: z.enum(['success', 'failure', 'cancelled', 'timeout']).optional(),
+    
+    // For workflow trigger steps (triggers another workflow in same account)
+    workflowId: z.string().optional(),
+    workflowParams: z.record(z.string(), z.any()).optional()
+  })
+);
 
 // Workflow metadata
 export const WorkflowMetadataSchema = z.object({
@@ -75,16 +89,42 @@ export const WorkflowMetadataSchema = z.object({
   tags: z.array(z.string()).default([])
 });
 
-// Main workflow schema
+// Workflow definition interface (ONLY steps array - no metadata duplication)
+export interface WorkflowDefinition {
+  steps: WorkflowStep[];
+}
+
+// Workflow definition schema
+export const WorkflowDefinitionSchema = z.object({
+  steps: z.array(WorkflowStepSchema)
+});
+
+// Main workflow schema (for backward compatibility - will be migrated to WorkflowDefinition)
 export const WorkflowJSONSchema = z.object({
   schemaVersion: z.string().default(CURRENT_SCHEMA_VERSION),
   metadata: WorkflowMetadataSchema,
-  steps: z.record(z.string(), WorkflowStepSchema),
+  steps: z.array(WorkflowStepSchema), // UPDATED: Now array instead of record
   mermaidDiagram: z.string().optional() // LLM-generated Mermaid markdown
 });
 
 // TypeScript types derived from schemas
-export type WorkflowStep = z.infer<typeof WorkflowStepSchema>;
+export interface WorkflowStep {
+  id: string;
+  name: string;
+  type: 'trigger' | 'condition' | 'action' | 'end' | 'branch' | 'merge' | 'workflow';
+  action?: string;
+  params?: Record<string, unknown>;
+  condition?: WorkflowCondition;
+  children?: WorkflowStep[];
+  onSuccess?: WorkflowStep;
+  onFailure?: WorkflowStep;
+  onSuccessGoTo?: string;
+  onFailureGoTo?: string;
+  result?: 'success' | 'failure' | 'cancelled' | 'timeout';
+  workflowId?: string;
+  workflowParams?: Record<string, unknown>;
+}
+
 export type WorkflowMetadata = z.infer<typeof WorkflowMetadataSchema>;
 export type WorkflowJSON = z.infer<typeof WorkflowJSONSchema>;
 
