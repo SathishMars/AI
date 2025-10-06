@@ -134,17 +134,40 @@ export async function PUT(
         // Validate workflow structure if workflowDefinition is being updated
         if (updates.workflowDefinition) {
           const service = new WorkflowTemplateService();
-          const workflowValidation = service.validateWorkflow(updates.workflowDefinition);
           
-          if (!workflowValidation.isValid) {
-            return NextResponse.json(
-              { 
-                error: 'Invalid workflow structure',
-                code: 'INVALID_WORKFLOW',
-                details: workflowValidation.errors
-              },
-              { status: 400 }
-            );
+          // Support both legacy WorkflowJSON and new WorkflowDefinition format
+          // WorkflowDefinition has { steps: WorkflowStep[] }
+          // WorkflowJSON has { steps: unknown[], metadata: {...}, schemaVersion: string }
+          const isWorkflowDefinition = updates.workflowDefinition.steps && 
+            !updates.workflowDefinition.metadata && 
+            !updates.workflowDefinition.schemaVersion;
+          
+          if (isWorkflowDefinition) {
+            // Validate new format
+            const workflowValidation = service.validateWorkflow(updates.workflowDefinition);
+            
+            if (!workflowValidation.isValid) {
+              return NextResponse.json(
+                { 
+                  error: 'Invalid workflow structure',
+                  code: 'INVALID_WORKFLOW',
+                  details: workflowValidation.errors
+                },
+                { status: 400 }
+              );
+            }
+          } else {
+            // Legacy format - WorkflowJSON with metadata
+            // Basic validation only (full validation requires WorkflowDefinition)
+            if (!Array.isArray(updates.workflowDefinition.steps)) {
+              return NextResponse.json(
+                { 
+                  error: 'Invalid workflow structure: steps must be an array',
+                  code: 'INVALID_WORKFLOW'
+                },
+                { status: 400 }
+              );
+            }
           }
         }
         

@@ -10,10 +10,9 @@ import {
   Container,
   Button
 } from '@mui/material';
-import { WorkflowJSON } from '@/app/types/workflow';
+import { WorkflowJSON, WorkflowStep } from '@/app/types/workflow';
 import ResponsiveWorkflowConfigurator from '@/app/components/ResponsiveWorkflowConfigurator';
-import { useWorkflowTemplate } from '@/app/hooks/useWorkflowTemplate';
-import { createDefaultWorkflow } from '@/app/utils/workflow-defaults';
+import { useWorkflowTemplateV2 } from '@/app/hooks/useWorkflowTemplateV2';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -22,22 +21,28 @@ interface PageProps {
 export default function ConfigureMyWorkflowPage({ params }: PageProps) {
   const [templateId, setTemplateId] = useState<string | null>(null);
   
+  // Use NEW workflow template hook with immediate auto-save
   const {
-    workflow,
+    template,
+    workflowJSON,
     isLoading,
+    isContextLoading,
     error,
-    isAutoSaving,
     isNewTemplate,
     hasUnsavedChanges,
+    isSaving,
+    canAutoSave,
     loadTemplate,
-    updateWorkflow,
+    initializeNewTemplate,
+    updateWorkflowDefinition,
+    updateTemplateName,
+    saveTemplate,
     clearError
-  } = useWorkflowTemplate({
-    templateName: templateId || undefined,
-    autoLoad: false,
-    autoSave: true, // Enable auto-save to database
-    autoSaveDelay: 2000 // Auto-save 2 seconds after changes
+  } = useWorkflowTemplateV2({
+    autoSave: true  // Immediate save (no delay)
   });
+  
+  const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
     const resolveParams = async () => {
@@ -47,60 +52,55 @@ export default function ConfigureMyWorkflowPage({ params }: PageProps) {
         
         setTemplateId(id);
         
-        if (id === 'new' || id === 'create') {
-          // Create a blank new workflow
-          const defaultWorkflow = createDefaultWorkflow();
-          updateWorkflow(defaultWorkflow);
-        } else {
-          // Load existing workflow template
-          await loadTemplate(id);
+        // Wait for user context to finish loading before creating/loading templates
+        if (!isContextLoading && !initialized) {
+          setInitialized(true);
+          
+          if (id === 'new' || id === 'create') {
+            // Initialize a new workflow in memory (no API call)
+            // Will be saved to database when user starts editing
+            initializeNewTemplate(
+              'New Workflow',
+              'Created from workflow builder'
+            );
+          } else {
+            // Load existing template
+            await loadTemplate(id);
+          }
         }
       } catch (err) {
         console.error('Error resolving params:', err);
       }
-    };
-    
-    
+    };    
     resolveParams();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params]); // Remove function dependencies to prevent infinite loops
+  }, [params, isContextLoading, initialized]); // Wait for context loading to complete
 
-  const handleSaveTemplate = async (workflowData: WorkflowJSON) => {
+    const handleSaveTemplate = async (updatedWorkflow: WorkflowJSON) => {
     try {
-      updateWorkflow(workflowData);
+      // Convert WorkflowJSON to WorkflowDefinition (just extract steps)
+      await updateWorkflowDefinition({
+        steps: updatedWorkflow.steps as WorkflowStep[]
+      });
     } catch (err) {
-      console.error('Failed to save template:', err);
+      console.error('Failed to save workflow:', err);
     }
   };
   
-  const handleTemplateNameChange = async (newName: string) => {
-    try {
-      // Update the template name in the workflow metadata
-      if (workflow) {
-        const updatedWorkflow: WorkflowJSON = {
-          ...workflow,
-          metadata: {
-            ...workflow.metadata,
-            name: newName
-          }
-        };
-        await updateWorkflow(updatedWorkflow);
-      }
-      
-      // Update the local template ID state to reflect the new name
-      setTemplateId(newName);
-      
-      // Note: No page redirect - stay on current page with updated name
-    } catch (err) {
-      console.error('Failed to change template name:', err);
-      throw err;
-    }
-  };  // Show loading state
-  if (isLoading) {
+    const handleTemplateNameChange = async (name: string) => {
+    if (!template) return;
+    
+    // Update template name directly (no metadata duplication)
+    await updateTemplateName(name);
+  };  // Show loading state (wait for both context and template)
+  if (isContextLoading || isLoading) {
     return (
       <Container maxWidth="xl" sx={{ py: 4 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: 400, gap: 2 }}>
           <CircularProgress />
+          <Typography variant="body2" color="text.secondary">
+            {isContextLoading ? 'Loading user context...' : 'Loading workflow...'}
+          </Typography>
         </Box>
       </Container>
     );
@@ -125,7 +125,7 @@ export default function ConfigureMyWorkflowPage({ params }: PageProps) {
   }
 
   // Show empty state if no workflow loaded
-  if (!workflow) {
+  if (!workflowJSON) {
     return (
       <Container maxWidth="md" sx={{ py: 4 }}>
         <Box sx={{ textAlign: 'center' }}>
@@ -149,18 +149,24 @@ export default function ConfigureMyWorkflowPage({ params }: PageProps) {
         </Alert>
       )}
       
-      {isAutoSaving && (
+      {isSaving && (
         <Alert severity="info" sx={{ mb: 2 }}>
-          Auto-saving workflow to database...
+          Saving workflow to database...
+        </Alert>
+      )}
+      
+      {!canAutoSave && template && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          Auto-save disabled: Please add at least one workflow step and provide a valid template name.
         </Alert>
       )}
       
       <ResponsiveWorkflowConfigurator
-        workflow={workflow}
+        workflow={workflowJSON}
         onWorkflowChange={handleSaveTemplate}
         validationResult={null}
         isNewWorkflow={isNewTemplate}
-        currentTemplateName={templateId || 'new'}
+        currentTemplateName={template?.name || templateId || 'new'}
         onTemplateNameChange={handleTemplateNameChange}
       />
     </Container>

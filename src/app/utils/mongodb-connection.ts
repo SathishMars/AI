@@ -41,38 +41,70 @@ class MongoDBConnectionPool {
     // Determine database environment
     this.environment = (process.env.DATABASE_ENVIRONMENT as DatabaseEnvironment) || 'local';
     
-    // Get database name
-    this.databaseName = process.env.MONGODB_DATABASE || 'groupize-workflows';
+    // Get connection string from environment
+    this.connectionString = this.getConnectionString();
     
-    // Build connection string based on environment
-    this.connectionString = this.buildConnectionString();
+    // Extract database name from connection string
+    this.databaseName = this.extractDatabaseName(this.connectionString);
   }
 
   /**
-   * Build connection string based on environment (local MongoDB vs AWS DocumentDB)
+   * Get connection string from environment variables
+   * Uses MONGODB_URI for local MongoDB and DOCUMENTDB_URI for AWS DocumentDB
    */
-  private buildConnectionString(): string {
+  private getConnectionString(): string {
     if (this.environment === 'documentdb') {
       // AWS DocumentDB connection
-      const docdbHost = process.env.DOCUMENTDB_HOST || process.env.DOCUMENTDB_CLUSTER_ENDPOINT;
-      const docdbPort = process.env.DOCUMENTDB_PORT || '27017';
-      const docdbUser = process.env.DOCUMENTDB_USER || process.env.DOCUMENTDB_USERNAME;
-      const docdbPassword = process.env.DOCUMENTDB_PASSWORD;
+      const docdbUri = process.env.DOCUMENTDB_URI;
       
-      if (!docdbHost || !docdbUser || !docdbPassword) {
-        throw new Error('AWS DocumentDB connection requires DOCUMENTDB_HOST, DOCUMENTDB_USER, and DOCUMENTDB_PASSWORD environment variables');
+      if (!docdbUri) {
+        throw new Error('AWS DocumentDB connection requires DOCUMENTDB_URI environment variable');
       }
       
-      // DocumentDB requires SSL and specific parameters
-      return `mongodb://${docdbUser}:${docdbPassword}@${docdbHost}:${docdbPort}/${this.databaseName}?ssl=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false`;
+      return docdbUri;
     } else {
       // Local MongoDB connection
-      const mongoHost = process.env.MONGODB_HOST || 'localhost';
-      const mongoPort = process.env.MONGODB_PORT || '27017';
-      const mongoUser = process.env.MONGODB_USER || 'groupize_app';
-      const mongoPassword = process.env.MONGODB_PASSWORD || 'gr0up!zeapP';
+      const mongoUri = process.env.MONGODB_URI;
       
-      return `mongodb://${mongoUser}:${mongoPassword}@${mongoHost}:${mongoPort}/${this.databaseName}`;
+      if (!mongoUri) {
+        throw new Error('Local MongoDB connection requires MONGODB_URI environment variable');
+      }
+      
+      return mongoUri;
+    }
+  }
+
+  /**
+   * Extract database name from MongoDB connection string
+   * Handles both simple and complex connection strings with query parameters
+   */
+  private extractDatabaseName(connectionString: string): string {
+    try {
+      // Remove 'mongodb://' prefix
+      const withoutProtocol = connectionString.replace(/^mongodb:\/\//, '');
+      
+      // Split by '/' to get the path portion
+      const parts = withoutProtocol.split('/');
+      
+      if (parts.length < 2) {
+        throw new Error('Invalid MongoDB connection string format');
+      }
+      
+      // Database name is after the host:port and before query params
+      const dbWithParams = parts[1];
+      
+      // Remove query parameters if present
+      const dbName = dbWithParams.split('?')[0];
+      
+      if (!dbName) {
+        throw new Error('Database name not found in connection string');
+      }
+      
+      return dbName;
+    } catch (error) {
+      console.error('Failed to extract database name from connection string:', error);
+      // Fallback to default
+      return 'groupize-workflows';
     }
   }
 

@@ -24,6 +24,8 @@ import {
   History as HistoryIcon
 } from '@mui/icons-material';
 import { WorkflowJSON, ValidationResult } from '@/app/types/workflow';
+import { WorkflowDefinition } from '@/app/types/workflow-template-v2';
+import { workflowDefinitionToJSON } from '@/app/utils/workflow-template-migration';
 import WorkflowCreationPane from './WorkflowCreationPane';
 import VisualizationPane from './VisualizationPane';
 import HistoryPanel from './HistoryPanel';
@@ -49,7 +51,10 @@ interface ConversationState {
 }
 
 interface ResponsiveWorkflowConfiguratorProps {
-  workflow: WorkflowJSON;
+  // Legacy support - WorkflowJSON (will be converted internally)
+  workflow?: WorkflowJSON;
+  // New support - WorkflowDefinition (preferred)
+  workflowDefinition?: WorkflowDefinition;
   onWorkflowChange: (workflow: WorkflowJSON) => void;
   validationResult: ValidationResult | null;
   isNewWorkflow: boolean;
@@ -58,13 +63,26 @@ interface ResponsiveWorkflowConfiguratorProps {
 }
 
 export default function ResponsiveWorkflowConfigurator({
-  workflow,
+  workflow: legacyWorkflow,
+  workflowDefinition,
   onWorkflowChange,
   validationResult,
   isNewWorkflow,
   currentTemplateName = 'new',
   onTemplateNameChange
 }: ResponsiveWorkflowConfiguratorProps) {
+  // Convert WorkflowDefinition to WorkflowJSON if provided
+  const workflow = React.useMemo(() => {
+    if (workflowDefinition) {
+      return workflowDefinitionToJSON(workflowDefinition);
+    }
+    return legacyWorkflow;
+  }, [workflowDefinition, legacyWorkflow]);
+  
+  // Ensure we have a workflow object
+  if (!workflow) {
+    throw new Error('ResponsiveWorkflowConfigurator requires either workflow or workflowDefinition prop');
+  }
   // Custom breakpoints: Mobile ≤767px, Tablet 768px-1199px, Desktop ≥1200px
   const isDesktop = useMediaQuery('(min-width: 1200px)');
   const isTablet = useMediaQuery('(min-width: 768px) and (max-width: 1199px)');
@@ -401,7 +419,6 @@ export default function ResponsiveWorkflowConfigurator({
               <WorkflowCreationPane
                 workflow={workflow}
                 onWorkflowChange={onWorkflowChange}
-                validationResult={validationResult}
                 isNewWorkflow={isNewWorkflow}
                 mrfData={undefined}
               />
@@ -447,7 +464,6 @@ export default function ResponsiveWorkflowConfigurator({
             <WorkflowCreationPane
               workflow={workflow}
               onWorkflowChange={onWorkflowChange}
-              validationResult={validationResult}
               isNewWorkflow={isNewWorkflow}
               mrfData={undefined}
             />

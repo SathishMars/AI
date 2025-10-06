@@ -203,13 +203,18 @@ async function handleAddMessage(data: {
 
   // Add message to conversation
   const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const conversationId = `${account}_${organization || 'account'}_${templateName}`;
   
   const message = await addMessageToConversation(
     account,
     organization || null,
     templateName,
     {
-      messageId,
+      conversationId,
+      account,
+      organization: organization || null,
+      workflowTemplateName: templateName,
+      id: messageId,
       role: role as ConfiguratorMessageRole,
       content,
       timestamp: new Date(),

@@ -4,7 +4,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Box, CircularProgress, Alert } from '@mui/material';
 import mermaid from 'mermaid';
-import { WorkflowJSON } from '@/app/types/workflow';
+import { WorkflowJSON, WorkflowStep } from '@/app/types/workflow';
 import { 
   MermaidVisualizationConfig, 
   DraftState,
@@ -88,7 +88,10 @@ export default function MermaidRenderer({
     const lines = ['flowchart TD'];
     
     // Define steps with custom styling
-    Object.entries(workflow.steps).forEach(([stepId, step]) => {
+    Object.entries(workflow.steps).forEach(([stepId, stepData]) => {
+      // Type guard to ensure step is a WorkflowStep
+      const step = stepData as WorkflowStep;
+      
       const stepStyle = config.stepStyles.get(stepId);
       const isDraft = draftState?.modifiedSteps.has(stepId);
       const indicator = config.indicators.get(stepId);
@@ -121,9 +124,12 @@ export default function MermaidRenderer({
     });
     
     // Define connections between steps
-    Object.entries(workflow.steps).forEach(([stepId, step]) => {
-      if (step.nextSteps) {
-        step.nextSteps.forEach(nextStep => {
+    Object.entries(workflow.steps).forEach(([stepId, stepData]) => {
+      // Type assertion for legacy workflow structure
+      const step = stepData as Record<string, unknown>;
+      
+      if (step.nextSteps && Array.isArray(step.nextSteps)) {
+        step.nextSteps.forEach((nextStep: string) => {
           lines.push(`    ${stepId} --> ${nextStep}`);
         });
       }

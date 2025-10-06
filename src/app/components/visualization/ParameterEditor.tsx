@@ -115,7 +115,7 @@ export default function ParameterEditor({
       Object.entries(step.params).forEach(([key, value]) => {
         params.push({
           name: `params.${key}`,
-          value,
+          value: value as string | number | boolean | object,
           type: inferParameterType(value),
           required: false,
           description: `Parameter: ${key}`
@@ -220,7 +220,7 @@ export default function ParameterEditor({
     if ('requireAllSuccess' in step && step.requireAllSuccess !== undefined) {
       params.push({
         name: 'requireAllSuccess',
-        value: step.requireAllSuccess,
+        value: Boolean(step.requireAllSuccess),
         type: 'boolean',
         required: false,
         description: 'Require all steps to succeed'
@@ -237,10 +237,12 @@ export default function ParameterEditor({
       });
     }
 
-    if (step.nextSteps) {
+    // Type assertion for legacy workflow schema
+    const stepWithNextSteps = step as WorkflowStep & { nextSteps?: string[] };
+    if (stepWithNextSteps.nextSteps) {
       params.push({
         name: 'nextSteps',
-        value: step.nextSteps,
+        value: stepWithNextSteps.nextSteps,
         type: 'array',
         required: false,
         description: 'List of next steps'

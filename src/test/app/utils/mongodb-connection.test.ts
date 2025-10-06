@@ -55,11 +55,7 @@ describe('MongoDB Connection Pool Utility', () => {
     
     // Set up test environment variables for local MongoDB
     process.env.DATABASE_ENVIRONMENT = 'local';
-    process.env.MONGODB_HOST = 'localhost';
-    process.env.MONGODB_PORT = '27017';
-    process.env.MONGODB_USER = 'testuser';
-    process.env.MONGODB_PASSWORD = 'testpass';
-    process.env.MONGODB_DATABASE = 'testdb';
+    process.env.MONGODB_URI = 'mongodb://testuser:testpass@localhost:27017/testdb';
   });
 
   afterEach(async () => {
@@ -205,11 +201,8 @@ describe('MongoDB Connection Pool Utility', () => {
   describe('Environment Configuration', () => {
     it('should use default values when environment variables are not set', () => {
       delete process.env.DATABASE_ENVIRONMENT;
-      delete process.env.MONGODB_HOST;
-      delete process.env.MONGODB_PORT;
-      delete process.env.MONGODB_USER;
-      delete process.env.MONGODB_PASSWORD;
-      delete process.env.MONGODB_DATABASE;
+      // Set MONGODB_URI with default values
+      process.env.MONGODB_URI = 'mongodb://groupize_app:gr0up!zeapP@localhost:27017/groupize-workflows';
       
       // Reset singleton to pick up new env vars
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -223,9 +216,7 @@ describe('MongoDB Connection Pool Utility', () => {
     it('should configure for DocumentDB environment', async () => {
       // Set DocumentDB environment variables
       process.env.DATABASE_ENVIRONMENT = 'documentdb';
-      process.env.DOCUMENTDB_HOST = 'test-cluster.cluster-xyz.us-east-1.docdb.amazonaws.com';
-      process.env.DOCUMENTDB_USER = 'docdb-user';
-      process.env.DOCUMENTDB_PASSWORD = 'docdb-password';
+      process.env.DOCUMENTDB_URI = 'mongodb://docdb-user:docdb-password@test-cluster.cluster-xyz.us-east-1.docdb.amazonaws.com:27017/groupize-workflows?ssl=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false';
       
       // Reset singleton to pick up new env vars
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -239,9 +230,7 @@ describe('MongoDB Connection Pool Utility', () => {
 
     it('should throw error for DocumentDB without required credentials', () => {
       process.env.DATABASE_ENVIRONMENT = 'documentdb';
-      delete process.env.DOCUMENTDB_HOST;
-      delete process.env.DOCUMENTDB_USER;
-      delete process.env.DOCUMENTDB_PASSWORD;
+      delete process.env.DOCUMENTDB_URI;
       
       // Reset singleton to pick up new env vars
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -249,7 +238,7 @@ describe('MongoDB Connection Pool Utility', () => {
       
       expect(() => {
         MongoDBConnectionPool.getInstance();
-      }).toThrow('AWS DocumentDB connection requires DOCUMENTDB_HOST, DOCUMENTDB_USER, and DOCUMENTDB_PASSWORD environment variables');
+      }).toThrow('AWS DocumentDB connection requires DOCUMENTDB_URI environment variable');
     });
   });
 

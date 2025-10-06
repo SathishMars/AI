@@ -6,11 +6,12 @@ import {
 } from '@/app/utils/workflow-template-database';
 import {
   TemplateError,
-  CreateWorkflowTemplateInputSchema,
   TemplateStatus,
   TemplateQueryFilters
 } from '@/app/types/workflow-template';
-import { WorkflowTemplateService } from '@/app/services/workflow-template-service';
+import {
+  CreateWorkflowTemplateInputSchema
+} from '@/app/types/workflow-template-v2';
 
 /**
  * Workflow Templates API Routes
@@ -131,25 +132,34 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const templateInput = validationResult.data;
 
-    // Validate workflow structure if workflowDefinition is provided
-    if (templateInput.workflowDefinition) {
-      const service = new WorkflowTemplateService();
-      const workflowValidation = service.validateWorkflow(templateInput.workflowDefinition);
-      
-      if (!workflowValidation.isValid) {
-        return NextResponse.json(
-          { 
-            error: 'Invalid workflow structure',
-            code: 'INVALID_WORKFLOW',
-            details: workflowValidation.errors
-          },
-          { status: 400 }
-        );
-      }
-    }
+    // Convert V2 input to legacy format for database
+    // V2 uses workflowDefinition with steps array, legacy expects full WorkflowJSON
+    const legacyInput = {
+      account: templateInput.account,
+      name: templateInput.name,
+      workflowDefinition: {
+        schemaVersion: '1.0.0',
+        metadata: {
+          id: '', // Will be generated
+          name: templateInput.name,
+          version: '1.0.0',
+          status: 'draft' as const,
+          tags: templateInput.tags || [],
+          description: templateInput.description,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          createdBy: templateInput.author || 'system'
+        },
+        steps: templateInput.workflowDefinition?.steps || []
+      },
+      description: templateInput.description,
+      category: templateInput.category,
+      tags: templateInput.tags,
+      author: templateInput.author || 'system'
+    };
 
     // Create template
-    const result = await createWorkflowTemplate(templateInput);
+    const result = await createWorkflowTemplate(legacyInput);
 
     return NextResponse.json({
       success: true,

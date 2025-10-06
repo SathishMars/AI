@@ -184,7 +184,6 @@ describe('WorkflowCreationPane', () => {
         <WorkflowCreationPane
           workflow={mockWorkflow}
           onWorkflowChange={mockOnWorkflowChange}
-          validationResult={mockValidationResult}
           isNewWorkflow={true}
         />
       );
@@ -198,7 +197,6 @@ describe('WorkflowCreationPane', () => {
         <WorkflowCreationPane
           workflow={mockWorkflow}
           onWorkflowChange={mockOnWorkflowChange}
-          validationResult={mockValidationResult}
           isNewWorkflow={true}
         />
       );
@@ -215,7 +213,6 @@ describe('WorkflowCreationPane', () => {
         <WorkflowCreationPane
           workflow={mockWorkflow}
           onWorkflowChange={mockOnWorkflowChange}
-          validationResult={mockValidationResult}
           isNewWorkflow={true}
           mrfData={mockMRFData}
         />
@@ -232,7 +229,6 @@ describe('WorkflowCreationPane', () => {
         <WorkflowCreationPane
           workflow={mockWorkflow}
           onWorkflowChange={mockOnWorkflowChange}
-          validationResult={mockValidationResult}
           isNewWorkflow={true}
           mrfData={mockMRFData}
         />
@@ -251,7 +247,6 @@ describe('WorkflowCreationPane', () => {
         <WorkflowCreationPane
           workflow={mockWorkflow}
           onWorkflowChange={mockOnWorkflowChange}
-          validationResult={mockValidationResult}
           isNewWorkflow={true}
         />
       );
@@ -267,7 +262,6 @@ describe('WorkflowCreationPane', () => {
         <WorkflowCreationPane
           workflow={mockWorkflow}
           onWorkflowChange={mockOnWorkflowChange}
-          validationResult={mockValidationResult}
           isNewWorkflow={true}
         />
       );
@@ -287,7 +281,6 @@ describe('WorkflowCreationPane', () => {
         <WorkflowCreationPane
           workflow={mockWorkflow}
           onWorkflowChange={mockOnWorkflowChange}
-          validationResult={mockValidationResult}
           isNewWorkflow={true}
         />
       );
@@ -308,7 +301,6 @@ describe('WorkflowCreationPane', () => {
         <WorkflowCreationPane
           workflow={mockWorkflow}
           onWorkflowChange={mockOnWorkflowChange}
-          validationResult={mockValidationResult}
           isNewWorkflow={true}
         />
       );
@@ -329,7 +321,6 @@ describe('WorkflowCreationPane', () => {
         <WorkflowCreationPane
           workflow={mockWorkflow}
           onWorkflowChange={mockOnWorkflowChange}
-          validationResult={mockValidationResult}
           isNewWorkflow={true}
         />
       );
@@ -349,7 +340,6 @@ describe('WorkflowCreationPane', () => {
         <WorkflowCreationPane
           workflow={mockWorkflow}
           onWorkflowChange={mockOnWorkflowChange}
-          validationResult={mockValidationResult}
           isNewWorkflow={true}
         />
       );
@@ -370,7 +360,6 @@ describe('WorkflowCreationPane', () => {
         <WorkflowCreationPane
           workflow={mockWorkflow}
           onWorkflowChange={mockOnWorkflowChange}
-          validationResult={mockValidationResult}
           isNewWorkflow={true}
         />
       );
@@ -389,7 +378,6 @@ describe('WorkflowCreationPane', () => {
         <WorkflowCreationPane
           workflow={mockWorkflow}
           onWorkflowChange={mockOnWorkflowChange}
-          validationResult={mockValidationResult}
           isNewWorkflow={true}
         />
       );
@@ -407,7 +395,6 @@ describe('WorkflowCreationPane', () => {
         <WorkflowCreationPane
           workflow={mockWorkflow}
           onWorkflowChange={mockOnWorkflowChange}
-          validationResult={mockValidationResult}
           isNewWorkflow={true}
         />
       );
@@ -426,7 +413,6 @@ describe('WorkflowCreationPane', () => {
         <WorkflowCreationPane
           workflow={mockWorkflow}
           onWorkflowChange={mockOnWorkflowChange}
-          validationResult={mockValidationResult}
           isNewWorkflow={true}
         />
       );
@@ -470,7 +456,6 @@ describe('WorkflowCreationPane', () => {
         <WorkflowCreationPane
           workflow={mockWorkflow}
           onWorkflowChange={mockOnWorkflowChange}
-          validationResult={validationWithErrors}
           isNewWorkflow={true}
         />
       );
@@ -486,7 +471,6 @@ describe('WorkflowCreationPane', () => {
         <WorkflowCreationPane
           workflow={mockWorkflow}
           onWorkflowChange={mockOnWorkflowChange}
-          validationResult={mockValidationResult}
           isNewWorkflow={true}
         />
       );
@@ -500,7 +484,6 @@ describe('WorkflowCreationPane', () => {
         <WorkflowCreationPane
           workflow={mockWorkflow}
           onWorkflowChange={mockOnWorkflowChange}
-          validationResult={mockValidationResult}
           isNewWorkflow={true}
         />
       );
@@ -532,7 +515,6 @@ describe('WorkflowCreationPane', () => {
         <WorkflowCreationPane
           workflow={mockWorkflow}
           onWorkflowChange={mockOnWorkflowChange}
-          validationResult={mockValidationResult}
           isNewWorkflow={true}
         />
       );
@@ -555,7 +537,6 @@ describe('WorkflowCreationPane', () => {
           <WorkflowCreationPane
             workflow={invalidWorkflow}
             onWorkflowChange={mockOnWorkflowChange}
-            validationResult={mockValidationResult}
             isNewWorkflow={true}
           />
         );

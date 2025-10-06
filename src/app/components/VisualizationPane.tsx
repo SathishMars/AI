@@ -158,7 +158,8 @@ export default function VisualizationPane({
           Workflow Steps Configuration
         </Typography>
         
-        {Object.entries(workflow.steps).map(([stepId, step]) => {
+        {Object.entries(workflow.steps).map(([stepId, stepData]) => {
+          const step = stepData as WorkflowStep;
           const stepErrors = getStepErrors(stepId);
           const hasErrors = stepErrors.length > 0;
           const isEditing = editingStepId === stepId;

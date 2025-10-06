@@ -93,6 +93,70 @@ const EVENT_PLANNING_FUNCTIONS: Record<string, FunctionDefinition> = {
     updatedAt: new Date('2024-01-20')
   },
 
+  onWorkflowTriggered: {
+    id: 'trigger_on_workflow_triggered',
+    name: 'onWorkflowTriggered',
+    description: 'Trigger workflow when another workflow calls it (workflow entry point for workflow chaining)',
+    version: '1.0.0',
+    namespace: 'functions',
+    category: 'trigger',
+    tags: ['trigger', 'workflow-start', 'workflow-chain', 'inter-workflow'],
+    parameters: {
+      expectedParams: {
+        type: 'object',
+        required: false,
+        description: 'Expected parameters from calling workflow (JSON object with parameter names and types)',
+        examples: [
+          { requestId: 'string', amount: 'number' },
+          { eventId: 'string', attendeeCount: 'number', priority: 'string' }
+        ]
+      },
+      validateParams: {
+        type: 'boolean',
+        required: false,
+        description: 'Validate incoming parameters match expected schema',
+        default: true,
+        examples: [true, false]
+      }
+    },
+    returnType: 'void',
+    examples: [
+      {
+        id: 'workflow_trigger_example_1',
+        name: 'Multi-Level Approval Entry Point',
+        description: 'Trigger point for approval workflow called by other workflows',
+        parameters: {
+          expectedParams: {
+            requestId: 'string',
+            amount: 'number',
+            requestType: 'string'
+          },
+          validateParams: true
+        },
+        context: 'Use as entry point for workflows that are triggered by other workflows'
+      }
+    ],
+    documentation: {
+      description: 'Workflow entry point that activates when another workflow triggers it using type "workflow" step',
+      usage: 'Use as the first step (trigger) in workflows designed to be called by other workflows',
+      aiPromptHints: [
+        'Use when this workflow is meant to be triggered by another workflow',
+        'Perfect for reusable approval or notification workflows',
+        'Receives parameters from calling workflow via workflowParams'
+      ],
+      commonUseCases: [
+        'Multi-level approval workflows',
+        'Reusable notification workflows',
+        'Shared business logic workflows',
+        'Workflow orchestration patterns'
+      ]
+    },
+    lifecycle: 'active',
+    compatibleVersions: ['1.0.0'],
+    createdAt: new Date('2024-01-01'),
+    updatedAt: new Date('2024-01-20')
+  },
+
   onScheduledEvent: {
     id: 'trigger_scheduled_event',
     name: 'onScheduledEvent',
@@ -234,6 +298,297 @@ const EVENT_PLANNING_FUNCTIONS: Record<string, FunctionDefinition> = {
     compatibleVersions: ['1.0.0', '1.1.0', '1.2.0'],
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-15')
+  },
+
+  notifyUsers: {
+    id: 'func_notify_users',
+    name: 'notifyUsers',
+    description: 'Send in-app notifications to users or groups (separate from email) with priority levels',
+    version: '1.0.0',
+    namespace: 'functions',
+    category: 'notification',
+    tags: ['notification', 'communication', 'in-app', 'user-notification'],
+    parameters: {
+      recipients: {
+        type: 'array',
+        required: true,
+        description: 'User IDs or group IDs to notify',
+        examples: [['user123', 'user456'], ['group_managers', 'group_admins']],
+        validation: ArraySchema
+      },
+      title: {
+        type: 'string',
+        required: true,
+        description: 'Notification title (max 100 characters)',
+        examples: ['Workflow Update', 'Approval Required', 'Event Created Successfully']
+      },
+      message: {
+        type: 'string',
+        required: true,
+        description: 'Notification message (max 500 characters)',
+        examples: ['Your approval is required for the upcoming team event', 'Event has been successfully created']
+      },
+      priority: {
+        type: 'string',
+        required: false,
+        description: 'Notification priority level',
+        examples: ['low', 'normal', 'high', 'urgent'],
+        default: 'normal'
+      },
+      actionUrl: {
+        type: 'string',
+        required: false,
+        description: 'Optional action URL when notification is clicked',
+        examples: ['/workflows/123/review', '/events/456/details'],
+        validation: UrlSchema
+      }
+    },
+    returnType: 'object',
+    examples: [
+      {
+        id: 'notify_example_1',
+        name: 'High Priority Manager Notification',
+        description: 'Notify manager of urgent approval request',
+        parameters: {
+          recipients: ['manager123'],
+          title: 'Urgent Approval Required',
+          message: 'A high-value request requires your immediate approval',
+          priority: 'high',
+          actionUrl: '/workflows/789/approve'
+        },
+        expectedOutput: {
+          notificationId: 'notif_123',
+          sentAt: '2024-01-15T10:00:00Z',
+          recipientCount: 1,
+          deliveryStatus: 'sent'
+        },
+        context: 'Use for urgent notifications requiring immediate user attention'
+      }
+    ],
+    documentation: {
+      description: 'Sends in-app notifications to users or groups with configurable priority levels',
+      usage: 'Use in workflow action steps to send in-app notifications. This is separate from email notifications.',
+      aiPromptHints: [
+        'Use when users need in-app notifications',
+        'Perfect for approval reminders and status updates',
+        'Can target individual users or entire groups',
+        'Set priority based on urgency'
+      ],
+      commonUseCases: [
+        'Approval request notifications',
+        'Workflow status updates',
+        'Task assignment notifications',
+        'Event creation confirmations',
+        'Deadline reminders'
+      ]
+    },
+    lifecycle: 'active',
+    compatibleVersions: ['1.0.0'],
+    createdAt: new Date('2024-01-01'),
+    updatedAt: new Date('2024-01-20')
+  },
+
+  collectFormInformation: {
+    id: 'func_collect_form_info',
+    name: 'collectFormInformation',
+    description: 'Pause workflow to collect additional information from user via dynamic form',
+    version: '1.0.0',
+    namespace: 'functions',
+    category: 'data-collection',
+    tags: ['form', 'data-collection', 'user-input', 'workflow-pause'],
+    parameters: {
+      formTitle: {
+        type: 'string',
+        required: true,
+        description: 'Title of the form to display',
+        examples: ['Additional Information Required', 'Budget Justification Form', 'Event Details']
+      },
+      fields: {
+        type: 'array',
+        required: true,
+        description: 'Form field definitions (JSON array of field objects)',
+        examples: [
+          [
+            { name: 'budget', type: 'number', label: 'Budget Amount', required: true },
+            { name: 'justification', type: 'textarea', label: 'Justification', required: true }
+          ]
+        ],
+        validation: ArraySchema
+      },
+      assignedTo: {
+        type: 'string',
+        required: true,
+        description: 'User ID to assign form to',
+        examples: ['user123', 'requester456']
+      },
+      dueDate: {
+        type: 'string',
+        required: false,
+        description: 'Due date for form submission (ISO format)',
+        examples: ['2024-12-31T23:59:59Z', '2024-06-15T12:00:00Z']
+      },
+      saveToContext: {
+        type: 'boolean',
+        required: false,
+        description: 'Save collected data to workflow context for later steps',
+        default: true,
+        examples: [true, false]
+      }
+    },
+    returnType: 'object',
+    examples: [
+      {
+        id: 'collect_form_example_1',
+        name: 'Budget Justification Collection',
+        description: 'Collect budget details from requester',
+        parameters: {
+          formTitle: 'Budget Justification Required',
+          fields: [
+            {
+              name: 'justification',
+              type: 'textarea',
+              label: 'Budget Justification',
+              required: true
+            },
+            {
+              name: 'costCenter',
+              type: 'select',
+              label: 'Cost Center',
+              required: true,
+              options: ['Marketing', 'Sales', 'Operations', 'IT']
+            }
+          ],
+          assignedTo: 'requester123',
+          saveToContext: true
+        },
+        expectedOutput: {
+          formId: 'form_789',
+          submittedAt: '2024-01-16T14:30:00Z',
+          collectedData: {
+            justification: 'Required for Q1 team building initiative',
+            costCenter: 'Marketing'
+          }
+        },
+        context: 'Use when additional information is needed mid-workflow'
+      }
+    ],
+    documentation: {
+      description: 'Pauses workflow to collect additional information from users via dynamic forms',
+      usage: 'Use in workflow action steps to pause and collect additional information',
+      aiPromptHints: [
+        'Use when workflow needs additional user input',
+        'Perfect for collecting missing information',
+        'Define form fields based on what data is needed',
+        'Collected data is saved to workflow context for later use'
+      ],
+      commonUseCases: [
+        'Budget justification collection',
+        'Additional event details gathering',
+        'Approval reason documentation',
+        'Post-event feedback collection'
+      ]
+    },
+    lifecycle: 'active',
+    compatibleVersions: ['1.0.0'],
+    createdAt: new Date('2024-01-01'),
+    updatedAt: new Date('2024-01-20')
+  },
+
+  triggerWorkflow: {
+    id: 'func_trigger_workflow',
+    name: 'triggerWorkflow',
+    description: 'Trigger another workflow within the same account and optionally wait for completion',
+    version: '2.0.0',
+    namespace: 'functions',
+    category: 'workflow-control',
+    tags: ['workflow', 'orchestration', 'workflow-chain', 'inter-workflow'],
+    parameters: {
+      workflowId: {
+        type: 'string',
+        required: true,
+        description: 'ID of workflow to trigger (must be in same account)',
+        examples: ['wf_approval_123', 'wf_notification_456']
+      },
+      params: {
+        type: 'object',
+        required: false,
+        description: 'Parameters to pass to triggered workflow (JSON object)',
+        examples: [
+          { requestId: '{{context.requestId}}', amount: 5000 },
+          { eventId: '{{context.eventId}}', attendeeCount: 150 }
+        ],
+        validation: ObjectSchema
+      },
+      waitForCompletion: {
+        type: 'boolean',
+        required: false,
+        description: 'Wait for triggered workflow to complete before continuing',
+        default: true,
+        examples: [true, false]
+      },
+      timeout: {
+        type: 'number',
+        required: false,
+        description: 'Timeout in minutes for workflow completion',
+        default: 30,
+        examples: [15, 30, 60, 120]
+      },
+      onSuccessGoTo: {
+        type: 'string',
+        required: false,
+        description: 'Step ID to jump to on successful completion',
+        examples: ['createEventAction', 'sendConfirmationEmail']
+      },
+      onFailureGoTo: {
+        type: 'string',
+        required: false,
+        description: 'Step ID to jump to on failure',
+        examples: ['handleError', 'notifyFailure', 'workflowEnd']
+      }
+    },
+    returnType: 'object',
+    examples: [
+      {
+        id: 'trigger_workflow_example_1',
+        name: 'Trigger Multi-Level Approval',
+        description: 'Trigger approval workflow for high-value requests',
+        parameters: {
+          workflowId: 'wf_multilevel_approval',
+          params: {
+            requestId: '{{context.requestId}}',
+            amount: 10000
+          },
+          waitForCompletion: true,
+          timeout: 60
+        },
+        expectedOutput: {
+          triggeredWorkflowId: 'exec_789',
+          result: 'success',
+          returnData: { approved: true }
+        },
+        context: 'Use for complex approval workflows'
+      }
+    ],
+    documentation: {
+      description: 'Triggers another workflow within the same account with parameter passing',
+      usage: 'Use to create workflow chains and orchestration patterns',
+      aiPromptHints: [
+        'Use when workflow needs to trigger another workflow',
+        'Perfect for multi-level approval patterns',
+        'Can pass context data between workflows',
+        'SECURITY: Only workflows in same account can be triggered'
+      ],
+      commonUseCases: [
+        'Multi-level approval workflows',
+        'Notification orchestration',
+        'Complex event planning workflows',
+        'Workflow composition patterns'
+      ]
+    },
+    lifecycle: 'active',
+    compatibleVersions: ['1.0.0', '2.0.0'],
+    createdAt: new Date('2024-01-01'),
+    updatedAt: new Date('2024-01-20')
   },
 
   collectMeetingInformation: {

@@ -1,4 +1,18 @@
-// src/app/hooks/useWorkflowTemplate.ts
+// src/app/hooks/useWorkflowTemplate.deprecated.ts
+//
+// ⚠️ DEPRECATED ⚠️
+// This hook is deprecated and will be removed in a future version.
+// Please use useWorkflowTemplateV2 instead.
+//
+// Migration Guide:
+// 1. Replace import: useWorkflowTemplateV2 from '@/app/hooks/useWorkflowTemplateV2'
+// 2. Hook now returns workflowJSON property instead of workflow
+// 3. Auto-save is immediate (no 2-second delay by default)
+// 4. Use updateWorkflowDefinition() instead of updateWorkflow()
+// 5. Use updateTemplateName() for name changes
+//
+// See: ai-implementation-summaries/phase2-component-integration-complete.md
+//
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
