@@ -13,7 +13,6 @@
     "postinstall": "npm rebuild lightningcss --silent || true"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.63.1",
     "@emotion/cache": "^11.14.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
@@ -24,21 +23,21 @@
     "@langchain/langgraph": "^0.4.9",
     "@langchain/langgraph-checkpoint-mongodb": "^0.1.1",
     "@langchain/openai": "^0.3.5",
-    "langchain": "^0.3.5",
     "@mui/icons-material": "^7.3.2",
     "@mui/material": "^7.3.2",
     "@mui/material-nextjs": "^7.3.2",
     "@types/mermaid": "^9.1.0",
     "@uiw/react-md-editor": "^4.0.8",
     "json-rules-engine": "^7.3.1",
+    "langchain": "^0.3.5",
+    "lightningcss": "^1.30.2",
     "mermaid": "^11.12.0",
     "mongodb": "^6.20.0",
     "next": "15.5.4",
-    "openai": "^5.23.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "short-unique-id": "^5.3.2",
-    "zod": "^4.1.11"
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

@@ -1,11 +1,8 @@
 // src/app/api/generate-mermaid/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import { ChatOpenAI } from '@langchain/openai';
+import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { WorkflowJSON } from '@/app/types/workflow';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,14 +15,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Initialize LangChain OpenAI model
+    const model = new ChatOpenAI({
+      modelName: 'gpt-4o-mini',
+      temperature: 0.3,
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+
     const prompt = createMermaidPrompt(workflow);
     
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: `You are an expert workflow visualization specialist who creates professional Mermaid flowchart diagrams. You have deep knowledge of Mermaid syntax v11+ and workflow design patterns.
+    const messages = [
+      new SystemMessage(`You are an expert workflow visualization specialist who creates professional Mermaid flowchart diagrams. You have deep knowledge of Mermaid syntax v11+ and workflow design patterns.
 
 CRITICAL WORKFLOW CONTEXT: You are generating a business process workflow diagram that shows how tasks flow through a system with conditional logic, approvals, and automated actions.
 
@@ -60,18 +60,12 @@ WORKFLOW-SPECIFIC BEST PRACTICES:
 - Use proper arrow labels for Success/Failure paths
 - Ensure all text is readable and high-contrast
 
-Generate production-quality diagrams that business users can easily read and follow with excellent visual accessibility.`
-        },
-        {
-          role: 'user',
-          content: prompt
-        }
-      ],
-      temperature: 0.2,
-      max_tokens: 4000
-    });
+Generate production-quality diagrams that business users can easily read and follow with excellent visual accessibility.`),
+      new HumanMessage(prompt)
+    ];
 
-    let mermaidDiagram = completion.choices[0]?.message?.content?.trim();
+    const response = await model.invoke(messages);
+    let mermaidDiagram = typeof response.content === 'string' ? response.content.trim() : '';
     console.log('Raw LLM response:', mermaidDiagram);
     
     if (!mermaidDiagram) {

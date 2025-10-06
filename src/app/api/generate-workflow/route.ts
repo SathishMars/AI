@@ -1,10 +1,10 @@
 // src/app/api/generate-workflow/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { LLMWorkflowGenerator } from '@/app/utils/llm-workflow-generator';
+import { LangChainWorkflowGenerator } from '@/app/utils/langchain/langchain-workflow-generator';
 import { getTriggerFunctionAutocomplete, getActionFunctionAutocomplete } from '@/app/data/workflow-conversation-autocomplete';
 
 /**
- * Server-side API route for LLM workflow generation
+ * Server-side API route for LLM workflow generation using LangChain
  * This prevents API keys from being exposed in the browser
  */
 export async function POST(request: NextRequest) {
@@ -171,16 +171,62 @@ flowchart TD
       });
     }
 
-    // Initialize LLM generator with conversational mode enabled
-    const generator = new LLMWorkflowGenerator({
-      provider,
-      apiKey,
-      model: provider === 'openai' ? 'gpt-4' : 'claude-3-sonnet-20240229',
+    // Initialize LangChain generator with conversational mode enabled
+    const generator = new LangChainWorkflowGenerator({
+      provider: provider === 'openai' ? 'openai' : provider === 'anthropic' ? 'anthropic' : 'lmstudio',
+      sessionId: `workflow-gen-${Date.now()}`,
+      workflowId: currentWorkflow?.metadata?.id || `new-workflow-${Date.now()}`,
+      userId: fullContext.user?.id,
+      organization: fullContext.user?.department,
       conversationalMode: true // Enable conversational mode for parameter collection
     });
 
+    // Initialize memory for the session
+    generator.initializeMemory();
+
+    // Map fullContext to LangChain's WorkflowGenerationContext
+    const functionDefs = [...(fullContext.triggerFunctions || []), ...(fullContext.actionFunctions || [])].map(f => ({
+      name: f.name,
+      description: f.description,
+      usage: f.llmInstructions?.usage || f.description,
+      parameters: (f.parameters || []).map(p => {
+        let options: string[] | undefined = undefined;
+        if (p.options && Array.isArray(p.options)) {
+          if (p.options.length > 0 && typeof p.options[0] === 'object') {
+            options = (p.options as Array<{value: string | number}>).map(o => String(o.value));
+          } else {
+            options = p.options.map(o => String(o));
+          }
+        }
+        return {
+          name: p.name,
+          type: String(p.type),
+          description: p.description,
+          required: p.required,
+          options
+        };
+      }),
+      example: (f.llmInstructions?.jsonExample || (f.examples && f.examples[0]) || {}) as Record<string, unknown>
+    }));
+
+    const langchainContext = {
+      userRole: fullContext.user?.role || 'employee',
+      userDepartment: fullContext.user?.department || 'general',
+      workflowId: currentWorkflow?.metadata?.id,
+      workflowName: currentWorkflow?.metadata?.name,
+      conversationGoal: 'create' as const,
+      currentWorkflowSteps: currentWorkflow?.steps ? Object.keys(currentWorkflow.steps) : [],
+      availableFunctions: fullContext.availableFunctions || [],
+      functionDefinitions: functionDefs,
+      conversationHistory: fullContext.conversationHistory || [],
+      user: fullContext.user,
+      mrf: fullContext.mrf,
+      referenceData: fullContext.referenceData,
+      currentDate: fullContext.currentDate
+    };
+
     // Handle backend-only processing with conversational responses
-    const result = await generator.generateWorkflow(userInput, fullContext, currentWorkflow);
+    const result = await generator.generateWorkflow(userInput, langchainContext, currentWorkflow);
     
     return NextResponse.json({
       workflow: result.workflow,
