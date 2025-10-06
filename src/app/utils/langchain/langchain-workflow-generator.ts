@@ -4,7 +4,6 @@ import { HumanMessage, SystemMessage, AIMessage, BaseMessage } from "@langchain/
 import { BufferMemory } from "langchain/memory";
 import { createWorkflowBuildModel, createConversationModel } from "./providers/llm-factory";
 import { getWorkflowToolRegistry, WorkflowToolRegistry } from "./tools/workflow-tools";
-import { createWorkflowMemory } from "./memory/mongodb-memory";
 import { WorkflowJSON, ValidationResult } from "@/app/types/workflow";
 import { getLLMFactory, LLMProvider } from "./providers/llm-factory";
 
@@ -135,19 +134,18 @@ export class LangChainWorkflowGenerator {
   }
 
   /**
-   * Initialize memory for the session
+   * Initialize in-memory buffer for the current session
+   * Conversation history is passed explicitly via context, not persisted to MongoDB
    */
-  public async initializeMemory(): Promise<void> {
-    this.memory = await createWorkflowMemory(
-      this.config.sessionId,
-      this.config.workflowId,
-      {
-        userId: this.config.userId,
-        organization: this.config.organization
-      }
-    );
+  public initializeMemory(): void {
+    // Use simple in-memory BufferMemory (not persisted)
+    // Conversation history comes from context.conversationHistory
+    this.memory = new BufferMemory({
+      memoryKey: "chat_history",
+      returnMessages: true
+    });
     
-    console.log(`🧠 Memory initialized for session: ${this.config.sessionId}`);
+    console.log(`🧠 In-memory buffer initialized for session: ${this.config.sessionId}`);
   }
 
   /**
@@ -160,7 +158,7 @@ export class LangChainWorkflowGenerator {
   ): Promise<LangChainWorkflowResult> {
     // Ensure memory is initialized
     if (!this.memory) {
-      await this.initializeMemory();
+      this.initializeMemory();
     }
 
     // Default to conversational mode for better parameter collection
@@ -205,13 +203,8 @@ export class LangChainWorkflowGenerator {
       }
     }
 
-    // Add conversation history from memory if available
-    if (this.memory) {
-      const chatHistory = await this.memory.loadMemoryVariables({});
-      if (chatHistory.history) {
-        console.log('📚 Adding LangChain memory history to context');
-      }
-    }
+    // Note: In-memory buffer history is automatically included by LangChain
+    // No need to manually load it - it's added via saveContext() below
     
     // Add current user message
     messages.push(new HumanMessage(userInput));
