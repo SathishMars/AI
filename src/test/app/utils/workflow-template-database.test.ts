@@ -9,7 +9,8 @@ import {
   deleteWorkflowTemplate,
   createConfiguratorConversation,
   addMessageToConversation,
-  getConversationHistory
+  getConversationHistory,
+  saveMessage
 } from '@/app/utils/workflow-template-database';
 import {
   TemplateError,
@@ -57,7 +58,10 @@ describe('Workflow Template Database Operations', () => {
       findOneAndUpdate: jest.fn(),
       updateOne: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
       deleteOne: jest.fn().mockResolvedValue({ deletedCount: 1 }),
-      countDocuments: jest.fn().mockResolvedValue(0)
+      countDocuments: jest.fn().mockResolvedValue(0),
+      aggregate: jest.fn().mockReturnValue({
+        toArray: jest.fn().mockResolvedValue([])
+      })
     };
 
     mockConversationsCollection = {
@@ -94,28 +98,23 @@ describe('Workflow Template Database Operations', () => {
       account: 'test-account',
       name: 'test-workflow',
       workflowDefinition: {
-        schemaVersion: '1.0',
-        metadata: {
-          id: 'test-workflow-001',
-          name: 'Test Workflow',
-          description: 'A test workflow',
-          version: '1.0.0',
-          status: 'draft',
-          tags: ['test']
-        },
-        steps: {
-          start: {
-            name: 'Start',
+        steps: [
+          {
+            id: 'startStep',
+            name: 'Start: Trigger Example',
             type: 'trigger',
             action: 'onMRFSubmit',
-            nextSteps: ['end']
-          },
-          end: {
-            name: 'End',
-            type: 'end',
-            result: 'success'
+            params: {},
+            children: [
+              {
+                id: 'endStep',
+                name: 'End: Finish Example',
+                type: 'end',
+                result: 'success'
+              }
+            ]
           }
-        }
+        ]
       },
       description: 'A test workflow template',
       category: 'test',
@@ -130,18 +129,26 @@ describe('Workflow Template Database Operations', () => {
       const result = await createWorkflowTemplate(sampleInput);
 
       expect(result).toMatchObject({
-        name: sampleInput.name,
         account: sampleInput.account,
-        status: 'draft',
         version: '1.0.0',
-        workflowDefinition: sampleInput.workflowDefinition,
+        workflowDefinition: expect.objectContaining({
+          steps: expect.any(Array)
+        }),
+        metadata: expect.objectContaining({
+          name: sampleInput.name,
+          status: 'draft',
+          author: sampleInput.author
+        }),
         _id: 'mock-object-id'
       });
 
       expect(mockTemplatesCollection.insertOne).toHaveBeenCalledWith(
         expect.objectContaining({
-          name: sampleInput.name,
-          status: 'draft',
+          account: sampleInput.account,
+          metadata: expect.objectContaining({
+            name: sampleInput.name,
+            status: 'draft'
+          }),
           version: '1.0.0'
         })
       );
@@ -183,36 +190,41 @@ describe('Workflow Template Database Operations', () => {
     it('should update a draft template successfully', async () => {
       const mockTemplate = {
         _id: 'template-id',
-        name: 'test-workflow',
+        account: 'test-account',
+        id: 'test-workflow',
         version: '1.0.0',
-        status: 'draft',
-        workflowDefinition: {},
-        metadata: { createdAt: new Date(), updatedAt: new Date(), author: 'test-user' }
+        workflowDefinition: { steps: [] },
+        metadata: { name: 'test-workflow', status: 'draft', createdAt: new Date(), updatedAt: new Date(), author: 'test-user' }
       };
 
       mockTemplatesCollection.findOne.mockResolvedValue(mockTemplate);
       mockTemplatesCollection.findOneAndUpdate.mockResolvedValue({
         ...mockTemplate,
-        description: 'Updated Test Workflow Description',
+        metadata: {
+          ...mockTemplate.metadata,
+          description: 'Updated Test Workflow Description'
+        },
         _id: { toString: () => 'template-id' }
       });
 
       const updates = { description: 'Updated Test Workflow Description' };
       const result = await updateWorkflowTemplate('test-account', 'test-workflow', '1.0.0', updates);
 
-      expect(result.name).toBe('test-workflow');
+      expect(result.metadata?.name).toBe('test-workflow');
+      expect(result.metadata?.description).toBe('Updated Test Workflow Description');
       expect(mockTemplatesCollection.findOneAndUpdate).toHaveBeenCalledWith(
-        { name: 'test-workflow', version: '1.0.0' },
-        { $set: { ...updates, 'metadata.updatedAt': expect.any(Date) } },
+        { account: 'test-account', id: 'test-workflow', version: '1.0.0' },
+        { $set: { 'metadata.description': updates.description, 'metadata.updatedAt': expect.any(Date) } },
         { returnDocument: 'after' }
       );
     });
 
     it('should throw error when trying to update published template', async () => {
       mockTemplatesCollection.findOne.mockResolvedValue({
-        name: 'test-workflow',
+        account: 'test-account',
+        id: 'test-workflow',
         version: '1.0.0',
-        status: 'published'
+        metadata: { status: 'published' }
       });
 
       await expect(updateWorkflowTemplate('test-account', 'test-workflow', '1.0.0', {}))
@@ -231,26 +243,27 @@ describe('Workflow Template Database Operations', () => {
     it('should publish a draft template successfully', async () => {
       const mockDraftTemplate = {
         _id: 'template-id',
-        name: 'test-workflow',
+        account: 'test-account',
+        id: 'test-workflow',
         version: '1.0.0',
-        status: 'draft'
+        metadata: { status: 'draft', author: 'test-user', createdAt: new Date(), updatedAt: new Date() }
       };
 
       mockTemplatesCollection.findOne.mockResolvedValue(mockDraftTemplate);
       mockTemplatesCollection.findOneAndUpdate.mockResolvedValue({
         ...mockDraftTemplate,
-        status: 'published',
+        metadata: { ...mockDraftTemplate.metadata, status: 'published', publishedAt: new Date() },
         _id: { toString: () => 'template-id' }
       });
 
       const result = await publishWorkflowTemplate('test-account', 'test-workflow', '1.0.0');
 
-      expect(result.status).toBe('published');
+      expect(result.metadata?.status).toBe('published');
       expect(mockTemplatesCollection.findOneAndUpdate).toHaveBeenCalledWith(
-        { account: 'test-account', name: 'test-workflow', version: '1.0.0' },
+        { account: 'test-account', id: 'test-workflow', version: '1.0.0' },
         { 
           $set: { 
-            status: 'published',
+            'metadata.status': 'published',
             'metadata.publishedAt': expect.any(Date),
             'metadata.updatedAt': expect.any(Date)
           }
@@ -270,13 +283,15 @@ describe('Workflow Template Database Operations', () => {
   describe('createDraftFromPublished', () => {
     it('should create draft from published template successfully', async () => {
       const mockPublishedTemplate = {
-        name: 'test-workflow',
-        displayName: 'Test Workflow',
+        account: 'test-account',
+        id: 'test-workflow',
+        organization: null,
         version: '1.0.0',
-        status: 'published',
-        workflowDefinition: { steps: {} },
+        workflowDefinition: { steps: [] },
         mermaidDiagram: 'flowchart TD',
         metadata: {
+          name: 'test-workflow',
+          status: 'published',
           createdAt: new Date(),
           updatedAt: new Date(),
           author: 'original-author'
@@ -297,7 +312,7 @@ describe('Workflow Template Database Operations', () => {
 
       const result = await createDraftFromPublished('test-account', 'test-workflow', '1.0.0', 'new-author');
 
-      expect(result.status).toBe('draft');
+  expect(result.metadata.status).toBe('draft');
       expect(result.version).toBe('1.1.0');
       expect(result.parentVersion).toBe('1.0.0');
       expect(result.metadata.author).toBe('new-author');
@@ -325,22 +340,29 @@ describe('Workflow Template Database Operations', () => {
       const mockTemplates = [
         {
           _id: { toString: () => 'template-id-1' },
-          name: 'test-workflow',
+          account: 'test-account',
+          organization: 'main-org',
+          id: 'test-workflow',
           version: '1.0.0',
-          status: 'published'
+          metadata: { status: 'published', name: 'Workflow Published', updatedAt: new Date() }
         },
         {
           _id: { toString: () => 'template-id-2' },
-          name: 'test-workflow',
+          account: 'test-account',
+          organization: 'main-org',
+          id: 'test-workflow',
           version: '1.1.0',
-          status: 'draft'
+          metadata: { status: 'draft', name: 'Workflow Draft', updatedAt: new Date() }
         }
       ];
 
       const mockConversations = [
         {
           _id: { toString: () => 'conv-id-1' },
-          templateName: 'test-workflow',
+          account: 'test-account',
+          organization: 'main-org',
+          workflowTemplateID: 'test-workflow',
+          workflowTemplateName: 'test-workflow',
           conversationId: 'conv-1',
           messages: []
         }
@@ -358,9 +380,9 @@ describe('Workflow Template Database Operations', () => {
         })
       });
 
-      const result = await getWorkflowTemplate('test-account', 'test-workflow');
+      const result = await getWorkflowTemplate('test-account', 'main-org', 'test-workflow');
 
-      expect(result.template?.status).toBe('draft'); // Should prefer draft
+      expect(result.template?.metadata.status).toBe('draft'); // Should prefer draft
       expect(result.templateState).toBe('draft_available');
       expect(result.conversations).toHaveLength(1);
       expect(result.suggestCreateDraft).toBe(false);
@@ -370,9 +392,11 @@ describe('Workflow Template Database Operations', () => {
       const mockTemplates = [
         {
           _id: { toString: () => 'template-id-1' },
-          name: 'test-workflow',
+          account: 'test-account',
+          organization: 'main-org',
+          id: 'test-workflow',
           version: '1.0.0',
-          status: 'published'
+          metadata: { status: 'published', name: 'Workflow Published', updatedAt: new Date() }
         }
       ];
 
@@ -388,9 +412,9 @@ describe('Workflow Template Database Operations', () => {
         })
       });
 
-      const result = await getWorkflowTemplate('test-account', 'test-workflow');
+      const result = await getWorkflowTemplate('test-account', 'main-org', 'test-workflow');
 
-      expect(result.template?.status).toBe('published');
+      expect(result.template?.metadata.status).toBe('published');
       expect(result.templateState).toBe('published_only');
       expect(result.suggestCreateDraft).toBe(true);
     });
@@ -408,7 +432,7 @@ describe('Workflow Template Database Operations', () => {
         })
       });
 
-      const result = await getWorkflowTemplate('test-account', 'nonexistent');
+  const result = await getWorkflowTemplate('test-account', 'main-org', 'nonexistent');
 
       expect(result.template).toBeNull();
       expect(result.templateState).toBe('not_found');
@@ -421,60 +445,63 @@ describe('Workflow Template Database Operations', () => {
       const mockTemplates = [
         {
           _id: { toString: () => 'template-1' },
-          name: 'workflow-1',
-          status: 'published'
+          account: 'test-account',
+          id: 'workflow-1',
+          version: '1.0.0',
+          metadata: { name: 'Workflow 1', status: 'published', updatedAt: new Date() }
         },
         {
           _id: { toString: () => 'template-2' },
-          name: 'workflow-2',
-          status: 'draft'
+          account: 'test-account',
+          id: 'workflow-2',
+          version: '1.0.0',
+          metadata: { name: 'Workflow 2', status: 'draft', updatedAt: new Date() }
         }
       ];
 
-      mockTemplatesCollection.countDocuments.mockResolvedValue(25);
-      mockTemplatesCollection.find.mockReturnValue({
-        sort: jest.fn().mockReturnValue({
-          skip: jest.fn().mockReturnValue({
-            limit: jest.fn().mockReturnValue({
-              toArray: jest.fn().mockResolvedValue(mockTemplates)
-            })
-          })
-        })
+      mockTemplatesCollection.aggregate.mockReturnValue({
+        toArray: jest.fn().mockResolvedValue(mockTemplates)
       });
 
       const result = await listWorkflowTemplates('test-account', {}, 1, 10);
 
       expect(result.templates).toHaveLength(2);
-      expect(result.totalCount).toBe(25);
+      expect(result.templates[0].metadata.name).toBe('Workflow 1');
+      expect(result.templates[1].metadata.status).toBe('draft');
+      expect(result.totalCount).toBe(2);
       expect(result.page).toBe(1);
       expect(result.pageSize).toBe(10);
-      expect(result.hasMore).toBe(true);
+      expect(result.hasMore).toBe(false);
     });
 
     it('should filter templates by status', async () => {
-      mockTemplatesCollection.countDocuments.mockResolvedValue(5);
-      mockTemplatesCollection.find.mockReturnValue({
-        sort: jest.fn().mockReturnValue({
-          skip: jest.fn().mockReturnValue({
-            limit: jest.fn().mockReturnValue({
-              toArray: jest.fn().mockResolvedValue([])
-            })
-          })
-        })
+      const mockTemplates = [
+        {
+          _id: { toString: () => 'template-1' },
+          account: 'test-account',
+          id: 'workflow-1',
+          version: '1.0.0',
+          metadata: { name: 'Workflow 1', status: 'published', updatedAt: new Date() }
+        }
+      ];
+
+      mockTemplatesCollection.aggregate.mockReturnValue({
+        toArray: jest.fn().mockResolvedValue(mockTemplates)
       });
 
       await listWorkflowTemplates('test-account', { status: 'published' }, 1, 10);
 
-      expect(mockTemplatesCollection.find).toHaveBeenCalledWith({ account: 'test-account', status: 'published' });
+      expect(mockTemplatesCollection.aggregate).toHaveBeenCalledWith(expect.any(Array));
     });
   });
 
   describe('deleteWorkflowTemplate', () => {
     it('should delete a draft template successfully', async () => {
       mockTemplatesCollection.findOne.mockResolvedValue({
-        name: 'test-workflow',
+        account: 'test-account',
+        id: 'test-workflow',
         version: '1.0.0',
-        status: 'draft'
+        metadata: { status: 'draft' }
       });
 
       const result = await deleteWorkflowTemplate('test-account', 'test-workflow', '1.0.0');
@@ -482,16 +509,17 @@ describe('Workflow Template Database Operations', () => {
       expect(result).toBe(true);
       expect(mockTemplatesCollection.deleteOne).toHaveBeenCalledWith({
         account: 'test-account',
-        name: 'test-workflow',
+        id: 'test-workflow',
         version: '1.0.0'
       });
     });
 
     it('should prevent deletion of published template with instances', async () => {
       mockTemplatesCollection.findOne.mockResolvedValue({
-        name: 'test-workflow',
+        account: 'test-account',
+        id: 'test-workflow',
         version: '1.0.0',
-        status: 'published',
+        metadata: { status: 'published' },
         usageStats: { instanceCount: 5 }
       });
 
@@ -527,6 +555,7 @@ describe('Workflow Template Database Operations', () => {
           account: 'test-account',
           organization: null,
           workflowTemplateName: 'test-workflow',
+          workflowTemplateID: 'test-workflow',
           messages: []
         };
 
@@ -538,6 +567,7 @@ describe('Workflow Template Database Operations', () => {
           account: 'test-account',
           organization: null,
           workflowTemplateName: 'test-workflow',
+          workflowTemplateId: 'test-workflow-id',
           id: 'msg_123',
           role: 'user' as const,
           content: 'Hello, aime!',
@@ -560,6 +590,7 @@ describe('Workflow Template Database Operations', () => {
           account: 'test-account',
           organization: null,
           workflowTemplateName: 'test-workflow',
+          workflowTemplateId: 'test-workflow-id',
           id: 'msg_123',
           role: 'user' as const,
           content: 'Hello, aime!',
@@ -573,6 +604,98 @@ describe('Workflow Template Database Operations', () => {
       });
     });
 
+    describe('saveMessage', () => {
+      it('should strip null metadata values and unset the field', async () => {
+        const timestamp = new Date();
+        const message = {
+          conversationId: 'conv-1',
+          account: 'test-account',
+          organization: null,
+          workflowTemplateId: 'template-1',
+          workflowTemplateName: 'Test Template',
+          id: 'msg-1',
+          role: 'user' as const,
+          content: 'Hello aime',
+          timestamp,
+          metadata: null
+        } as unknown as Omit<ConfiguratorMessage, '_id'>;
+
+        const savedDocument = {
+          _id: { toString: () => 'mongo-id' },
+          conversationId: message.conversationId,
+          account: message.account,
+          organization: message.organization,
+          workflowTemplateId: message.workflowTemplateId,
+          workflowTemplateName: message.workflowTemplateName,
+          id: message.id,
+          role: message.role,
+          content: message.content,
+          timestamp
+        };
+
+        mockConversationsCollection.findOne.mockResolvedValue(savedDocument);
+
+        await expect(saveMessage(message)).resolves.toMatchObject({ id: 'msg-1' });
+
+        const updateCall = mockConversationsCollection.updateOne.mock.calls[0];
+        const updateDoc = updateCall[1];
+
+        expect(updateDoc.$set.metadata).toBeUndefined();
+        expect(updateDoc.$unset).toEqual({ metadata: '' });
+      });
+
+      it('should retain defined metadata values while removing nullish entries', async () => {
+        const timestamp = new Date();
+        const message = {
+          conversationId: 'conv-2',
+          account: 'test-account',
+          organization: null,
+          workflowTemplateId: 'template-1',
+          workflowTemplateName: 'Test Template',
+          id: 'msg-2',
+          role: 'assistant' as const,
+          content: 'Workflow generated',
+          timestamp,
+          metadata: {
+            provider: null,
+            tokensUsed: 0,
+            workflowGenerated: false,
+            suggestedActions: []
+          }
+        } as unknown as Omit<ConfiguratorMessage, '_id'>;
+
+        const savedDocument = {
+          _id: { toString: () => 'mongo-id-2' },
+          conversationId: message.conversationId,
+          account: message.account,
+          organization: message.organization,
+          workflowTemplateId: message.workflowTemplateId,
+          workflowTemplateName: message.workflowTemplateName,
+          id: message.id,
+          role: message.role,
+          content: message.content,
+          timestamp,
+          metadata: {
+            tokensUsed: 0,
+            workflowGenerated: false
+          }
+        };
+
+        mockConversationsCollection.findOne.mockResolvedValue(savedDocument);
+
+        await expect(saveMessage(message)).resolves.toMatchObject({ id: 'msg-2' });
+
+  const updateCall = mockConversationsCollection.updateOne.mock.calls[0];
+        const updateDoc = updateCall[1];
+
+        expect(updateDoc.$set.metadata).toEqual({
+          tokensUsed: 0,
+          workflowGenerated: false
+        });
+        expect(updateDoc.$unset).toBeUndefined();
+      });
+    });
+
     describe('getConversationHistory', () => {
       it('should retrieve conversation history', async () => {
         const mockConversations = [
@@ -581,6 +704,7 @@ describe('Workflow Template Database Operations', () => {
             account: 'test-account',
             organization: null,
             workflowTemplateName: 'test-workflow',
+            workflowTemplateID: 'test-workflow',
             messages: []
           }
         ];

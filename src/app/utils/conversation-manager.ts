@@ -9,8 +9,15 @@ import {
   createUserMessage,
   createAimeMessage,
   ProactiveSuggestion,
-  ImplicitBehaviorMetrics
+  ImplicitBehaviorMetrics,
+  MessageMetadata,
+  MessageType
 } from '@/app/types/conversation';
+import { 
+  ConfiguratorMessage,
+  ConfiguratorMessageMetadata,
+  ConfiguratorMessageRole
+} from '@/app/types/workflow-template';
 import { 
   createConversationApiData, 
   WorkflowContext,
@@ -19,24 +26,249 @@ import {
 
 export { createEmptyConversationState } from '@/app/types/conversation';
 
+type ConversationManagerOptions = {
+  autosaveDelay?: number;
+  autosaveRetryCooldown?: number;
+  maxAutosaveRetries?: number;
+};
+
+class ConversationSaveError extends Error {
+  constructor(message: string, public info?: { status: number; body?: unknown }) {
+    super(message);
+    this.name = 'ConversationSaveError';
+  }
+}
+
 export class ConversationStateManager {
   private state: ConversationState;
   private autosaveEnabled: boolean = true;
-  private autosaveDelay: number = 2000; // 2 seconds after last activity
+  private autosaveDelay: number;
+  private autosaveRetryCooldown: number;
+  private maxAutosaveRetries: number;
   private autosaveTimeout: NodeJS.Timeout | null = null;
   private workflowContext: WorkflowContext | null = null;
   private currentWorkflow: { steps?: unknown[] } | null = null;
+  private pendingMessageIds: Set<string> = new Set();
+  private lastAutosaveError: { signature: string; attempt: number; timestamp: number; error?: unknown } | null = null;
   
-  constructor(initialState: ConversationState, workflowContext?: WorkflowContext) {
+  constructor(
+    initialState: ConversationState,
+    workflowContext?: WorkflowContext | null,
+    options: ConversationManagerOptions = {}
+  ) {
     this.state = initialState;
-    this.workflowContext = workflowContext || null;
+    this.workflowContext = workflowContext ?? null;
+    this.autosaveDelay = Math.max(100, options.autosaveDelay ?? 100);
+    this.autosaveRetryCooldown = Math.max(250, options.autosaveRetryCooldown ?? 5000);
+    this.maxAutosaveRetries = Math.max(1, options.maxAutosaveRetries ?? 3);
   }
   
+  private getPendingMessages(): ConversationMessage[] {
+    if (this.pendingMessageIds.size === 0) {
+      return [];
+    }
+
+    const pending = this.state.messages.filter(message =>
+      this.pendingMessageIds.has(message.id) && this.shouldQueueMessageForAutosave(message)
+    );
+
+    if (pending.length !== this.pendingMessageIds.size) {
+      const validIds = new Set(pending.map(message => message.id));
+      this.pendingMessageIds.forEach(id => {
+        if (!validIds.has(id)) {
+          this.pendingMessageIds.delete(id);
+        }
+      });
+    }
+
+    return pending.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+  }
+
+  private shouldQueueMessageForAutosave(message: ConversationMessage): boolean {
+    if (message.status !== 'complete') return false;
+    return message.sender === 'user' || message.sender === 'aime';
+  }
+
+  private getBatchSignature(messages: ConversationMessage[]): string {
+    return messages
+      .map(message => message.id)
+      .sort()
+      .join('|');
+  }
+
+  private clearAutosaveFailureState(): void {
+    this.lastAutosaveError = null;
+  }
+
+  private scheduleAutosaveRetry(delay?: number): void {
+    if (!this.autosaveEnabled) return;
+    if (this.pendingMessageIds.size === 0) return;
+
+    const timeoutDelay = Math.max(this.autosaveDelay, delay ?? this.autosaveDelay);
+
+    if (this.autosaveTimeout) {
+      clearTimeout(this.autosaveTimeout);
+    }
+
+    this.autosaveTimeout = setTimeout(() => {
+      void this.saveConversation();
+    }, timeoutDelay);
+  }
+
+  private buildConfiguratorMetadata(message: ConversationMessage): ConfiguratorMessageMetadata | undefined {
+    const metadata: ConfiguratorMessageMetadata = {};
+    let hasMetadata = false;
+
+    const messageMetadata: MessageMetadata | undefined = message.metadata;
+
+    if (messageMetadata?.workflowStepGenerated) {
+      metadata.workflowStepGenerated = messageMetadata.workflowStepGenerated;
+      hasMetadata = true;
+    }
+
+    if (messageMetadata?.functionsCalled && messageMetadata.functionsCalled.length > 0) {
+      metadata.functionsCalled = [...messageMetadata.functionsCalled];
+      hasMetadata = true;
+    }
+
+    if (messageMetadata?.validationErrors && messageMetadata.validationErrors.length > 0) {
+      metadata.validationErrors = [...messageMetadata.validationErrors];
+      hasMetadata = true;
+    }
+
+    if (messageMetadata?.editedWorkflowJSON) {
+      metadata.editIntent = true;
+      hasMetadata = true;
+    }
+
+    const suggestedActions = new Set<string>();
+
+    if (messageMetadata?.suggestions) {
+      messageMetadata.suggestions.forEach(suggestion => {
+        const label = suggestion.actionText || suggestion.title;
+        if (label) {
+          suggestedActions.add(label);
+        }
+      });
+    }
+
+    if (message.suggestions) {
+      message.suggestions.forEach(suggestion => {
+        const label = suggestion.actionText || suggestion.title;
+        if (label) {
+          suggestedActions.add(label);
+        }
+      });
+    }
+
+    if (suggestedActions.size > 0) {
+      metadata.suggestedActions = Array.from(suggestedActions);
+      hasMetadata = true;
+    }
+
+    if (message.type === 'workflow_generated') {
+      metadata.workflowGenerated = true;
+      metadata.mermaidDiagram = true;
+      hasMetadata = true;
+    }
+
+    return hasMetadata ? metadata : undefined;
+  }
+
+  private mapMessageForPersistence(message: ConversationMessage): Omit<ConfiguratorMessage, '_id'> | null {
+    if (!this.workflowContext) {
+      return null;
+    }
+
+    const { account, organization, workflowTemplateId, workflowTemplateName } = this.workflowContext;
+    if (!account || !workflowTemplateName) {
+      return null;
+    }
+
+    const templateIdentifier = workflowTemplateId || workflowTemplateName;
+    if (!templateIdentifier) {
+      return null;
+    }
+
+    const role: ConfiguratorMessageRole = message.sender === 'user' ? 'user' : 'assistant';
+    const metadata = this.buildConfiguratorMetadata(message);
+
+    return {
+      conversationId: this.state.conversationId,
+      account,
+      organization: organization ?? null,
+      workflowTemplateId: templateIdentifier,
+      workflowTemplateName,
+      id: message.id,
+      role,
+      content: message.content,
+      timestamp: message.timestamp,
+      ...(metadata ? { metadata } : {})
+    };
+  }
+
+  private async saveMessagesToDatabaseAPI(messages: ConversationMessage[]): Promise<void> {
+    if (!this.workflowContext) {
+      return;
+    }
+
+    const payload = messages
+      .map(message => this.mapMessageForPersistence(message))
+      .filter((message): message is Omit<ConfiguratorMessage, '_id'> => Boolean(message));
+
+    if (payload.length === 0) {
+      return;
+    }
+
+    const requestBody = {
+      action: 'save_messages',
+      ...createConversationApiData(this.workflowContext, {
+        messages: payload
+      })
+    };
+
+    const response = await fetch('/api/workflow-configurator-conversations', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+      let errorBody: unknown;
+      try {
+        errorBody = await response.json();
+      } catch {
+        errorBody = undefined;
+      }
+
+      const bodyError = typeof (errorBody as { error?: string })?.error === 'string'
+        ? (errorBody as { error: string }).error
+        : undefined;
+
+      const message = bodyError || response.statusText || 'Failed to save messages';
+
+      console.error('Conversation autosave API failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: message,
+        details: errorBody
+      });
+
+      throw new ConversationSaveError(message, {
+        status: response.status,
+        body: errorBody
+      });
+    }
+  }
+
   /**
    * Set the workflow context for database operations
    */
   setWorkflowContext(context: WorkflowContext): void {
     this.workflowContext = context;
+    this.clearAutosaveFailureState();
   }
   
   /**
@@ -44,15 +276,7 @@ export class ConversationStateManager {
    */
   setCurrentWorkflow(workflow: { steps?: unknown[] } | null): void {
     this.currentWorkflow = workflow;
-  }
-  
-  /**
-   * Check if the workflow has real steps
-   */
-  private hasWorkflowSteps(): boolean {
-    if (!this.currentWorkflow?.steps || !Array.isArray(this.currentWorkflow.steps)) return false;
-    
-    return this.currentWorkflow.steps.length > 0;
+    this.clearAutosaveFailureState();
   }
   
   // Message management
@@ -65,7 +289,11 @@ export class ConversationStateManager {
     
     this.state.messages.push(fullMessage);
     this.updateBehaviorMetrics(fullMessage);
-    this.scheduleAutosave();
+    if (this.shouldQueueMessageForAutosave(fullMessage)) {
+      this.pendingMessageIds.add(fullMessage.id);
+      this.clearAutosaveFailureState();
+      this.scheduleAutosave();
+    }
     
     return fullMessage;
   }
@@ -82,16 +310,24 @@ export class ConversationStateManager {
     const messageIndex = this.state.messages.findIndex(m => m.id === messageId);
     if (messageIndex === -1) return false;
     
-    this.state.messages[messageIndex] = {
+    const updatedMessage: ConversationMessage = {
       ...this.state.messages[messageIndex],
       ...updates,
       timestamp: updates.timestamp || this.state.messages[messageIndex].timestamp
     };
-    
+
+    this.state.messages[messageIndex] = updatedMessage;
+
     // Update behavior metrics if message was updated
-    this.updateBehaviorMetrics(this.state.messages[messageIndex]);
-    
-    this.scheduleAutosave();
+    this.updateBehaviorMetrics(updatedMessage);
+
+    if (this.shouldQueueMessageForAutosave(updatedMessage)) {
+      this.pendingMessageIds.add(messageId);
+      this.clearAutosaveFailureState();
+      this.scheduleAutosave();
+    } else {
+      this.pendingMessageIds.delete(messageId);
+    }
     return true;
   }
   
@@ -100,7 +336,11 @@ export class ConversationStateManager {
     this.state.messages = this.state.messages.filter(m => m.id !== messageId);
     
     if (this.state.messages.length !== initialLength) {
-      this.scheduleAutosave();
+      this.pendingMessageIds.delete(messageId);
+      this.clearAutosaveFailureState();
+      if (this.pendingMessageIds.size > 0) {
+        this.scheduleAutosave();
+      }
       return true;
     }
     return false;
@@ -145,6 +385,7 @@ export class ConversationStateManager {
   // Context management
   updateContext(updates: Partial<ConversationContext>): void {
     this.state.context = { ...this.state.context, ...updates };
+    this.clearAutosaveFailureState();
     this.scheduleAutosave();
   }
   
@@ -191,83 +432,107 @@ export class ConversationStateManager {
   
   // Conversation persistence
   private scheduleAutosave(): void {
-    if (!this.autosaveEnabled) return;
-    
-    if (this.autosaveTimeout) {
-      clearTimeout(this.autosaveTimeout);
-    }
-    
-    this.autosaveTimeout = setTimeout(() => {
-      this.saveConversation();
-    }, this.autosaveDelay);
+    if (this.pendingMessageIds.size === 0) return;
+    this.scheduleAutosaveRetry(this.autosaveDelay);
   }
   
   private async saveConversation(): Promise<void> {
     if (this.state.isAutoSaving) return;
+    if (this.pendingMessageIds.size === 0) return;
     
     // CRITICAL: Don't save conversation if workflow has no steps yet
-    if (!this.hasWorkflowSteps()) {
-      console.log('⏭️ Skipping conversation save: workflow has no steps yet');
+    if (!this.workflowContext) {
+      console.log('⏭️ Skipping conversation save: no workflow context set');
       return;
+    }
+
+    const { account, workflowTemplateId } = this.workflowContext;
+    if (!shouldUseDatabaseConversations(account, workflowTemplateId)) {
+      // No database context - conversation is ephemeral (not persisted)
+      return;
+    }
+
+    const pendingMessages = this.getPendingMessages();
+    if (pendingMessages.length === 0) {
+      return;
+    }
+
+    const batchSignature = this.getBatchSignature(pendingMessages);
+    const lastFailure = this.lastAutosaveError;
+
+    if (lastFailure && lastFailure.signature === batchSignature) {
+      const elapsed = Date.now() - lastFailure.timestamp;
+
+      if (lastFailure.attempt >= this.maxAutosaveRetries) {
+        console.warn('Skipping autosave: max retries reached for current message batch', {
+          conversationId: this.state.conversationId,
+          pendingMessageIds: pendingMessages.map(message => message.id),
+          maxRetries: this.maxAutosaveRetries
+        });
+        return;
+      }
+
+      if (elapsed < this.autosaveRetryCooldown) {
+        const waitMs = this.autosaveRetryCooldown - elapsed;
+        console.log(`Autosave retry cooling down for ${waitMs}ms`);
+        this.scheduleAutosaveRetry(waitMs);
+        return;
+      }
     }
     
     this.state.isAutoSaving = true;
     this.state.lastActivity = new Date();
     
     try {
-      const conversationData = this.getState();
-      
-      // Save to database if we have workflow context (saved templates only)
-      if (this.workflowContext && shouldUseDatabaseConversations(
-        this.workflowContext.account, 
-        this.workflowContext.workflowTemplateName
-      )) {
-        await this.saveToDatabaseAPI(conversationData);
-        console.log('Conversation autosaved to database:', this.state.conversationId);
-      } else {
-        // No database context - conversation is ephemeral (not persisted)
-        console.log('Ephemeral conversation (no persistence):', this.state.conversationId);
-      }
+      await this.saveMessagesToDatabaseAPI(pendingMessages);
+      pendingMessages.forEach(message => this.pendingMessageIds.delete(message.id));
+      console.log(`Conversation autosaved (${pendingMessages.length} message(s)) for:`, this.state.conversationId);
+      this.clearAutosaveFailureState();
     } catch (error) {
-      console.error('Failed to autosave conversation:', error);
+      if (error instanceof ConversationSaveError) {
+        console.error('Failed to autosave conversation messages:', {
+          conversationId: this.state.conversationId,
+          error: error.message,
+          details: error.info
+        });
+      } else {
+        console.error('Failed to autosave conversation messages:', error);
+      }
+
+      const previousFailure = this.lastAutosaveError;
+      const attempt = previousFailure && previousFailure.signature === batchSignature
+        ? previousFailure.attempt + 1
+        : 1;
+
+      this.lastAutosaveError = {
+        signature: batchSignature,
+        attempt,
+        timestamp: Date.now(),
+        error
+      };
+
+      if (attempt < this.maxAutosaveRetries) {
+        this.scheduleAutosaveRetry(this.autosaveRetryCooldown);
+      } else {
+        console.warn('Autosave retries exhausted; waiting for new messages before retrying', {
+          conversationId: this.state.conversationId,
+          pendingMessageIds: pendingMessages.map(message => message.id)
+        });
+      }
     } finally {
       this.state.isAutoSaving = false;
     }
   }
   
-  /**
-   * Save conversation to database via API
-   */
-  private async saveToDatabaseAPI(conversationData: ConversationState): Promise<void> {
-    if (!this.workflowContext) return;
-    
-    const apiData = createConversationApiData(this.workflowContext, {
-      conversation: conversationData
-    });
-    
-    const response = await fetch('/api/workflow-configurator-conversations', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(apiData)
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Failed to save conversation: ${response.statusText}`);
-    }
-  }
-  
   async loadConversation(conversationId: string): Promise<boolean> {
     try {
-      // Load from database only if we have workflow context (saved templates)
       if (this.workflowContext && shouldUseDatabaseConversations(
-        this.workflowContext.account, 
-        this.workflowContext.workflowTemplateName
+        this.workflowContext.account,
+        this.workflowContext.workflowTemplateId
       )) {
-        const databaseData = await this.loadFromDatabaseAPI();
-        if (databaseData) {
-          this.restoreConversationState(databaseData);
+        const messages = await this.loadMessagesFromDatabaseAPI();
+        if (messages.length > 0) {
+          this.restoreConversationMessages(messages);
           console.log('Loaded conversation from database:', conversationId);
           return true;
         }
@@ -286,43 +551,122 @@ export class ConversationStateManager {
   /**
    * Load conversation from database via API
    */
-  private async loadFromDatabaseAPI(): Promise<ConversationState | null> {
-    if (!this.workflowContext) return null;
-    
-    const params = new URLSearchParams(createConversationApiData(this.workflowContext) as Record<string, string>);
-    
-    const response = await fetch(`/api/workflow-configurator-conversations?${params}`, {
+  private async loadMessagesFromDatabaseAPI(): Promise<ConfiguratorMessage[]> {
+    if (!this.workflowContext) return [];
+
+    const { account, organization, workflowTemplateId, workflowTemplateName } = this.workflowContext;
+    if (!shouldUseDatabaseConversations(account, workflowTemplateId)) {
+      return [];
+    }
+
+    const params = new URLSearchParams();
+    if (workflowTemplateId) {
+      params.append('templateId', workflowTemplateId);
+    }
+    params.append('templateName', workflowTemplateName);
+    params.append('limit', '500');
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'x-account': account
+    };
+
+    if (organization) {
+      headers['x-organization'] = organization;
+    }
+
+    const response = await fetch(`/api/workflow-configurator-conversations?${params.toString()}`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      }
+      headers
     });
-    
+
     if (!response.ok) {
       if (response.status === 404) {
-        return null; // No conversation found, that's okay
+        return [];
       }
-      throw new Error(`Failed to load conversation: ${response.statusText}`);
+      throw new Error(`Failed to load conversation messages: ${response.statusText}`);
     }
-    
+
     const result = await response.json();
-    return result.data?.conversation || null;
+    if (!result?.data?.messages || !Array.isArray(result.data.messages)) {
+      return [];
+    }
+
+    return (result.data.messages as ConfiguratorMessage[]).map(message => ({
+      ...message,
+      timestamp: new Date(message.timestamp)
+    }));
   }
-  
-  /**
-   * Restore conversation state from loaded data
-   */
-  private restoreConversationState(parsedState: ConversationState): void {
-    // Validate and restore state
-    this.state = {
-      ...parsedState,
-      // Restore Date objects
-      messages: parsedState.messages.map(msg => ({
-        ...msg,
-        timestamp: new Date(msg.timestamp)
-      })),
-      lastActivity: new Date(parsedState.lastActivity)
+
+  private restoreConversationMessages(messages: ConfiguratorMessage[]): void {
+    const conversationMessages = messages.map(message => this.convertConfiguratorMessage(message));
+    this.state.messages = conversationMessages;
+
+    if (conversationMessages.length > 0) {
+      this.state.lastActivity = conversationMessages[conversationMessages.length - 1].timestamp;
+    }
+
+    this.state.behaviorMetrics.messageCount = conversationMessages.length;
+    this.state.behaviorMetrics.functionsUsedCount = conversationMessages.reduce<Record<string, number>>((acc, message) => {
+      if (message.metadata?.functionsCalled) {
+        message.metadata.functionsCalled.forEach((fn: string) => {
+          acc[fn] = (acc[fn] || 0) + 1;
+        });
+      }
+      return acc;
+    }, {});
+
+    this.pendingMessageIds.clear();
+  }
+
+  private convertConfiguratorMessage(message: ConfiguratorMessage): ConversationMessage {
+    const sender: ConversationMessage['sender'] = message.role === 'user' ? 'user' : 'aime';
+    const type = this.resolveMessageTypeFromMetadata(message);
+
+    const conversationMessage: ConversationMessage = {
+      id: message.id,
+      sender,
+      content: message.content,
+      timestamp: new Date(message.timestamp),
+      status: 'complete',
+      type
     };
+
+    const metadata: MessageMetadata = {};
+
+    if (message.metadata?.workflowStepGenerated) {
+      metadata.workflowStepGenerated = message.metadata.workflowStepGenerated;
+    }
+
+    if (message.metadata?.functionsCalled && message.metadata.functionsCalled.length > 0) {
+      metadata.functionsCalled = [...message.metadata.functionsCalled];
+    }
+
+    if (message.metadata?.validationErrors && message.metadata.validationErrors.length > 0) {
+      metadata.validationErrors = [...message.metadata.validationErrors];
+    }
+
+    if (message.metadata?.editIntent) {
+      metadata.editedWorkflowJSON = true;
+    }
+
+    if (Object.keys(metadata).length > 0) {
+      conversationMessage.metadata = metadata;
+    }
+
+    return conversationMessage;
+  }
+
+  private resolveMessageTypeFromMetadata(message: ConfiguratorMessage): MessageType {
+    if (message.metadata?.workflowGenerated) {
+      return 'workflow_generated';
+    }
+
+    if (message.metadata?.validationErrors && message.metadata.validationErrors.length > 0) {
+      return 'validation_result';
+    }
+
+    return 'text';
   }
   
   // State access
@@ -330,9 +674,20 @@ export class ConversationStateManager {
     return { ...this.state };
   }
   
-  setState(newState: ConversationState): void {
+  setState(newState: ConversationState, options?: { triggerAutosave?: boolean }): void {
     this.state = newState;
-    this.scheduleAutosave();
+    this.pendingMessageIds.clear();
+    this.clearAutosaveFailureState();
+    if (options?.triggerAutosave) {
+      newState.messages.forEach(message => {
+        if (this.shouldQueueMessageForAutosave(message)) {
+          this.pendingMessageIds.add(message.id);
+        }
+      });
+      if (this.pendingMessageIds.size > 0) {
+        this.scheduleAutosave();
+      }
+    }
   }
   
   // Configuration
@@ -345,7 +700,7 @@ export class ConversationStateManager {
   }
   
   setAutosaveDelay(delay: number): void {
-    this.autosaveDelay = Math.max(500, delay); // Minimum 500ms
+    this.autosaveDelay = Math.max(100, delay); // Minimum 100ms
   }
   
   // Cleanup
@@ -354,6 +709,7 @@ export class ConversationStateManager {
       clearTimeout(this.autosaveTimeout);
       this.autosaveTimeout = null;
     }
+    this.pendingMessageIds.clear();
   }
 }
 

@@ -26,15 +26,16 @@ import {
 import { ConversationMessage } from '@/app/types/conversation';
 import { WorkflowCreationFlow } from '@/app/utils/workflow-creation-flow';
 import { createEmptyConversationState, ConversationStateManager } from '@/app/utils/conversation-manager';
-import { WorkflowContext } from '@/app/utils/frontend-conversation-helpers';
+import { WorkflowContext, shouldUseDatabaseConversations } from '@/app/utils/frontend-conversation-helpers';
 import { generateUniqueTemplateName } from '@/app/utils/template-name-generator';
 import { SmartAutocomplete } from './SmartAutocomplete';
-import { ConversationHistoryMessage } from '@/app/utils/llm-workflow-generator';
+import { ConversationHistoryMessage } from '@/app/utils/langchain/langchain-workflow-generator';
 import { WorkflowAutocompleteItem } from '@/app/types/workflow-conversation-autocomplete';
 import { getLLMContext } from '@/app/data/workflow-conversation-autocomplete';
 // Phase 4: Frontend validation integration
 import { useWorkflowValidation, WorkflowValidationState } from '@/app/hooks/useWorkflowValidation';
 import { WorkflowValidationFeedback } from './WorkflowValidationFeedback';
+import { useUnifiedUserContext } from '@/app/contexts/UnifiedUserContext';
 
 // Cache for available functions to prevent constant API calls
 let availableFunctionsCache: string[] | null = null;
@@ -143,6 +144,8 @@ interface WorkflowCreationPaneProps {
   workflow: WorkflowJSON;
   onWorkflowChange: (workflow: WorkflowJSON) => void;
   isNewWorkflow: boolean;
+  workflowTemplateId?: string;
+  workflowTemplateName?: string;
   mrfData?: MRFData;
 }
 
@@ -150,12 +153,15 @@ export default function WorkflowCreationPane({
   workflow,
   onWorkflowChange,
   isNewWorkflow,
+  workflowTemplateId,
+  workflowTemplateName,
   mrfData
 }: WorkflowCreationPaneProps) {
   // Creation flow state
   const [creationFlow] = useState(() => new WorkflowCreationFlow());
   const [currentSession, setCurrentSession] = useState<CreationSession | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const { account, currentOrganization } = useUnifiedUserContext();
   
   // Memoize validation callback to prevent infinite loops
   const onValidationComplete = useCallback((state: WorkflowValidationState) => {
@@ -197,8 +203,9 @@ export default function WorkflowCreationPane({
   
   // Initialize creation session
   useEffect(() => {
-    const currentWorkflowId = workflow.metadata?.id || 'new-workflow';
-    const currentWorkflowName = workflow.metadata?.name || 'New Workflow';
+  const workflowWithMetadata = workflow as WorkflowJSON & { metadata?: { id?: string; name?: string } };
+  const currentWorkflowId = workflowTemplateId || workflowWithMetadata.metadata?.id || 'new-workflow';
+  const currentWorkflowName = workflowTemplateName || workflowWithMetadata.metadata?.name || 'New Workflow';
     
     // Only reinitialize if the core identifiers have actually changed
     if (workflowIdRef.current === currentWorkflowId && 
@@ -215,11 +222,18 @@ export default function WorkflowCreationPane({
         console.log('🚀 Initializing workflow creation session');
         
         // Create workflow context for database integration
-        const workflowContextForDb: WorkflowContext = {
-          account: 'groupize-demos', // TODO: Get from user context
-          organization: null, // TODO: Get from user context if needed
+        const accountId = account?.id || null;
+        const organizationId = currentOrganization?.id || null;
+        const persistenceEnabled = accountId 
+          ? shouldUseDatabaseConversations(accountId, currentWorkflowId)
+          : false;
+
+        const workflowContextForDb: WorkflowContext | null = persistenceEnabled ? {
+          account: accountId!,
+          organization: organizationId,
+          workflowTemplateId: currentWorkflowId,
           workflowTemplateName: currentWorkflowName || generateUniqueTemplateName()
-        };
+        } : null;
         setWorkflowContext(workflowContextForDb);
         
         // Fetch available functions from API - cache this to prevent constant calls
@@ -244,8 +258,15 @@ export default function WorkflowCreationPane({
         // For now, always create fresh conversation state
         // Database integration will be added in future to persist conversations for saved templates
         
-        const conversationState = createEmptyConversationState(currentWorkflowId, context);
-        const manager = new ConversationStateManager(conversationState, workflowContextForDb);
+        const conversationState = createEmptyConversationState(
+          currentWorkflowId,
+          context,
+          workflowContextForDb || undefined
+        );
+        const manager = new ConversationStateManager(
+          conversationState,
+          workflowContextForDb || undefined
+        );
         
         // Add welcome message for new conversation
         const welcomeMessage = mrfData 
@@ -340,58 +361,51 @@ export default function WorkflowCreationPane({
   // Helper function to add a message and update state properly
   const addMessage = useCallback((content: string, sender: 'user' | 'aime', type: 'text' | 'workflow_generated' = 'text') => {
     if (!conversationManager) return;
-    
-    // Create the message object with unique ID
-    const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const newMessage: ConversationMessage = {
-      id: messageId,
-      sender,
-      content,
-      timestamp: new Date(),
-      status: sender === 'user' ? 'complete' : 'streaming',
-      type,
-    };
-    
-    // Add to local state first (primary source of truth for UI)
-    setMessages(prev => [...prev, newMessage]);
-    
-    // Also add to conversation manager for persistence
-    if (sender === 'user') {
-      conversationManager.addUserMessage(content);
-    } else {
-      conversationManager.addAimeMessage(content, type);
-    }
+
+    const managerMessage = sender === 'user'
+      ? conversationManager.addUserMessage(content)
+      : conversationManager.addAimeMessage(content, type);
+
+    setMessages(prev => [...prev, managerMessage]);
   }, [conversationManager]);
 
   // Helper function to replace the last aime message
   const replaceLastAimeMessage = useCallback((content: string, type: 'text' | 'workflow_generated' = 'text') => {
     if (!conversationManager) return;
-    
-    // Update local state (primary source of truth for UI)
+
+    const lastAimeMessage = [...conversationManager.getMessages()].reverse().find(msg => msg.sender === 'aime');
+    if (!lastAimeMessage) return;
+
+    const timestamp = new Date();
+    conversationManager.updateMessage(lastAimeMessage.id, {
+      content,
+      type,
+      status: 'complete',
+      timestamp
+    });
+
     setMessages(prev => {
-      const lastAimeIndex = prev.findLastIndex(msg => msg.sender === 'aime');
-      
-      if (lastAimeIndex !== -1) {
-        const newMessages = [...prev];
-        newMessages[lastAimeIndex] = {
-          ...newMessages[lastAimeIndex],
-          content,
-          type,
-          timestamp: new Date(),
-          status: 'complete' as const
-        };
-        
-        // Scroll to bottom after message replacement
-        setTimeout(() => {
-          // Check if scrollIntoView exists (JSDOM compatibility)
-          if (messagesEndRef.current?.scrollIntoView) {
-            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-          }
-        }, 50);
-        
-        return newMessages;
+      const lastAimeIndex = prev.findLastIndex(msg => msg.id === lastAimeMessage.id);
+      if (lastAimeIndex === -1) {
+        return prev;
       }
-      return prev;
+
+      const newMessages = [...prev];
+      newMessages[lastAimeIndex] = {
+        ...newMessages[lastAimeIndex],
+        content,
+        type,
+        timestamp,
+        status: 'complete'
+      };
+
+      setTimeout(() => {
+        if (messagesEndRef.current?.scrollIntoView) {
+          messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 50);
+
+      return newMessages;
     });
   }, [conversationManager]);
   

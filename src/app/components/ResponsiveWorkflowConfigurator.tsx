@@ -472,6 +472,8 @@ export default function ResponsiveWorkflowConfigurator({
                 workflow={workflow}
                 onWorkflowChange={onWorkflowChange}
                 isNewWorkflow={isNewWorkflow}
+                workflowTemplateId={currentTemplateId}
+                workflowTemplateName={currentTemplateName}
                 mrfData={undefined}
               />
             ) : activeTab === 1 ? (
@@ -517,6 +519,8 @@ export default function ResponsiveWorkflowConfigurator({
               workflow={workflow}
               onWorkflowChange={onWorkflowChange}
               isNewWorkflow={isNewWorkflow}
+              workflowTemplateId={currentTemplateId}
+              workflowTemplateName={currentTemplateName}
               mrfData={undefined}
             />
           </Box>

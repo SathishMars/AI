@@ -9,6 +9,7 @@
 export interface WorkflowContext {
   account: string;
   organization?: string | null;
+  workflowTemplateId?: string;
   workflowTemplateName: string;
 }
 
@@ -20,10 +21,18 @@ export function createConversationApiData(
   context: WorkflowContext,
   additionalData: Record<string, unknown> = {}
 ): Record<string, unknown> {
-  return {
+  const base: Record<string, unknown> = {
     account: context.account,
     organization: context.organization || null,
-    templateName: context.workflowTemplateName,
+    templateName: context.workflowTemplateName
+  };
+
+  if (context.workflowTemplateId) {
+    base.templateId = context.workflowTemplateId;
+  }
+
+  return {
+    ...base,
     ...additionalData
   };
 }
@@ -34,9 +43,12 @@ export function createConversationApiData(
  */
 export function shouldUseDatabaseConversations(
   account?: string,
-  workflowTemplateName?: string
+  workflowTemplateId?: string
 ): boolean {
-  return !!(account && workflowTemplateName);
+  if (!account) return false;
+  if (!workflowTemplateId) return false;
+  const normalizedId = workflowTemplateId.trim().toLowerCase();
+  return normalizedId !== '' && normalizedId !== 'new' && normalizedId !== 'new-workflow';
 }
 
 /**
@@ -46,9 +58,11 @@ export function shouldUseDatabaseConversations(
 export function createFrontendKey(
   account: string,
   organization: string | null,
+  workflowTemplateId: string,
   workflowTemplateName: string
 ): string {
+  const baseId = workflowTemplateId || workflowTemplateName;
   return organization 
-    ? `${account}-${organization}-${workflowTemplateName}`
-    : `${account}-${workflowTemplateName}`;
+    ? `${account}-${organization}-${baseId}`
+    : `${account}-${baseId}`;
 }

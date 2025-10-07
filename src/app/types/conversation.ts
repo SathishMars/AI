@@ -241,13 +241,16 @@ export const MRF_CONTEXT_PROPERTIES = [
 export function createEmptyConversationState(
   workflowId: string, 
   context: ConversationContext,
-  workflowContext?: { account: string; organization?: string | null; workflowTemplateName: string }
+  workflowContext?: { account: string; organization?: string | null; workflowTemplateId?: string; workflowTemplateName: string }
 ): ConversationState {
   // Generate conversation ID based on context if available, otherwise use MongoDB ObjectID
   const conversationId = workflowContext 
-    ? (workflowContext.organization 
-        ? `${workflowContext.account}-${workflowContext.organization}-${workflowContext.workflowTemplateName}`
-        : `${workflowContext.account}-${workflowContext.workflowTemplateName}`)
+    ? (() => {
+        const baseId = workflowContext.workflowTemplateId || workflowContext.workflowTemplateName;
+        return workflowContext.organization 
+          ? `${workflowContext.account}-${workflowContext.organization}-${baseId}`
+          : `${workflowContext.account}-${baseId}`;
+      })()
     : generateObjectId(); // Use proper MongoDB ObjectID format
 
   return {

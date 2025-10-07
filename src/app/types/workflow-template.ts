@@ -112,9 +112,16 @@ export type ConfiguratorMessageRole = 'user' | 'assistant' | 'system';
 
 // Enhanced message metadata for configurator
 export interface ConfiguratorMessageMetadata {
+  userAgent?: string | null;
+  ipAddress?: string | null;
   templateVersion?: string; // Version when message was created
-  model?: string; // AI model used (e.g., 'gpt-4', 'claude-3')
+  model?: string | null; // AI model used (e.g., 'gpt-4', 'claude-3')
+  provider?: string | null;
   tokenCount?: number; // Token usage for this message
+  tokensUsed?: number | null;
+  suggestedActions?: string[] | null;
+  workflowGenerated?: boolean | null;
+  mermaidDiagram?: boolean | null;
   workflowStepGenerated?: string; // Step ID if workflow was modified
   functionsCalled?: string[]; // Functions referenced in message
   validationErrors?: string[]; // Validation issues detected
@@ -128,6 +135,7 @@ export interface ConfiguratorMessage {
   conversationId: string; // Deterministic ID for the conversation
   account: string; // Account identifier
   organization: string | null; // Organization identifier (null for account-wide)
+  workflowTemplateId: string; // Template short-id (stable identifier)
   workflowTemplateName: string; // Name of the workflow template
   id: string; // Unique message ID within conversation (messageId)
   role: ConfiguratorMessageRole;
@@ -261,6 +269,7 @@ export const ConfiguratorMessageSchema = z.object({
   conversationId: z.string().min(1),
   account: z.string().min(1).max(100),
   organization: z.string().nullable(),
+  workflowTemplateId: z.string().min(1),
   workflowTemplateName: z.string().min(1),
   id: z.string().min(1), // messageId
   role: z.enum(['user', 'assistant', 'system']),

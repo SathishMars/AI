@@ -1,7 +1,7 @@
 // src/test/utils/conversation-manager.test.ts
 import { ConversationStateManager, MultiConversationStateManager } from '@/app/utils/conversation-manager';
 import { createEmptyConversationState } from '@/app/types/conversation';
-import type { ConversationContext, ConversationMessage } from '@/app/types/conversation';
+import type { ConversationContext } from '@/app/types/conversation';
 
 // Mock localStorage for testing
 const localStorageMock = {
@@ -161,23 +161,212 @@ describe('ConversationStateManager', () => {
   });
 
   describe('Autosave Functionality', () => {
-    test('should schedule autosave after message addition', async () => {
-      manager.setAutosaveDelay(100); // Short delay for testing
-      
-      manager.addUserMessage('Test message');
-      
-      // Wait for autosave to trigger
-      await new Promise(resolve => setTimeout(resolve, 150));
-      
-      expect(localStorageMock.setItem).toHaveBeenCalled();
+    let fetchMock: jest.Mock;
+    const originalFetch = globalThis.fetch;
+    const originalWindowFetch = typeof window !== 'undefined' ? window.fetch : undefined;
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+      fetchMock = jest.fn().mockResolvedValue({
+        ok: true,
+        json: jest.fn().mockResolvedValue({ success: true })
+      });
+      globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
+      if (typeof window !== 'undefined') {
+        window.fetch = fetchMock as unknown as typeof window.fetch;
+      }
+
+      manager.setWorkflowContext({
+        account: 'test-account',
+        organization: null,
+        workflowTemplateId: 'template-123',
+        workflowTemplateName: 'Test Template'
+      });
     });
 
-    test('should respect autosave enabled/disabled setting', () => {
+    afterEach(() => {
+      jest.runOnlyPendingTimers();
+      jest.useRealTimers();
+      fetchMock.mockReset();
+      globalThis.fetch = originalFetch;
+      if (typeof window !== 'undefined') {
+        window.fetch = originalWindowFetch as typeof window.fetch;
+      }
+    });
+
+    test('should schedule autosave after message addition', async () => {
+      const initialLastActivity = manager.getState().lastActivity.getTime();
+      manager.setAutosaveDelay(100); // Short delay for testing
+      
+      const message = manager.addUserMessage('Test message');
+      
+      await jest.advanceTimersByTimeAsync(100);
+      await Promise.resolve();
+
+  const updatedLastActivity = manager.getState().lastActivity.getTime();
+  expect(updatedLastActivity).toBeGreaterThanOrEqual(initialLastActivity);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      const [, requestInit] = fetchMock.mock.calls[0];
+      expect(requestInit?.method).toBe('POST');
+      const requestBody = JSON.parse((requestInit?.body as string) ?? '{}');
+      expect(requestBody.action).toBe('save_messages');
+      expect(Array.isArray(requestBody.messages)).toBe(true);
+      expect(requestBody.messages).toHaveLength(1);
+      expect(requestBody.messages[0].id).toBe(message.id);
+      expect(requestBody.messages[0].role).toBe('user');
+    });
+
+    test('should ignore streaming aime messages until they complete', async () => {
+      manager.setAutosaveDelay(100);
+
+      const placeholder = manager.addAimeMessage('Working on it...');
+
+      await jest.advanceTimersByTimeAsync(150);
+      await Promise.resolve();
+
+      expect(fetchMock).not.toHaveBeenCalled();
+
+      manager.updateMessage(placeholder.id, {
+        content: 'Final answer',
+        status: 'complete',
+        timestamp: new Date()
+      });
+
+      await jest.advanceTimersByTimeAsync(100);
+      await Promise.resolve();
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const callBody = JSON.parse((fetchMock.mock.calls[0]?.[1]?.body as string) ?? '{}');
+      expect(callBody.messages?.[0]?.id).toBe(placeholder.id);
+    });
+
+    test('should respect autosave enabled/disabled setting', async () => {
+      const initialLastActivity = manager.getState().lastActivity.getTime();
       manager.setAutosaveEnabled(false);
       manager.addUserMessage('Test message');
       
-      // Should not trigger autosave
-      expect(localStorageMock.setItem).not.toHaveBeenCalled();
+      await jest.advanceTimersByTimeAsync(500);
+      await Promise.resolve();
+
+      const updatedLastActivity = manager.getState().lastActivity.getTime();
+      expect(updatedLastActivity).toBe(initialLastActivity);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    test('setState should not trigger autosave by default', async () => {
+      fetchMock.mockClear();
+
+      const baseState = manager.getState();
+      const timestamp = new Date();
+      const newState = {
+        ...baseState,
+        messages: [
+          {
+            id: 'loaded-message',
+            sender: 'user' as const,
+            content: 'Loaded from database',
+            timestamp,
+            status: 'complete' as const,
+            type: 'text' as const
+          }
+        ],
+        behaviorMetrics: {
+          ...baseState.behaviorMetrics,
+          messageCount: 1
+        }
+      };
+
+      manager.setState(newState);
+
+      await jest.advanceTimersByTimeAsync(150);
+      await Promise.resolve();
+
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    test('setState can trigger autosave when requested', async () => {
+      fetchMock.mockClear();
+
+      const baseState = manager.getState();
+      const timestamp = new Date();
+      const newState = {
+        ...baseState,
+        messages: [
+          {
+            id: 'loaded-message',
+            sender: 'user' as const,
+            content: 'Loaded from database',
+            timestamp,
+            status: 'complete' as const,
+            type: 'text' as const
+          }
+        ],
+        behaviorMetrics: {
+          ...baseState.behaviorMetrics,
+          messageCount: 1
+        }
+      };
+
+      manager.setState(newState, { triggerAutosave: true });
+
+      await jest.advanceTimersByTimeAsync(100);
+      await Promise.resolve();
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    test('should limit autosave retries after repeated failures', async () => {
+      fetchMock.mockImplementation(() => Promise.resolve({
+        ok: false,
+        status: 400,
+        statusText: 'Bad Request',
+        json: jest.fn().mockResolvedValue({
+          success: false,
+          error: 'Document failed MongoDB schema validation',
+          code: 'SCHEMA_VALIDATION_ERROR',
+          details: { reason: 'schema' }
+        })
+      }));
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      try {
+        const retryState = createEmptyConversationState('test-workflow', mockContext);
+        const retryManager = new ConversationStateManager(retryState, undefined, {
+          autosaveDelay: 50,
+          autosaveRetryCooldown: 100,
+          maxAutosaveRetries: 2
+        });
+
+        retryManager.setWorkflowContext({
+          account: 'test-account',
+          organization: null,
+          workflowTemplateId: 'template-123',
+          workflowTemplateName: 'Test Template'
+        });
+
+        retryManager.addUserMessage('This will trigger autosave failure');
+
+        await jest.advanceTimersByTimeAsync(100);
+        await Promise.resolve();
+        await Promise.resolve();
+
+        await jest.advanceTimersByTimeAsync(200);
+        await Promise.resolve();
+        await Promise.resolve();
+
+        await jest.advanceTimersByTimeAsync(500);
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(1);
+        expect(fetchMock.mock.calls.length).toBeLessThanOrEqual(2);
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+        expect(warnSpy.mock.calls[0]?.[0]).toContain('Autosave retries exhausted');
+      } finally {
+        warnSpy.mockRestore();
+      }
     });
   });
 
@@ -256,6 +445,7 @@ describe('MultiConversationStateManager', () => {
       expect(closed).toBe(true);
       expect(multiManager.getConversationCount()).toBe(1);
       expect(multiManager.activeConversations[conv1.conversationId]).toBeUndefined();
+      expect(multiManager.activeConversations[conv2.conversationId]).toBeDefined();
     });
 
     test('should switch to another conversation when current is closed', () => {

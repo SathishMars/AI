@@ -1,5 +1,6 @@
 // src/app/utils/workflow-template-database.ts
 import { getMongoDatabase } from './mongodb-connection';
+import type { MongoServerError } from 'mongodb';
 import { generateConversationId } from './conversation-id-generator';
 import { generateShortId } from './short-id-generator';
 import {
@@ -12,6 +13,7 @@ import {
   TemplateResolutionResult,
   CreateConversationInput,
   ConfiguratorMessage,
+  ConfiguratorMessageMetadata,
   TemplateStateManager,
   TemplateError,
   ConversationError,
@@ -35,6 +37,37 @@ import {
 const COLLECTION_TEMPLATES = 'workflowTemplates';
 const COLLECTION_CONVERSATIONS = 'aimeWorkflowConversations';
 
+function sanitizeConfiguratorMetadata(
+  metadata: ConfiguratorMessageMetadata | null | undefined
+): ConfiguratorMessageMetadata | undefined {
+  if (!metadata || typeof metadata !== 'object') {
+    return undefined;
+  }
+
+  const sanitizedEntries = Object.entries(metadata).filter(([, value]) => {
+    if (value === null || value === undefined) {
+      return false;
+    }
+
+    if (Array.isArray(value)) {
+      return value.length > 0;
+    }
+
+    return true;
+  });
+
+  if (sanitizedEntries.length === 0) {
+    return undefined;
+  }
+
+  const sanitizedRecord: Record<string, unknown> = {};
+  sanitizedEntries.forEach(([key, value]) => {
+    sanitizedRecord[key] = value;
+  });
+
+  return sanitizedRecord as ConfiguratorMessageMetadata;
+}
+
 // ===========================================
 // Template Database Operations
 // ===========================================
@@ -45,118 +78,158 @@ const COLLECTION_CONVERSATIONS = 'aimeWorkflowConversations';
 export async function createWorkflowTemplate(
   input: CreateWorkflowTemplateInput
 ): Promise<WorkflowTemplate> {
-  try {
-    console.log('💾 [DB] createWorkflowTemplate - Input received:');
-    console.log('  - Account:', input.account);
-    console.log('  - Organization:', input.organization);
-    console.log('  - Name:', input.name);
-    console.log('  - Author:', input.author);
-    console.log('  - WorkflowDefinition:', {
-      hasSteps: !!input.workflowDefinition?.steps,
-      stepsIsArray: Array.isArray(input.workflowDefinition?.steps),
-      stepsCount: input.workflowDefinition?.steps?.length || 0
-    });
-    console.log('  - Tags:', input.tags);
-    console.log('  - Category:', input.category);
+  const trimmedName = input.name?.trim();
 
+  if (!trimmedName) {
+    throw new TemplateError('Template name is required before saving', 'NAME_REQUIRED');
+  }
+
+  // Prevent placeholder names (architecture rule: do not persist unnamed templates)
+  const loweredName = trimmedName.toLowerCase();
+  if (loweredName === 'new' || loweredName === 'create') {
+    throw new TemplateError(
+      'Rename the template before saving',
+      'PLACEHOLDER_NAME_NOT_ALLOWED',
+      { name: trimmedName }
+    );
+  }
+
+  const definitionInput = (input.workflowDefinition ?? { steps: [] }) as Record<string, unknown> & {
+    steps?: unknown;
+  };
+
+  const rawSteps = definitionInput.steps;
+  const stepCount = Array.isArray(rawSteps)
+    ? rawSteps.length
+    : rawSteps && typeof rawSteps === 'object'
+      ? Object.keys(rawSteps as Record<string, unknown>).length
+      : 0;
+
+  if (stepCount === 0) {
+    throw new TemplateError(
+      'Workflow must contain at least one step before saving',
+      'EMPTY_WORKFLOW',
+      { name: trimmedName }
+    );
+  }
+
+  const organization = input.organization ?? null;
+
+  console.log('📥 [DB] createWorkflowTemplate called:');
+  console.log('  - Account:', input.account);
+  console.log('  - Organization:', organization ?? '(account-wide)');
+  console.log('  - Name:', trimmedName);
+  console.log('  - Author:', input.author);
+  console.log('  - Step count:', stepCount);
+
+  try {
     const db = await getMongoDatabase();
     const collection = db.collection(COLLECTION_TEMPLATES);
 
-    // Generate short ID for new template
-    const templateId = generateShortId();
-    console.log('  - Generated Template ID:', templateId);
+    const baseFilter: Record<string, unknown> = { account: input.account };
+    if (organization === null) {
+      baseFilter.organization = null;
+    } else if (organization !== undefined) {
+      baseFilter.organization = organization;
+    }
 
-    // Check if template with this account + name already exists
-    const existingTemplate = await collection.findOne({ 
-      account: input.account,
-      organization: input.organization || null,
-      'metadata.name': input.name 
+    const existingTemplate = await collection.findOne({
+      ...baseFilter,
+      $or: [
+        { 'metadata.name': trimmedName },
+        { name: trimmedName } // Legacy support
+      ]
     });
+
+    let templateId = generateShortId();
+    let parentVersion: string | undefined;
     let version = '1.0.0';
-    
+
     if (existingTemplate) {
-      console.log('  - Existing template found, calculating next version...');
-      // Generate next version
+      templateId =
+        (existingTemplate as { id?: string }).id ??
+        (existingTemplate as { templateId?: string }).templateId ??
+        templateId;
+      parentVersion = (existingTemplate as { version?: string }).version;
+
+      const versionFilter: Record<string, unknown> = {
+        ...baseFilter,
+        id: templateId
+      };
+
       const existingVersions = await collection
-        .find({ 
-          account: input.account,
-          organization: input.organization || null,
-          'metadata.name': input.name 
-        })
+        .find(versionFilter)
         .project({ version: 1 })
         .toArray();
-      
-      const versions = existingVersions.map(t => t.version);
-      const latestVersion = getLatestVersion(versions);
-      
-      if (latestVersion) {
-        version = generateNextVersion(latestVersion, 'minor');
-      }
-      console.log('  - New version:', version);
-    } else {
-      console.log('  - New template, version:', version);
+
+      const versionStrings = existingVersions
+        .map((doc: { version?: string }) => doc.version)
+        .filter((value): value is string => typeof value === 'string' && value.length > 0);
+
+      const latestVersion = versionStrings.length > 0 ? getLatestVersion(versionStrings) : parentVersion;
+      version = generateNextVersion(latestVersion || '1.0.0', 'minor');
     }
 
-    // Build template document (without _id for insertion)
     const now = new Date();
-    
-    // Build metadata object with proper typing
-    interface TemplateDocMetadata {
-      name: string;
-      status: 'draft' | 'published' | 'deprecated' | 'archived';
-      author: string;
-      createdAt: Date;
-      updatedAt: Date;
-      tags: string[];
-      description?: string;
-      category?: string;
-      publishedAt?: Date;
-      updatedBy?: string;
-    }
-    
-    const metadata: TemplateDocMetadata = {
-      name: input.name,  // Descriptive name in metadata (REQUIRED)
-      status: 'draft',  // Status in metadata (REQUIRED)
-      author: input.author,  // Author (REQUIRED)
-      createdAt: now,  // Date object (REQUIRED)
-      updatedAt: now,  // Date object (REQUIRED)
-      tags: input.tags || []  // Tags array (REQUIRED - default to empty)
+
+    const stepsArray = Array.isArray(rawSteps)
+      ? rawSteps
+      : rawSteps && typeof rawSteps === 'object'
+        ? Object.values(rawSteps as Record<string, unknown>)
+        : [];
+
+    const workflowDefinition = {
+      ...definitionInput,
+      steps: stepsArray
+    } as WorkflowTemplate['workflowDefinition'] & Record<string, unknown>;
+
+    const metadata: WorkflowTemplate['metadata'] = {
+      name: trimmedName,
+      status: 'draft',
+      author: input.author,
+      updatedBy: input.author,
+      createdAt: now,
+      updatedAt: now,
+      tags: input.tags && input.tags.length > 0 ? input.tags : ['ai-generated']
     };
-    
-    // Only add optional fields if they have non-null/undefined values
-    if (input.description) {
+
+    if (typeof input.description === 'string' && input.description.trim().length > 0) {
       metadata.description = input.description;
     }
-    if (input.category) {
+    if (typeof input.category === 'string' && input.category.trim().length > 0) {
       metadata.category = input.category;
     }
-    
-    const templateDoc = {
-      id: templateId,  // 10-char short-id (composite key)
-      account: input.account,  // Composite key
-      organization: input.organization || null,  // Composite key (nullable)
-      version,  // Composite key
-      workflowDefinition: input.workflowDefinition,
-      metadata,
-      usageStats: {
-        instanceCount: 0  // MongoDB will accept this as int if it's a whole number
-      }
-    };
 
-    console.log('📄 [DB] Template document structure before save:');
-    console.log('  - Composite Keys:', {
-      id: templateDoc.id,
-      account: templateDoc.account,
-      organization: templateDoc.organization,
-      version: templateDoc.version
-    });
+    const templateDoc = {
+      id: templateId,
+      account: input.account,
+      organization,
+      version,
+      workflowDefinition,
+      metadata,
+      ...(parentVersion ? { parentVersion } : {}),
+      usageStats: {
+        instanceCount: 0
+      }
+    } satisfies Record<string, unknown>;
+
+    console.log('🛠️ [DB] Prepared template document for insert:');
+    console.log('  - Template ID:', templateDoc.id);
+    console.log('  - Version:', templateDoc.version);
+    console.log('  - Parent version:', templateDoc.parentVersion ?? '(none)');
     console.log('  - Metadata:', {
       name: templateDoc.metadata.name,
       status: templateDoc.metadata.status,
       author: templateDoc.metadata.author,
       tags: templateDoc.metadata.tags
     });
-    console.log('  - WorkflowDefinition.steps count:', templateDoc.workflowDefinition.steps?.length || 0);
+    const workflowSteps = (templateDoc.workflowDefinition as { steps?: unknown }).steps;
+    const workflowStepCount = Array.isArray(workflowSteps)
+      ? workflowSteps.length
+      : workflowSteps && typeof workflowSteps === 'object'
+        ? Object.keys(workflowSteps as Record<string, unknown>).length
+        : 0;
+    console.log('  - WorkflowDefinition.steps count:', workflowStepCount);
 
     // Validate template
     const docForValidation = {
@@ -934,8 +1007,22 @@ export async function saveMessage(
     const db = await getMongoDatabase();
     const collection = db.collection(COLLECTION_CONVERSATIONS);
 
+    const { metadata: rawMetadata, ...messageWithoutMetadata } = message as Omit<
+      ConfiguratorMessage,
+      '_id'
+    > & { metadata?: ConfiguratorMessageMetadata | null };
+
+    const sanitizedMetadata = sanitizeConfiguratorMetadata(rawMetadata);
+
+    // Normalize organization nullability and remove empty metadata
+    const normalizedMessage = {
+      ...messageWithoutMetadata,
+      organization: message.organization ?? null,
+      ...(sanitizedMetadata ? { metadata: sanitizedMetadata } : {})
+    } as Omit<ConfiguratorMessage, '_id'>;
+
     // Validate message
-    const validationResult = ConfiguratorMessageSchema.safeParse(message);
+    const validationResult = ConfiguratorMessageSchema.safeParse(normalizedMessage);
     if (!validationResult.success) {
       throw new ConversationError(
         'Message validation failed',
@@ -944,17 +1031,83 @@ export async function saveMessage(
       );
     }
 
-    // Insert message document
-    const result = await collection.insertOne(message);
-    
-    return {
-      ...message,
-      _id: result.insertedId.toString()
+    const messageDoc = validationResult.data;
+
+    const filter = {
+      account: messageDoc.account,
+      organization: messageDoc.organization,
+      workflowTemplateId: messageDoc.workflowTemplateId,
+      id: messageDoc.id
     };
+
+    const updateOperations: {
+      $set: Record<string, unknown>;
+      $unset?: Record<string, ''>;
+    } = {
+      $set: {
+        ...messageDoc,
+        timestamp: new Date(messageDoc.timestamp)
+      }
+    };
+
+    if (!Object.prototype.hasOwnProperty.call(messageDoc, 'metadata')) {
+      updateOperations.$unset = { metadata: '' };
+    }
+
+    await collection.updateOne(
+      filter,
+      updateOperations,
+      { upsert: true }
+    );
+
+    const savedMessage = await collection.findOne(filter);
+
+    if (!savedMessage) {
+      throw new ConversationError(
+        'Failed to verify saved message',
+        'SAVE_ERROR'
+      );
+    }
+
+    return {
+      ...savedMessage,
+      _id: savedMessage._id?.toString()
+    } as ConfiguratorMessage;
 
   } catch (error) {
     if (error instanceof ConversationError) throw error;
     
+    if (isMongoServerError(error)) {
+  const mongoError = error as MongoServerError;
+      const errInfo = (mongoError as { errInfo?: unknown }).errInfo;
+
+      console.error('MongoDB error while saving message:', {
+        code: mongoError.code,
+        codeName: mongoError.codeName,
+        errInfo
+      });
+
+      const baseDetails = {
+        mongoCode: mongoError.code,
+        mongoCodeName: mongoError.codeName,
+        details: errInfo
+      } as const;
+
+      if (mongoError.code === 121) {
+        throw new ConversationError(
+          'Document failed MongoDB schema validation',
+          'SCHEMA_VALIDATION_ERROR',
+          baseDetails
+        );
+      }
+
+      throw new ConversationError(
+        'MongoDB error while saving message',
+        'DATABASE_ERROR',
+        baseDetails
+      );
+    }
+
     console.error('Failed to save message:', error);
     throw new ConversationError(
       'Failed to save message',
@@ -968,23 +1121,46 @@ export async function saveMessage(
  * Get all messages for a conversation
  * Returns messages ordered by timestamp ascending
  */
-export async function getMessages(
-  account: string,
-  organization: string | null,
-  workflowTemplateName: string
-): Promise<ConfiguratorMessage[]> {
+interface MessageQueryOptions {
+  account: string;
+  organization: string | null;
+  workflowTemplateId?: string;
+  workflowTemplateName?: string;
+  limit?: number;
+}
+
+export async function getMessages({
+  account,
+  organization,
+  workflowTemplateId,
+  workflowTemplateName,
+  limit
+}: MessageQueryOptions): Promise<ConfiguratorMessage[]> {
   try {
     const db = await getMongoDatabase();
     const collection = db.collection(COLLECTION_CONVERSATIONS);
 
-    const messages = await collection
-      .find({
-        account,
-        organization,
-        workflowTemplateName
-      })
-      .sort({ timestamp: 1 }) // Order by timestamp ascending
-      .toArray();
+    const filter: Record<string, string | null> = {
+      account,
+      organization: organization ?? null
+    };
+
+    if (workflowTemplateId) {
+      filter.workflowTemplateId = workflowTemplateId;
+    }
+    if (workflowTemplateName) {
+      filter.workflowTemplateName = workflowTemplateName;
+    }
+
+    const cursor = collection
+      .find(filter)
+      .sort({ timestamp: 1 });
+
+    if (limit && limit > 0) {
+      cursor.limit(limit);
+    }
+
+    const messages = await cursor.toArray();
 
     return messages.map(msg => ({
       ...msg,
@@ -1007,7 +1183,7 @@ export async function getMessages(
 export async function getMessageById(
   account: string,
   organization: string | null,
-  workflowTemplateName: string,
+  workflowTemplateId: string,
   messageId: string
 ): Promise<ConfiguratorMessage | null> {
   try {
@@ -1016,8 +1192,8 @@ export async function getMessageById(
 
     const message = await collection.findOne({
       account,
-      organization,
-      workflowTemplateName,
+      organization: organization ?? null,
+      workflowTemplateId,
       id: messageId
     });
 
@@ -1046,7 +1222,7 @@ export async function getMessageById(
 export async function deleteConversationMessages(
   account: string,
   organization: string | null,
-  workflowTemplateName: string
+  workflowTemplateId: string
 ): Promise<number> {
   try {
     const db = await getMongoDatabase();
@@ -1054,8 +1230,8 @@ export async function deleteConversationMessages(
 
     const result = await collection.deleteMany({
       account,
-      organization,
-      workflowTemplateName
+      organization: organization ?? null,
+      workflowTemplateId
     });
 
     return result.deletedCount;
@@ -1068,4 +1244,13 @@ export async function deleteConversationMessages(
       { originalError: error instanceof Error ? error.message : String(error) }
     );
   }
+}
+
+function isMongoServerError(error: unknown): error is MongoServerError {
+  return Boolean(
+    error &&
+    typeof error === 'object' &&
+    'code' in error &&
+    typeof (error as { code: unknown }).code === 'number'
+  );
 }

@@ -60,6 +60,7 @@ import "@fontsource/roboto/700.css";
 - **Version Management**: Only 1 published + max 1 draft per template ID; others become archived/deprecated
 - **Auto-Save Rules**: Save only when workflow has ≥1 real step AND template is named (not 'new'/'create')
 - **Data Separation**: AIME conversations stored separately from workflow templates in distinct collection
+- **Conversation Autosave**: Persist conversation messages only for user input and completed aime responses; streaming or placeholder system messages must not trigger autosave. Loading conversations with `setState` should be done without re-triggering saves unless explicitly requested with `triggerAutosave`.
 - **Rule condition schema**:
 ```json
 {
