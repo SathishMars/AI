@@ -24,6 +24,118 @@ function generateErrorId(): string {
   return `err_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
+// ============================================================================
+// STEP NAME FORMAT VALIDATION
+// ============================================================================
+
+// Step name prefix requirements by step type
+export const STEP_NAME_PREFIXES: Record<string, string> = {
+  trigger: 'Start:',
+  condition: 'Check:',
+  action: 'Action:',
+  end: 'End:'
+};
+
+// Emoji detection regex (covers most common emoji ranges)
+// Comprehensive pattern that includes all major emoji categories
+export const EMOJI_REGEX = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E0}-\u{1F1FF}\u{FE00}-\u{FE0F}\u{203C}-\u{3299}]/u;
+
+/**
+ * Validates that a step name follows the professional format requirements:
+ * - Must start with the required prefix for the step type
+ * - Must not contain emojis
+ * 
+ * @param stepName - The name of the step to validate
+ * @param stepType - The type of step (trigger, condition, action, end)
+ * @returns Validation result with errors if any
+ */
+export function validateStepNameFormat(
+  stepName: string,
+  stepType: string
+): { isValid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  
+  // Get required prefix for this step type
+  const requiredPrefix = STEP_NAME_PREFIXES[stepType];
+  
+  if (!requiredPrefix) {
+    // Unknown step type - add warning but don't fail validation
+    return { isValid: true, errors: [] };
+  }
+  
+  // Check for required prefix
+  if (!stepName.startsWith(requiredPrefix)) {
+    errors.push(`Step name must start with "${requiredPrefix}"`);
+  }
+  
+  // Check for emojis
+  if (EMOJI_REGEX.test(stepName)) {
+    errors.push('Step names must not contain emojis');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+}
+
+/**
+ * Validates step names across all steps in the workflow.
+ * Supports both nested array structure and legacy object structure.
+ * 
+ * @param workflow - The workflow to validate
+ * @returns Array of validation errors
+ */
+export function validateStepNames(workflow: WorkflowJSON): ValidationError[] {
+  const errors: ValidationError[] = [];
+  
+  // Handle new nested array structure
+  if (Array.isArray(workflow.steps)) {
+    traverseWorkflow(workflow.steps as WorkflowStep[], (step) => {
+      const validation = validateStepNameFormat(step.name, step.type);
+      
+      if (!validation.isValid) {
+        const exampleName = `${STEP_NAME_PREFIXES[step.type] || 'Prefix:'} ${step.name.replace(EMOJI_REGEX, '').trim()}`;
+        
+        errors.push({
+          id: generateErrorId(),
+          severity: 'error',
+          stepId: step.id,
+          fieldPath: 'name',
+          technicalMessage: validation.errors.join('; '),
+          conversationalExplanation: `The step name "${step.name}" doesn't follow our professional format. ${validation.errors.join(' and ')}.`,
+          suggestedFix: `Rename the step to follow the format. For example: "${exampleName}"`,
+          documentationLink: '/docs/workflow-best-practices#step-naming'
+        });
+      }
+    });
+    return errors;
+  }
+  
+  // Handle legacy object structure
+  const stepsRecord = workflow.steps as unknown as Record<string, WorkflowStep>;
+  Object.values(stepsRecord).forEach((step) => {
+    const validation = validateStepNameFormat(step.name, step.type);
+    
+    if (!validation.isValid) {
+      const exampleName = `${STEP_NAME_PREFIXES[step.type] || 'Prefix:'} ${step.name.replace(EMOJI_REGEX, '').trim()}`;
+      
+      errors.push({
+        id: generateErrorId(),
+        severity: 'error',
+        stepId: step.id,
+        fieldPath: 'name',
+        technicalMessage: validation.errors.join('; '),
+        conversationalExplanation: `The step name "${step.name}" doesn't follow our professional format. ${validation.errors.join(' and ')}.`,
+        suggestedFix: `Rename the step to follow the format. For example: "${exampleName}"`,
+        documentationLink: '/docs/workflow-best-practices#step-naming'
+      });
+    }
+  });
+  
+  return errors;
+}
+
 // Schema version validation
 export function validateSchemaVersion(version: string): ValidationError[] {
   const errors: ValidationError[] = [];
@@ -222,6 +334,9 @@ export async function validateWorkflow(
     
     // Function reference validation
     allErrors.push(...await validateFunctionReferences(validatedWorkflow, functionsLibrary));
+    
+    // Step name format validation (CRITICAL for professional consistency)
+    allErrors.push(...validateStepNames(validatedWorkflow));
     
     // New nested array structure validations (if applicable)
     if (Array.isArray(validatedWorkflow.steps)) {

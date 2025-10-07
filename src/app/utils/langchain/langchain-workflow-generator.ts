@@ -345,6 +345,49 @@ WORKFLOW SCHEMA:
   }
 }
 
+STEP NAME FORMAT RULES (CRITICAL - MUST FOLLOW):
+All workflow step names MUST follow this professional format. This is enforced by validation and non-compliant workflows will be rejected.
+
+PREFIX REQUIREMENTS BY STEP TYPE:
+- trigger steps: MUST start with "Start:"
+- condition steps: MUST start with "Check:"
+- action steps: MUST start with "Action:"
+- end steps: MUST start with "End:"
+
+PROFESSIONAL FORMAT: "{Prefix}: {Clear Description}"
+
+GOOD EXAMPLES (USE THESE PATTERNS):
+✅ "Start: On MRF Submission"
+✅ "Start: Daily at 9 AM"
+✅ "Check: Attendees Over 100"
+✅ "Check: Budget Exceeds Threshold"
+✅ "Action: Request Manager Approval"
+✅ "Action: Send Confirmation Email"
+✅ "Action: Create Event in Calendar"
+✅ "End: Workflow Complete"
+✅ "End: Request Denied"
+
+BAD EXAMPLES (DO NOT USE - WILL CAUSE VALIDATION ERRORS):
+❌ "🎯 Start: On MRF Submission" (NO emojis - will be rejected)
+❌ "✅ Check: Attendees Over 100" (NO emojis - will be rejected)
+❌ "📧 Send Email" (NO emojis, missing "Action:" prefix)
+❌ "Send Approval Request" (missing "Action:" prefix)
+❌ "Check attendance count" (missing "Check:" prefix)
+❌ "Workflow Complete" (missing "End:" prefix)
+❌ "On Form Submit" (missing "Start:" prefix)
+
+EMOJI PROHIBITION:
+- NO emojis anywhere in step names
+- NO decorative symbols or icons
+- Use professional business language only
+- Keep descriptions clear and concise
+
+VALIDATION ENFORCEMENT:
+- All step names are validated before saving
+- Non-compliant names will cause workflow save to fail
+- Validation checks both prefix requirements and emoji presence
+- Always follow the format "{Prefix}: {Description}" exactly
+
 AVAILABLE FUNCTIONS:
 ${functionDetails}
 
