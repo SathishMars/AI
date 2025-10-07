@@ -38,7 +38,7 @@ import { ConversationHistoryMessage } from '@/app/utils/llm-workflow-generator';
 import { WorkflowAutocompleteItem } from '@/app/types/workflow-conversation-autocomplete';
 import { getLLMContext } from '@/app/data/workflow-conversation-autocomplete';
 // Phase 4: Frontend validation integration
-import { useWorkflowValidation } from '@/app/hooks/useWorkflowValidation';
+import { useWorkflowValidation, WorkflowValidationState } from '@/app/hooks/useWorkflowValidation';
 import { WorkflowValidationFeedback } from './WorkflowValidationFeedback';
 
 // Cache for available functions to prevent constant API calls
@@ -197,6 +197,12 @@ export default function WorkflowCreationPane({
   const [isCreating, setIsCreating] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState<'saving' | 'saved' | 'error' | 'idle'>('idle');
   
+  // Memoize validation callback to prevent infinite loops
+  const onValidationComplete = useCallback((state: WorkflowValidationState) => {
+    console.log('🔍 Validation complete:', state.isValid ? 'PASS' : 'FAIL', 
+                `- ${state.errors.length} errors, ${state.warnings.length} warnings`);
+  }, []);
+
   // Phase 4: Real-time workflow validation
   const {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -210,10 +216,7 @@ export default function WorkflowCreationPane({
     hasStepErrors
   } = useWorkflowValidation({
     debounceMs: 500,
-    onValidationComplete: (state) => {
-      console.log('🔍 Validation complete:', state.isValid ? 'PASS' : 'FAIL', 
-                  `- ${state.errors.length} errors, ${state.warnings.length} warnings`);
-    }
+    onValidationComplete
   });
   
   // Conversation state
@@ -270,7 +273,7 @@ export default function WorkflowCreationPane({
           userDepartment: 'IT',
           availableFunctions,
           conversationGoal: isNewWorkflow ? 'create' : 'edit',
-          currentWorkflowSteps: Object.keys(workflow.steps || {}),
+          currentWorkflowSteps: Array.isArray(workflow.steps) ? workflow.steps.map((s: WorkflowStep) => s.id || s.name) : [],
           mrfData
         };
         
@@ -334,15 +337,8 @@ export default function WorkflowCreationPane({
   // Update conversation manager with current workflow for validation
   useEffect(() => {
     if (conversationManager) {
-      // Convert array-based steps to object format for conversation manager compatibility
-      const stepsAsObject = Array.isArray(workflow.steps)
-        ? workflow.steps.reduce((acc: Record<string, unknown>, step: unknown, index: number) => {
-            acc[`step${index}`] = step;
-            return acc;
-          }, {})
-        : workflow.steps as Record<string, unknown>;
-      
-      conversationManager.setCurrentWorkflow({ steps: stepsAsObject });
+      // Pass workflow steps in nested array format
+      conversationManager.setCurrentWorkflow({ steps: workflow.steps });
     }
   }, [conversationManager, workflow]);
   
@@ -480,7 +476,7 @@ export default function WorkflowCreationPane({
       addMessage(messageText, 'user');
       
       // Show processing indicator from aime (will be replaced with actual response)
-      const hasExistingSteps = workflow.steps && Object.keys(workflow.steps).length > 0;
+      const hasExistingSteps = Array.isArray(workflow.steps) && workflow.steps.length > 0;
       const processingMessage = hasExistingSteps
         ? 'I see you want to modify the existing workflow. Let me understand the current structure and update it based on your request...'
         : 'Working on your request... I\'m analyzing your requirements and creating the workflow.';
@@ -603,7 +599,7 @@ export default function WorkflowCreationPane({
         replaceLastAimeMessage(combinedMessage);
       } else {
         // Replace with standard success message when no conversational response
-        const hasStepsForSuccess = workflow.steps && Object.keys(workflow.steps).length > 0;
+        const hasStepsForSuccess = Array.isArray(workflow.steps) && workflow.steps.length > 0;
         const successMessage = hasStepsForSuccess
           ? `Perfect! I've modified your existing workflow to incorporate your request. The updated workflow maintains the existing structure while adding the new requirements. Check the visualization on the right to see the changes.`
           : `Excellent! I've created your new workflow based on your request. The workflow includes all the logic you described. You can see the complete workflow structure in the visualization on the right.`;
@@ -635,23 +631,49 @@ export default function WorkflowCreationPane({
   };
   
   // Create complete workflow from partial data
-  const createCompleteWorkflow = (partialWorkflow: Partial<WorkflowJSON>): WorkflowJSON | null => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const createCompleteWorkflow = (partialWorkflow: Partial<WorkflowJSON> | any): WorkflowJSON | null => {
     console.log('🔨 Building complete workflow from partial:', partialWorkflow);
     
-    // Build a complete workflow by merging partial data with current workflow
-    const baseWorkflow = workflow;
+    // Handle new LLM format: { account, organization, metadata, workflowDefinition: { steps } }
+    // vs old format: { schemaVersion, metadata, steps }
+    let steps: unknown[] = [];
     
+    // Check if it's the new format with workflowDefinition
+    if (partialWorkflow.workflowDefinition?.steps) {
+      console.log('📦 New format detected: workflowDefinition.steps');
+      steps = Array.isArray(partialWorkflow.workflowDefinition.steps) 
+        ? partialWorkflow.workflowDefinition.steps 
+        : [];
+    } 
+    // Check if it's the old format with steps at top level
+    else if (partialWorkflow.steps) {
+      console.log('📦 Old format detected: steps at top level');
+      steps = Array.isArray(partialWorkflow.steps) 
+        ? partialWorkflow.steps 
+        : [];
+    }
+    // Fallback to current workflow steps
+    else if (Array.isArray(workflow.steps)) {
+      console.log('📦 Using current workflow steps');
+      steps = workflow.steps;
+    }
+    
+    interface StepSummary { id?: string; name?: string; type?: string }
+    console.log('📊 Steps extracted:', {
+      count: steps.length,
+      isArray: Array.isArray(steps),
+      firstStep: steps[0] ? { 
+        id: (steps[0] as StepSummary).id, 
+        name: (steps[0] as StepSummary).name,
+        type: (steps[0] as StepSummary).type
+      } : null
+    });
+    
+    // Build a complete workflow in the simple internal format
     const completeWorkflow: WorkflowJSON = {
-      schemaVersion: partialWorkflow.schemaVersion || baseWorkflow.schemaVersion || '1.0',
-      metadata: {
-        ...baseWorkflow.metadata,
-        ...partialWorkflow.metadata,
-        updatedAt: new Date()
-      },
-      steps: {
-        ...baseWorkflow.steps,
-        ...partialWorkflow.steps
-      }
+      // Simple internal format: just { steps: [] }
+      steps: steps
     };
     
     console.log('✅ Created complete workflow:', completeWorkflow);

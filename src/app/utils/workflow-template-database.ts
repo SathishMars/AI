@@ -1,6 +1,7 @@
 // src/app/utils/workflow-template-database.ts
 import { getMongoDatabase } from './mongodb-connection';
 import { generateConversationId } from './conversation-id-generator';
+import { generateShortId } from './short-id-generator';
 import {
   WorkflowTemplate,
   ConfiguratorConversation,
@@ -45,20 +46,43 @@ export async function createWorkflowTemplate(
   input: CreateWorkflowTemplateInput
 ): Promise<WorkflowTemplate> {
   try {
+    console.log('💾 [DB] createWorkflowTemplate - Input received:');
+    console.log('  - Account:', input.account);
+    console.log('  - Organization:', input.organization);
+    console.log('  - Name:', input.name);
+    console.log('  - Author:', input.author);
+    console.log('  - WorkflowDefinition:', {
+      hasSteps: !!input.workflowDefinition?.steps,
+      stepsIsArray: Array.isArray(input.workflowDefinition?.steps),
+      stepsCount: input.workflowDefinition?.steps?.length || 0
+    });
+    console.log('  - Tags:', input.tags);
+    console.log('  - Category:', input.category);
+
     const db = await getMongoDatabase();
     const collection = db.collection(COLLECTION_TEMPLATES);
 
+    // Generate short ID for new template
+    const templateId = generateShortId();
+    console.log('  - Generated Template ID:', templateId);
+
     // Check if template with this account + name already exists
     const existingTemplate = await collection.findOne({ 
-      account: input.account, 
-      name: input.name 
+      account: input.account,
+      organization: input.organization || null,
+      'metadata.name': input.name 
     });
     let version = '1.0.0';
     
     if (existingTemplate) {
+      console.log('  - Existing template found, calculating next version...');
       // Generate next version
       const existingVersions = await collection
-        .find({ account: input.account, name: input.name })
+        .find({ 
+          account: input.account,
+          organization: input.organization || null,
+          'metadata.name': input.name 
+        })
         .project({ version: 1 })
         .toArray();
       
@@ -68,49 +92,122 @@ export async function createWorkflowTemplate(
       if (latestVersion) {
         version = generateNextVersion(latestVersion, 'minor');
       }
+      console.log('  - New version:', version);
+    } else {
+      console.log('  - New template, version:', version);
     }
 
     // Build template document (without _id for insertion)
+    const now = new Date();
+    
+    // Build metadata object with proper typing
+    interface TemplateDocMetadata {
+      name: string;
+      status: 'draft' | 'published' | 'deprecated' | 'archived';
+      author: string;
+      createdAt: Date;
+      updatedAt: Date;
+      tags: string[];
+      description?: string;
+      category?: string;
+      publishedAt?: Date;
+      updatedBy?: string;
+    }
+    
+    const metadata: TemplateDocMetadata = {
+      name: input.name,  // Descriptive name in metadata (REQUIRED)
+      status: 'draft',  // Status in metadata (REQUIRED)
+      author: input.author,  // Author (REQUIRED)
+      createdAt: now,  // Date object (REQUIRED)
+      updatedAt: now,  // Date object (REQUIRED)
+      tags: input.tags || []  // Tags array (REQUIRED - default to empty)
+    };
+    
+    // Only add optional fields if they have non-null/undefined values
+    if (input.description) {
+      metadata.description = input.description;
+    }
+    if (input.category) {
+      metadata.category = input.category;
+    }
+    
     const templateDoc = {
-      account: input.account,
-      name: input.name,
-      status: 'draft' as const,
-      version,
+      id: templateId,  // 10-char short-id (composite key)
+      account: input.account,  // Composite key
+      organization: input.organization || null,  // Composite key (nullable)
+      version,  // Composite key
       workflowDefinition: input.workflowDefinition,
-      metadata: {
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        author: input.author,
-        description: input.description,
-        category: input.category,
-        tags: input.tags
-      },
+      metadata,
       usageStats: {
-        instanceCount: 0
+        instanceCount: 0  // MongoDB will accept this as int if it's a whole number
       }
     };
 
+    console.log('📄 [DB] Template document structure before save:');
+    console.log('  - Composite Keys:', {
+      id: templateDoc.id,
+      account: templateDoc.account,
+      organization: templateDoc.organization,
+      version: templateDoc.version
+    });
+    console.log('  - Metadata:', {
+      name: templateDoc.metadata.name,
+      status: templateDoc.metadata.status,
+      author: templateDoc.metadata.author,
+      tags: templateDoc.metadata.tags
+    });
+    console.log('  - WorkflowDefinition.steps count:', templateDoc.workflowDefinition.steps?.length || 0);
+
     // Validate template
-    const validationResult = WorkflowTemplateSchema.safeParse({
+    const docForValidation = {
       ...templateDoc,
       _id: 'temp-id' // Add temporary ID for validation
-    });
+    };
+    
+    console.log('📋 [DB] Full document being validated:', JSON.stringify(docForValidation, null, 2));
+    
+    const validationResult = WorkflowTemplateSchema.safeParse(docForValidation);
     if (!validationResult.success) {
+      console.error('❌ [DB] Template validation failed:', validationResult.error.issues);
+      console.error('❌ [DB] Document that failed validation:', JSON.stringify(docForValidation, null, 2));
       throw new TemplateError(
         'Template validation failed',
         'VALIDATION_ERROR',
         { errors: validationResult.error.issues }
       );
     }
+    console.log('✅ [DB] Template validation passed');
 
     // Insert template
-    const result = await collection.insertOne(templateDoc);
-    
-    // Return created template with MongoDB ID
-    return {
-      ...templateDoc,
-      _id: result.insertedId.toString()
-    };
+    console.log('💾 [DB] Inserting template into MongoDB...');
+    try {
+      const result = await collection.insertOne(templateDoc);
+      console.log('✅ [DB] Template inserted with MongoDB _id:', result.insertedId.toString());
+      
+      // Return created template with MongoDB ID
+      return {
+        ...templateDoc,
+        organization: templateDoc.organization ?? undefined,  // Convert null to undefined for type compatibility
+        _id: result.insertedId.toString()
+      } as WorkflowTemplate;
+    } catch (insertError: unknown) {
+      // MongoDB schema validation error - extract details
+      if (insertError && typeof insertError === 'object' && 'code' in insertError && insertError.code === 121) {
+        console.error('❌ [DB] MongoDB Schema Validation Error Details:');
+        if ('errInfo' in insertError) {
+          console.error(JSON.stringify(insertError.errInfo, null, 2));
+        }
+        throw new TemplateError(
+          'Document failed MongoDB schema validation',
+          'SCHEMA_VALIDATION_ERROR',
+          { 
+            mongoError: insertError,
+            document: templateDoc
+          }
+        );
+      }
+      throw insertError;
+    }
 
   } catch (error) {
     if (error instanceof TemplateError) throw error;
@@ -129,7 +226,7 @@ export async function createWorkflowTemplate(
  */
 export async function updateWorkflowTemplate(
   account: string,
-  name: string,
+  id: string,
   version: string,
   updates: UpdateWorkflowTemplateInput
 ): Promise<WorkflowTemplate> {
@@ -137,33 +234,40 @@ export async function updateWorkflowTemplate(
     const db = await getMongoDatabase();
     const collection = db.collection(COLLECTION_TEMPLATES);
 
-    // Find existing template
-    const existingTemplate = await collection.findOne({ account, name, version });
+    // Find existing template by composite key
+    const existingTemplate = await collection.findOne({ account, id, version });
     if (!existingTemplate) {
       throw new TemplateError(
-        `Template not found: ${name} v${version} for account ${account}`,
+        `Template not found: ${id} v${version} for account ${account}`,
         'NOT_FOUND'
       );
     }
 
     // Only allow updates to draft templates
-    if (existingTemplate.status !== 'draft') {
+    if (existingTemplate.metadata?.status !== 'draft') {
       throw new TemplateError(
         'Only draft templates can be updated',
         'INVALID_STATUS',
-        { currentStatus: existingTemplate.status }
+        { currentStatus: existingTemplate.metadata?.status }
       );
     }
 
-    // Build update document
-    const updateDoc = {
-      ...updates,
+    // Build update document - map fields to metadata
+    const updateDoc: Record<string, unknown> = {
       'metadata.updatedAt': new Date()
     };
+    
+    if (updates.name) updateDoc['metadata.name'] = updates.name;
+    if (updates.description) updateDoc['metadata.description'] = updates.description;
+    if (updates.category) updateDoc['metadata.category'] = updates.category;
+    if (updates.tags) updateDoc['metadata.tags'] = updates.tags;
+    if (updates.updatedBy) updateDoc['metadata.updatedBy'] = updates.updatedBy;
+    if (updates.workflowDefinition) updateDoc.workflowDefinition = updates.workflowDefinition;
+    if (updates.mermaidDiagram) updateDoc.mermaidDiagram = updates.mermaidDiagram;
 
     // Update template
     const result = await collection.findOneAndUpdate(
-      { name, version },
+      { account, id, version },
       { $set: updateDoc },
       { returnDocument: 'after' }
     );
@@ -197,7 +301,7 @@ export async function updateWorkflowTemplate(
  */
 export async function publishWorkflowTemplate(
   account: string,
-  name: string,
+  id: string,
   version: string
 ): Promise<WorkflowTemplate> {
   try {
@@ -205,20 +309,25 @@ export async function publishWorkflowTemplate(
     const collection = db.collection(COLLECTION_TEMPLATES);
 
     // Find draft template
-    const draftTemplate = await collection.findOne({ account, name, version, status: 'draft' });
+    const draftTemplate = await collection.findOne({ 
+      account, 
+      id, 
+      version, 
+      'metadata.status': 'draft' 
+    });
     if (!draftTemplate) {
       throw new TemplateError(
-        `Draft template not found: ${name} v${version} for account ${account}`,
+        `Draft template not found: ${id} v${version} for account ${account}`,
         'NOT_FOUND'
       );
     }
 
     // Update to published status
     const result = await collection.findOneAndUpdate(
-      { account, name, version },
+      { account, id, version },
       { 
         $set: { 
-          status: 'published',
+          'metadata.status': 'published',
           'metadata.publishedAt': new Date(),
           'metadata.updatedAt': new Date()
         }
@@ -255,7 +364,7 @@ export async function publishWorkflowTemplate(
  */
 export async function createDraftFromPublished(
   account: string,
-  name: string,
+  id: string,
   publishedVersion: string,
   author: string
 ): Promise<WorkflowTemplate> {
@@ -266,20 +375,24 @@ export async function createDraftFromPublished(
     // Find published template
     const publishedTemplate = await collection.findOne({ 
       account,
-      name, 
+      id, 
       version: publishedVersion, 
-      status: 'published' 
+      'metadata.status': 'published' 
     });
     
     if (!publishedTemplate) {
       throw new TemplateError(
-        `Published template not found: ${name} v${publishedVersion} for account ${account}`,
+        `Published template not found: ${id} v${publishedVersion} for account ${account}`,
         'NOT_FOUND'
       );
     }
 
-    // Check if draft already exists
-    const existingDraft = await collection.findOne({ account, name, status: 'draft' });
+    // Check if draft already exists for this template ID
+    const existingDraft = await collection.findOne({ 
+      account, 
+      id, 
+      'metadata.status': 'draft' 
+    });
     if (existingDraft) {
       throw new TemplateError(
         'Draft version already exists',
@@ -290,7 +403,7 @@ export async function createDraftFromPublished(
 
     // Generate next version
     const existingVersions = await collection
-      .find({ account, name })
+      .find({ account, id })
       .project({ version: 1 })
       .toArray();
     
@@ -300,18 +413,19 @@ export async function createDraftFromPublished(
 
     // Create new draft template (without _id for insertion)
     const draftTemplateDoc = {
-      account: publishedTemplate.account,
-      name: publishedTemplate.name,
-      status: 'draft' as const,
-      version: nextVersion,
+      id: publishedTemplate.id,  // Keep same template ID (composite key)
+      account: publishedTemplate.account,  // Composite key
+      organization: publishedTemplate.organization,  // Composite key
+      version: nextVersion,  // Composite key
       workflowDefinition: publishedTemplate.workflowDefinition,
       mermaidDiagram: publishedTemplate.mermaidDiagram,
       metadata: {
         ...publishedTemplate.metadata,
+        status: 'draft' as const,
+        author,
         createdAt: new Date(),
         updatedAt: new Date(),
-        publishedAt: undefined,
-        author
+        publishedAt: undefined
       },
       parentVersion: publishedVersion,
       usageStats: {
@@ -324,8 +438,9 @@ export async function createDraftFromPublished(
     
     return {
       ...draftTemplateDoc,
+      organization: draftTemplateDoc.organization ?? undefined,  // Convert null to undefined for type compatibility
       _id: result.insertedId.toString()
-    };
+    } as WorkflowTemplate;
 
   } catch (error) {
     if (error instanceof TemplateError) throw error;
@@ -348,9 +463,9 @@ export async function getWorkflowTemplate(account: string, organization: string 
     const templatesCollection = db.collection(COLLECTION_TEMPLATES);
     const conversationsCollection = db.collection(COLLECTION_CONVERSATIONS);
 
-    // Get all versions of the template
+    // Get all versions of the template by ID
     const templates = await templatesCollection
-      .find({ account, organization, name: workflowTemplateID })
+      .find({ account, organization, id: workflowTemplateID })
       .sort({ version: -1 })
       .toArray();
 
@@ -407,62 +522,102 @@ export async function listWorkflowTemplates(
     const db = await getMongoDatabase();
     const collection = db.collection(COLLECTION_TEMPLATES);
 
-    // Build query - always filter by account
+    console.log('📊 [DB] listWorkflowTemplates called:');
+    console.log('  - Account:', account);
+    console.log('  - Filters:', JSON.stringify(filters));
+    console.log('  - Page:', page, '/ Page size:', pageSize);
+
+    // Build match stage for aggregation pipeline
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const query: any = { account };
+    const matchStage: any = { account };
     
     // Add organization filter if specified in filters
     if (filters.organization !== undefined) {
-      query.organization = filters.organization; // null for account-wide, string for org-specific
+      matchStage.organization = filters.organization; // null for account-wide, string for org-specific
     }
     
     if (filters.status) {
       if (Array.isArray(filters.status)) {
-        query.status = { $in: filters.status };
+        matchStage['metadata.status'] = { $in: filters.status };
       } else {
-        query.status = filters.status;
+        matchStage['metadata.status'] = filters.status;
       }
     }
     
     if (filters.category) {
-      query['metadata.category'] = filters.category;
+      matchStage['metadata.category'] = filters.category;
     }
     
     if (filters.tags && filters.tags.length > 0) {
-      query['metadata.tags'] = { $in: filters.tags };
+      matchStage['metadata.tags'] = { $in: filters.tags };
     }
     
     if (filters.author) {
-      query['metadata.author'] = filters.author;
+      matchStage['metadata.author'] = filters.author;
     }
     
     if (filters.createdAfter || filters.createdBefore) {
-      query['metadata.createdAt'] = {};
+      matchStage['metadata.createdAt'] = {};
       if (filters.createdAfter) {
-        query['metadata.createdAt'].$gte = filters.createdAfter;
+        matchStage['metadata.createdAt'].$gte = filters.createdAfter;
       }
       if (filters.createdBefore) {
-        query['metadata.createdAt'].$lte = filters.createdBefore;
+        matchStage['metadata.createdAt'].$lte = filters.createdBefore;
       }
     }
 
-    // Get total count
-    const totalCount = await collection.countDocuments(query);
+    console.log('🔍 [DB] Match stage:', JSON.stringify(matchStage));
 
-    // Get paginated results
+    // Use aggregation pipeline to get only the latest version per template ID
+    // Strategy: Group by template ID, keep the one with latest updatedAt
+    // Priority: draft > published > deprecated > archived (within same updatedAt)
+    const aggregationPipeline = [
+      // Stage 1: Match filters
+      { $match: matchStage },
+      
+      // Stage 2: Sort by updatedAt descending (most recent first)
+      { $sort: { 'metadata.updatedAt': -1 } },
+      
+      // Stage 3: Group by template ID, keep first (most recent) document
+      {
+        $group: {
+          _id: '$id',  // Group by template id (not MongoDB _id)
+          doc: { $first: '$$ROOT' }  // Keep entire first document
+        }
+      },
+      
+      // Stage 4: Replace root with the kept document
+      { $replaceRoot: { newRoot: '$doc' } },
+      
+      // Stage 5: Sort by name for consistent ordering
+      { $sort: { 'metadata.name': 1 } }
+    ];
+
+    console.log('🔧 [DB] Aggregation pipeline:', JSON.stringify(aggregationPipeline, null, 2));
+
+    // Execute aggregation to get all matching unique templates
+    const allTemplates = await collection.aggregate(aggregationPipeline).toArray();
+    
+    console.log('📋 [DB] Found', allTemplates.length, 'unique templates after deduplication');
+
+    // Get total count (unique templates)
+    const totalCount = allTemplates.length;
+
+    // Apply pagination to the deduplicated results
     const skip = (page - 1) * pageSize;
-    const templates = await collection
-      .find(query)
-      .sort({ 'metadata.updatedAt': -1 })
-      .skip(skip)
-      .limit(pageSize)
-      .toArray();
+    const paginatedTemplates = allTemplates.slice(skip, skip + pageSize);
 
     // Convert to WorkflowTemplate objects
-    const workflowTemplates: WorkflowTemplate[] = templates.map(template => ({
+    const workflowTemplates: WorkflowTemplate[] = paginatedTemplates.map(template => ({
       ...template,
       _id: template._id.toString()
     })) as WorkflowTemplate[];
+
+    console.log('✅ [DB] Returning', workflowTemplates.length, 'templates for page', page);
+    console.log('📄 [DB] Template details:');
+    workflowTemplates.forEach(t => {
+      console.log(`  - ${t.id}: "${t.metadata.name}" (v${t.version}, ${t.metadata.status})`);
+    });
 
     return {
       templates: workflowTemplates,
@@ -487,7 +642,7 @@ export async function listWorkflowTemplates(
  */
 export async function deleteWorkflowTemplate(
   account: string,
-  name: string,
+  id: string,
   version: string
 ): Promise<boolean> {
   try {
@@ -495,15 +650,15 @@ export async function deleteWorkflowTemplate(
     const collection = db.collection(COLLECTION_TEMPLATES);
 
     // Only allow deletion of draft templates
-    const template = await collection.findOne({ account, name, version });
+    const template = await collection.findOne({ account, id, version });
     if (!template) {
       throw new TemplateError(
-        `Template not found: ${name} v${version} for account ${account}`,
+        `Template not found: ${id} v${version} for account ${account}`,
         'NOT_FOUND'
       );
     }
 
-    if (template.status === 'published' && template.usageStats?.instanceCount > 0) {
+    if (template.metadata?.status === 'published' && template.usageStats?.instanceCount > 0) {
       throw new TemplateError(
         'Cannot delete published template with active instances',
         'DELETION_BLOCKED',
@@ -512,7 +667,7 @@ export async function deleteWorkflowTemplate(
     }
 
     // Delete template
-    const result = await collection.deleteOne({ account, name, version });
+    const result = await collection.deleteOne({ account, id, version });
     
     return result.deletedCount > 0;
 

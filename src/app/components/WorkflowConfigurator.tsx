@@ -26,7 +26,8 @@ interface WorkflowConfiguratorProps {
   onWorkflowChange: (workflow: WorkflowJSON) => void;
   validationResult: ValidationResult | null;
   isNewWorkflow: boolean;
-  currentTemplateName?: string;
+  currentTemplateId?: string; // 10-char composite key identifier
+  currentTemplateName?: string; // Template name (for backward compatibility)
   onTemplateNameChange?: (name: string) => Promise<void>;
 }
 
@@ -35,7 +36,8 @@ export default function WorkflowConfigurator({
   onWorkflowChange,
   validationResult,
   isNewWorkflow,
-  currentTemplateName = 'new',
+  currentTemplateId = 'new',
+  currentTemplateName,
   onTemplateNameChange
 }: WorkflowConfiguratorProps) {
   const [showFullVisualization, setShowFullVisualization] = useState(false);
@@ -44,28 +46,16 @@ export default function WorkflowConfigurator({
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   
   const handleSave = () => {
-    // Update metadata
-    const updatedWorkflow = {
-      ...workflow,
-      metadata: {
-        ...workflow.metadata,
-        updatedAt: new Date()
-      }
-    };
-    onWorkflowChange(updatedWorkflow);
+    // WorkflowJSON only has steps - metadata is handled at template level
+    // Just trigger the save callback
+    onWorkflowChange(workflow);
   };
   
   const handlePublish = () => {
     if (validationResult?.isValid) {
-      const publishedWorkflow = {
-        ...workflow,
-        metadata: {
-          ...workflow.metadata,
-          status: 'published' as const,
-          updatedAt: new Date()
-        }
-      };
-      onWorkflowChange(publishedWorkflow);
+      // WorkflowJSON only has steps - status is handled at template level
+      // Just trigger the save callback
+      onWorkflowChange(workflow);
     }
   };
   
@@ -86,6 +76,7 @@ export default function WorkflowConfigurator({
       <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <WorkflowTemplateSelector
+            currentTemplateId={currentTemplateId}
             currentTemplateName={currentTemplateName}
             refreshTrigger={refreshTrigger}
           />
@@ -163,7 +154,6 @@ export default function WorkflowConfigurator({
               <WorkflowCreationPane
                 workflow={workflow}
                 onWorkflowChange={onWorkflowChange}
-                validationResult={validationResult}
                 isNewWorkflow={isNewWorkflow}
                 mrfData={undefined} // Don't pass sample data - only pass real MRF context
               />

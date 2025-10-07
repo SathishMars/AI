@@ -58,8 +58,10 @@ interface ResponsiveWorkflowConfiguratorProps {
   onWorkflowChange: (workflow: WorkflowJSON) => void;
   validationResult: ValidationResult | null;
   isNewWorkflow: boolean;
-  currentTemplateName?: string;
+  currentTemplateId?: string; // 10-char composite key identifier
+  currentTemplateName?: string; // Template name (for backward compatibility during migration)
   onTemplateNameChange?: (name: string) => Promise<void>;
+  refreshTrigger?: number; // External trigger to refresh template list
 }
 
 export default function ResponsiveWorkflowConfigurator({
@@ -68,8 +70,10 @@ export default function ResponsiveWorkflowConfigurator({
   onWorkflowChange,
   validationResult,
   isNewWorkflow,
-  currentTemplateName = 'new',
-  onTemplateNameChange
+  currentTemplateId = 'new',
+  currentTemplateName,
+  onTemplateNameChange,
+  refreshTrigger: externalRefreshTrigger
 }: ResponsiveWorkflowConfiguratorProps) {
   // Convert WorkflowDefinition to WorkflowJSON if provided
   const workflow = React.useMemo(() => {
@@ -98,7 +102,10 @@ export default function ResponsiveWorkflowConfigurator({
   
   // Template naming state
   const [showNameDialog, setShowNameDialog] = useState(false);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [internalRefreshTrigger, setInternalRefreshTrigger] = useState(0);
+  
+  // Use external refresh trigger if provided, otherwise use internal
+  const refreshTrigger = externalRefreshTrigger !== undefined ? externalRefreshTrigger : internalRefreshTrigger;
   
   // Auto-show dialog for new templates
   useEffect(() => {
@@ -169,27 +176,14 @@ export default function ResponsiveWorkflowConfigurator({
   
   // Workflow actions
   const handleSave = useCallback(() => {
-    const updatedWorkflow = {
-      ...workflow,
-      metadata: {
-        ...workflow.metadata,
-        updatedAt: new Date()
-      }
-    };
-    onWorkflowChange(updatedWorkflow);
+    // WorkflowJSON only has steps - metadata is handled at template level
+    onWorkflowChange(workflow);
   }, [workflow, onWorkflowChange]);
   
   const handlePublish = useCallback(() => {
     if (validationResult?.isValid) {
-      const publishedWorkflow = {
-        ...workflow,
-        metadata: {
-          ...workflow.metadata,
-          status: 'published' as const,
-          updatedAt: new Date()
-        }
-      };
-      onWorkflowChange(publishedWorkflow);
+      // WorkflowJSON only has steps - status is handled at template level
+      onWorkflowChange(workflow);
     }
   }, [workflow, validationResult, onWorkflowChange]);
   
@@ -206,7 +200,7 @@ export default function ResponsiveWorkflowConfigurator({
     setShowNameDialog(false);
     // Small delay to ensure database write completes, then trigger refresh
     setTimeout(() => {
-      setRefreshTrigger(prev => prev + 1);
+      setInternalRefreshTrigger((prev: number) => prev + 1);
     }, 300);
   }, [onTemplateNameChange]);
   
@@ -227,6 +221,7 @@ export default function ResponsiveWorkflowConfigurator({
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
           <WorkflowTemplateSelector
+            currentTemplateId={currentTemplateId}
             currentTemplateName={currentTemplateName}
             refreshTrigger={refreshTrigger}
           />
@@ -348,7 +343,7 @@ export default function ResponsiveWorkflowConfigurator({
         {renderToolbar()}
         <Box sx={{ flex: 1, overflow: 'hidden' }}>
           <HistoryPanel
-            workflowId={workflow.metadata.id}
+            workflowId={currentTemplateId || 'new'}
             isOpen={true}
             onToggle={() => setShowHistory(false)}
           />
@@ -430,7 +425,7 @@ export default function ResponsiveWorkflowConfigurator({
               />
             ) : (
               <HistoryPanel
-                workflowId={workflow.metadata.id}
+                workflowId={currentTemplateId || 'new'}
                 isOpen={true}
                 onToggle={() => setActiveTab(0)}
               />

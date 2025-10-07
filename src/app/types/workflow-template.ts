@@ -15,13 +15,16 @@ import { WorkflowJSON } from './workflow';
 // Template lifecycle status
 export type TemplateStatus = 'draft' | 'published' | 'deprecated' | 'archived';
 
-// Template metadata interface
+// Template metadata interface (UPDATED: includes name, description, status)
 export interface TemplateMetadata {
+  name: string; // Template name (user-editable, descriptive)
+  description?: string;
+  status: TemplateStatus; // Template lifecycle status
+  author: string; // User who created this version
+  updatedBy?: string; // User who last updated this version
   createdAt: Date;
   updatedAt: Date;
   publishedAt?: Date;
-  author: string;
-  description?: string;
   category?: string;
   tags?: string[];
 }
@@ -32,41 +35,43 @@ export interface TemplateUsageStats {
   lastUsed?: Date;
 }
 
-// Core workflow template interface (UPDATED with short-id and WorkflowDefinition)
+// Core workflow template interface (Database schema)
+// Composite key fields at top level: id, account, organization, version
+// Descriptive fields in metadata: name, description, status, author, timestamps
 export interface WorkflowTemplate {
   _id?: string; // MongoDB ObjectId
-  id: string; // 10-char short-id (auto-generated, e.g., "a1b2c3d4e5")
-  account: string; // Account identifier for multi-tenancy
-  organization?: string; // Organization identifier within account (optional - if null, template is shared across all organizations in account)
-  name: string; // Template name (user-editable, NOT part of composite key)
-  status: TemplateStatus;
-  version: string; // Semantic version (major.minor.patch)
-  workflowDefinition: WorkflowJSON; // Complete workflow JSON (will use WorkflowDefinition in future)
-  mermaidDiagram?: string; // Generated Mermaid diagram
-  metadata: TemplateMetadata;
-  parentVersion?: string; // Reference to parent version
+  id: string; // 10-char short-id (composite key - shared across versions)
+  account: string; // Account identifier (composite key)
+  organization?: string; // Organization identifier (composite key - nullable)
+  version: string; // Semantic version (composite key - major.minor.patch)
+  workflowDefinition: { steps: unknown[] }; // Simple format: just the steps array
+  mermaidDiagram?: string; // Auto-generated Mermaid flowchart
+  metadata: TemplateMetadata; // Descriptive fields: name, status, author, timestamps, etc.
+  parentVersion?: string; // Reference to parent version for lineage tracking
   usageStats?: TemplateUsageStats;
 }
 
 // Template creation/update input (without auto-generated fields)
 export interface CreateWorkflowTemplateInput {
-  account: string;
-  organization?: string; // Optional - if null, template is shared across all organizations in account
-  name: string;
-  workflowDefinition: WorkflowJSON;
+  account: string; // Composite key
+  organization?: string; // Composite key (nullable for account-wide templates)
+  name: string; // Descriptive name
+  workflowDefinition: WorkflowJSON | { steps: unknown[] }; // Accept either full WorkflowJSON or simple { steps: [] }
   description?: string;
   category?: string;
   tags?: string[];
-  author: string;
+  author: string; // User creating the template
 }
 
 // Template update input (partial fields allowed)
 export interface UpdateWorkflowTemplateInput {
-  workflowDefinition?: WorkflowJSON;
+  name?: string; // Allow name updates
+  workflowDefinition?: WorkflowJSON | { steps: unknown[] };
   mermaidDiagram?: string;
   description?: string;
   category?: string;
   tags?: string[];
+  updatedBy?: string; // User updating the template
 }
 
 // Template query filters
@@ -214,15 +219,17 @@ export const TemplateUsageStatsSchema = z.object({
 });
 
 // Core workflow template validation
+// UPDATED: Composite keys (id, account, organization, version) at top level
+// Descriptive fields (name, status, author, timestamps) in metadata object
 export const WorkflowTemplateSchema = z.object({
   _id: z.string().optional(),
-  account: z.string().min(1).max(100),
-  name: z.string().min(1).max(100).regex(/^[a-zA-Z0-9-_]+$/, 'Template name must contain only alphanumeric characters, hyphens, and underscores'),
-  status: TemplateStatusSchema,
-  version: z.string().regex(SEMANTIC_VERSION_REGEX, 'Version must follow semantic versioning (major.minor.patch)'),
+  id: z.string().min(10).max(10), // 10-char short-id (composite key)
+  account: z.string().min(1).max(100), // Composite key
+  organization: z.string().nullable().optional(), // Composite key (nullable)
+  version: z.string().regex(SEMANTIC_VERSION_REGEX, 'Version must follow semantic versioning (major.minor.patch)'), // Composite key
   workflowDefinition: z.any(), // WorkflowJSON validation handled separately
   mermaidDiagram: z.string().optional(),
-  metadata: TemplateMetadataSchema,
+  metadata: TemplateMetadataSchema, // Contains name, status, author, timestamps, etc.
   parentVersion: z.string().optional(),
   usageStats: TemplateUsageStatsSchema.optional()
 });
@@ -386,8 +393,8 @@ export class TemplateStateManager {
   
   // Determine if draft creation should be suggested
   static shouldSuggestDraftCreation(templates: WorkflowTemplate[]): boolean {
-    const hasPublished = templates.some(t => t.status === 'published');
-    const hasDraft = templates.some(t => t.status === 'draft');
+    const hasPublished = templates.some(t => t.metadata.status === 'published');
+    const hasDraft = templates.some(t => t.metadata.status === 'draft');
     
     return hasPublished && !hasDraft;
   }
@@ -395,10 +402,10 @@ export class TemplateStateManager {
   // Get the template to load (draft priority)
   static getTemplateToLoad(templates: WorkflowTemplate[]): WorkflowTemplate | null {
     // Priority: draft -> latest published -> null
-    const draft = templates.find(t => t.status === 'draft');
+    const draft = templates.find(t => t.metadata.status === 'draft');
     if (draft) return draft;
     
-    const published = templates.filter(t => t.status === 'published');
+    const published = templates.filter(t => t.metadata.status === 'published');
     if (published.length === 0) return null;
     
     // Return latest published version
@@ -410,8 +417,8 @@ export class TemplateStateManager {
   static getTemplateState(templates: WorkflowTemplate[]): TemplateResolutionResult['templateState'] {
     if (templates.length === 0) return 'not_found';
     
-    const hasDraft = templates.some(t => t.status === 'draft');
-    const hasPublished = templates.some(t => t.status === 'published');
+    const hasDraft = templates.some(t => t.metadata.status === 'draft');
+    const hasPublished = templates.some(t => t.metadata.status === 'published');
     
     if (hasDraft) return 'draft_available';
     if (hasPublished) return 'published_only';

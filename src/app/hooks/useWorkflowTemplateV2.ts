@@ -18,7 +18,8 @@ import {
   WorkflowTemplate,
   WorkflowDefinition,
   CreateWorkflowTemplateInput,
-  shouldAutoSave
+  shouldAutoSave,
+  TemplateStatus
 } from '@/app/types/workflow-template-v2';
 import { 
   templateToWorkflowJSON,
@@ -26,11 +27,13 @@ import {
 } from '@/app/utils/workflow-template-migration';
 import { WorkflowJSON } from '@/app/types/workflow';
 import { useUnifiedUserContext } from '@/app/contexts/UnifiedUserContext';
+import { generateShortId } from '@/app/utils/short-id-generator';
 
 interface UseWorkflowTemplateV2Options {
   templateId?: string;      // 10-char short-id
   autoLoad?: boolean;
   autoSave?: boolean;       // Enable immediate auto-save
+  onTemplateSaved?: (template: WorkflowTemplate) => void; // Callback after successful save
 }
 
 interface UseWorkflowTemplateV2Return {
@@ -69,7 +72,8 @@ export function useWorkflowTemplateV2(
   const { 
     templateId,
     autoLoad = true,
-    autoSave = true
+    autoSave = true,
+    onTemplateSaved
   } = options;
   
   const { account, currentOrganization, isLoading: contextLoading } = useUnifiedUserContext();
@@ -210,22 +214,29 @@ export function useWorkflowTemplateV2(
     }
     
     const newTemplate: WorkflowTemplate = {
-      id: 'new',  // Temporary ID
+      id: generateShortId(),  // Generate proper 10-char short ID
       account: accountId,
-      organization: organizationId || null,
-      name,
-      status: 'draft',
+      organization: organizationId || undefined,
       version: '1.0.0',
       workflowDefinition: {
         steps: []  // Start with empty steps
       },
       metadata: {
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        name,  // Name goes in metadata
+        status: 'draft' as TemplateStatus,  // Status goes in metadata
         description,
-        author: account?.name || 'Unknown'
+        author: account?.name || 'Unknown',
+        createdAt: new Date(),
+        updatedAt: new Date()
       }
     };
+    
+    console.log('🆕 Initialized new template:', {
+      id: newTemplate.id,
+      name: newTemplate.metadata.name,
+      account: newTemplate.account,
+      organization: newTemplate.organization
+    });
     
     setTemplate(newTemplate);
     setOriginalTemplate(JSON.parse(JSON.stringify(newTemplate)));
@@ -257,28 +268,101 @@ export function useWorkflowTemplateV2(
     
     // Auto-save if enabled and criteria met
     if (autoSave && shouldAutoSave(updatedTemplate)) {
+      console.log('💾 [Frontend] Auto-save triggered');
+      console.log('  - Template has _id:', !!template._id);
+      console.log('  - Template has version:', template.version);
+      console.log('  - Account:', accountId);
+      console.log('  - Organization:', organizationId);
+      
       try {
         setIsSaving(true);
         
-        const response = await fetch(`/api/workflow-templates/${template.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-account': accountId || '',
-            'x-organization': organizationId || ''
-          },
-          body: JSON.stringify({
-            workflowDefinition: definition
-          })
-        });
+        // For new workflows (no _id in database), create with POST; for existing, update with PUT
+        const isNewWorkflow = !template._id || !template.version;
+        console.log('  - Is new workflow:', isNewWorkflow);
         
-        if (!response.ok) {
-          throw new Error(`Failed to save template: ${response.statusText}`);
+        if (isNewWorkflow) {
+          // Create new template with POST
+          const requestBody = {
+            account: accountId || 'groupize-demos',
+            organization: organizationId || null,
+            name: template.metadata.name || 'New Workflow',
+            description: template.metadata.description,
+            workflowDefinition: definition,
+            author: 'system',
+            tags: template.metadata.tags || []
+          };
+          
+          console.log('📤 [Frontend] Sending POST to create template:');
+          console.log('  - Account:', requestBody.account);
+          console.log('  - Organization:', requestBody.organization);
+          console.log('  - Name:', requestBody.name);
+          console.log('  - Author:', requestBody.author);
+          console.log('  - WorkflowDefinition.steps count:', definition.steps?.length || 0);
+          console.log('  - Tags:', requestBody.tags);
+          
+          const response = await fetch('/api/workflow-templates', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-account': accountId || '',
+              'x-organization': organizationId || ''
+            },
+            body: JSON.stringify(requestBody)
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            console.error('❌ [Frontend] Failed to create template:', errorData);
+            throw new Error(`Failed to create template: ${errorData.error || response.statusText}`);
+          }
+          
+          const result = await response.json();
+          const savedTemplate = result.data || result;
+          
+          console.log('✅ [Frontend] Template created successfully:');
+          console.log('  - ID:', savedTemplate.id);
+          console.log('  - Version:', savedTemplate.version);
+          console.log('  - MongoDB _id:', savedTemplate._id);
+          console.log('  - Status:', savedTemplate.metadata?.status);
+          console.log('  - Name:', savedTemplate.metadata?.name);
+          
+          setTemplate(savedTemplate);
+          setOriginalTemplate(JSON.parse(JSON.stringify(savedTemplate)));
+          
+          // Notify parent that template was saved (trigger selector refresh)
+          if (onTemplateSaved) {
+            console.log('🔔 [Frontend] Calling onTemplateSaved callback');
+            onTemplateSaved(savedTemplate);
+          }
+        } else {
+          // Update existing template with PUT
+          const response = await fetch(`/api/workflow-templates/${template.id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-account': accountId || '',
+              'x-organization': organizationId || ''
+            },
+            body: JSON.stringify({
+              version: template.version || '1.0.0',
+              action: 'update',
+              updates: {
+                workflowDefinition: definition
+              }
+            })
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(`Failed to save template: ${errorData.error || response.statusText}`);
+          }
+          
+          const result = await response.json();
+          const savedTemplate = result.data || result;
+          setTemplate(savedTemplate);
+          setOriginalTemplate(JSON.parse(JSON.stringify(savedTemplate)));
         }
-        
-        const savedTemplate = await response.json();
-        setTemplate(savedTemplate);
-        setOriginalTemplate(JSON.parse(JSON.stringify(savedTemplate)));
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to save template';
         setError(errorMessage);
@@ -287,7 +371,7 @@ export function useWorkflowTemplateV2(
         setIsSaving(false);
       }
     }
-  }, [template, autoSave, accountId, organizationId]);
+  }, [template, autoSave, accountId, organizationId, onTemplateSaved]);
   
   /**
    * Update template name
@@ -308,14 +392,22 @@ export function useWorkflowTemplateV2(
           'x-account': accountId || '',
           'x-organization': organizationId || ''
         },
-        body: JSON.stringify({ name })
+        body: JSON.stringify({ 
+          version: template.version || '1.0.0',
+          action: 'update',
+          updates: {
+            name
+          }
+        })
       });
       
       if (!response.ok) {
-        throw new Error(`Failed to update template name: ${response.statusText}`);
+        const errorData = await response.json();
+        throw new Error(`Failed to update template name: ${errorData.error || response.statusText}`);
       }
       
-      const updatedTemplate = await response.json();
+      const result = await response.json();
+      const updatedTemplate = result.data || result;
       setTemplate(updatedTemplate);
       setOriginalTemplate(JSON.parse(JSON.stringify(updatedTemplate)));
     } catch (err) {
@@ -348,7 +440,7 @@ export function useWorkflowTemplateV2(
         },
         body: JSON.stringify({
           workflowDefinition: template.workflowDefinition,
-          name: template.name
+          name: template.metadata.name
         })
       });
       

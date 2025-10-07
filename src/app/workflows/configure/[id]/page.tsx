@@ -1,7 +1,7 @@
 // src/app/workflows/configure/[id]/page.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Alert,
@@ -11,6 +11,7 @@ import {
   Button
 } from '@mui/material';
 import { WorkflowJSON, WorkflowStep } from '@/app/types/workflow';
+import { WorkflowTemplate } from '@/app/types/workflow-template-v2';
 import ResponsiveWorkflowConfigurator from '@/app/components/ResponsiveWorkflowConfigurator';
 import { useWorkflowTemplateV2 } from '@/app/hooks/useWorkflowTemplateV2';
 
@@ -20,6 +21,13 @@ interface PageProps {
 
 export default function WorkflowConfigurePage({ params }: PageProps) {
   const [templateId, setTemplateId] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  
+  // Callback when template is saved (trigger selector refresh)
+  const handleTemplateSaved = useCallback((savedTemplate: WorkflowTemplate) => {
+    console.log('🔄 [Page] Template saved, triggering selector refresh:', savedTemplate.id);
+    setRefreshTrigger(prev => prev + 1);
+  }, []);
   
   // Use workflow template hook with immediate auto-save
   const {
@@ -28,7 +36,10 @@ export default function WorkflowConfigurePage({ params }: PageProps) {
     canAutoSave, loadTemplate, initializeNewTemplate,
     updateWorkflowDefinition, updateTemplateName,
     clearError
-  } = useWorkflowTemplateV2({ autoSave: true });
+  } = useWorkflowTemplateV2({ 
+    autoSave: true,
+    onTemplateSaved: handleTemplateSaved
+  });
   
   const [initialized, setInitialized] = useState(false);
 
@@ -66,6 +77,11 @@ export default function WorkflowConfigurePage({ params }: PageProps) {
 
   const handleSaveTemplate = async (updatedWorkflow: WorkflowJSON) => {
     try {
+      console.log('💾 Saving workflow template:', {
+        templateId: template?.id,
+        templateName: template?.metadata?.name,
+        stepsCount: updatedWorkflow.steps.length
+      });
       // Convert WorkflowJSON to WorkflowDefinition (just extract steps)
       await updateWorkflowDefinition({
         steps: updatedWorkflow.steps as WorkflowStep[]
@@ -151,13 +167,36 @@ export default function WorkflowConfigurePage({ params }: PageProps) {
         </Alert>
       )}
       
+      {/* Debug: Log template state */}
+      {(() => {
+        console.log('📄 Page render - Template state:', {
+          template: template ? {
+            id: template.id,
+            name: template.metadata?.name,
+            account: template.account,
+            organization: template.organization,
+            version: template.version,
+            stepsCount: template.workflowDefinition?.steps?.length || 0
+          } : null,
+          templateId,
+          isNewTemplate,
+          propsToConfigurator: {
+            currentTemplateId: template?.id || templateId || 'new',
+            currentTemplateName: template?.metadata?.name || 'New Workflow'
+          }
+        });
+        return null;
+      })()}
+      
       <ResponsiveWorkflowConfigurator
         workflow={workflowJSON}
         onWorkflowChange={handleSaveTemplate}
         validationResult={null}
         isNewWorkflow={isNewTemplate}
-        currentTemplateName={template?.name || templateId || 'Unknown Workflow'}
+        currentTemplateId={template?.id || templateId || 'new'}
+        currentTemplateName={template?.metadata?.name || 'New Workflow'}
         onTemplateNameChange={handleTemplateNameChange}
+        refreshTrigger={refreshTrigger}
       />
     </Container>
   );
