@@ -5,22 +5,17 @@ import {
   Box,
   Typography,
   Paper,
-  Chip,
   IconButton,
   List,
   ListItem,
   Tooltip,
-  Fade,
   CircularProgress,
   Alert,
   AlertTitle
 } from '@mui/material';
 import {
   SmartToy as AimeIcon,
-  Send as SendIcon,
-  Check as CheckIcon,
-  Error as ErrorIcon,
-  HelpOutline as HelpOutlineIcon
+  Send as SendIcon
 } from '@mui/icons-material';
 import { WorkflowJSON, WorkflowStep } from '@/app/types/workflow';
 import { 
@@ -112,40 +107,6 @@ const MessageItem = memo(({ message, isStreaming }: { message: ConversationMessa
 
 MessageItem.displayName = 'MessageItem';
 
-// Enhanced auto-save status indicator
-
-// Auto-save status indicator
-const AutoSaveIndicator = ({ status }: { status: 'saving' | 'saved' | 'error' | 'idle' }) => {
-  const getStatusIcon = () => {
-    switch (status) {
-      case 'saving': return <CircularProgress size={16} />;
-      case 'saved': return <CheckIcon sx={{ color: 'success.main' }} />;
-      case 'error': return <ErrorIcon sx={{ color: 'error.main' }} />;
-      default: return null;
-    }
-  };
-  
-  const getStatusText = () => {
-    switch (status) {
-      case 'saving': return 'Saving...';
-      case 'saved': return 'Saved';
-      case 'error': return 'Save failed';
-      default: return '';
-    }
-  };
-  
-  return (
-    <Fade in={status !== 'idle'}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-        {getStatusIcon()}
-        <Typography variant="caption" color="text.secondary">
-          {getStatusText()}
-        </Typography>
-      </Box>
-    </Fade>
-  );
-};
-
 // Simple message display without workflow content
 const SimpleMessageRenderer = ({ 
   message, 
@@ -195,7 +156,6 @@ export default function WorkflowCreationPane({
   const [creationFlow] = useState(() => new WorkflowCreationFlow());
   const [currentSession, setCurrentSession] = useState<CreationSession | null>(null);
   const [isCreating, setIsCreating] = useState(false);
-  const [autoSaveStatus, setAutoSaveStatus] = useState<'saving' | 'saved' | 'error' | 'idle'>('idle');
   
   // Memoize validation callback to prevent infinite loops
   const onValidationComplete = useCallback((state: WorkflowValidationState) => {
@@ -353,23 +313,6 @@ export default function WorkflowCreationPane({
     // Note: If steps is empty/undefined/not-an-array, validation hook will keep previous state
     // The hook's internal logic handles empty arrays gracefully
   }, [workflow.steps, validateWorkflow]);
-  
-  // Handle auto-save status events
-  useEffect(() => {
-    const handleAutoSaveEvent = (event: CustomEvent) => {
-      if (event.detail.sessionId === currentSession?.sessionId) {
-        setAutoSaveStatus(event.detail.status);
-        
-        // Reset to idle after showing saved status
-        if (event.detail.status === 'saved') {
-          setTimeout(() => setAutoSaveStatus('idle'), 2000);
-        }
-      }
-    };
-    
-    window.addEventListener('autoSaveStatus', handleAutoSaveEvent as EventListener);
-    return () => window.removeEventListener('autoSaveStatus', handleAutoSaveEvent as EventListener);
-  }, [currentSession?.sessionId]);
   
   // Helper function to get recent conversation history (last 10 message pairs)
   const getConversationHistory = useCallback((): ConversationHistoryMessage[] => {
@@ -744,33 +687,7 @@ export default function WorkflowCreationPane({
   
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* Enhanced Header with Auto-Save Status */}
-      <Box sx={{ display: 'flex', alignItems: 'center', p: 2, borderBottom: 1, borderColor: 'divider' }}>
-        <AimeIcon sx={{ mr: 1, color: 'primary.main' }} />
-        <Typography variant="h6" component="h3">
-          aime workflow creator
-        </Typography>
-        <Chip
-          label={isNewWorkflow ? 'Create Mode' : 'Edit Mode'}
-          size="small"
-          sx={{ ml: 2 }}
-          color={isNewWorkflow ? 'success' : 'info'}
-        />
-        <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Tooltip title="Toggle guidance">
-            <IconButton 
-              size="small" 
-              aria-label="Toggle guidance"
-              onClick={() => {/* Toggle guidance panel */}}
-            >
-              <HelpOutlineIcon />
-            </IconButton>
-          </Tooltip>
-          <AutoSaveIndicator status={autoSaveStatus} />
-        </Box>
-      </Box>
-      
-      {/* Messages Area */}
+      {/* Messages Area - Full height for maximum chat space */}
       <Box sx={{ flex: 1, overflow: 'auto', p: 1 }}>
         {messages.length > 0 ? (
           <List sx={{ height: '100%', overflow: 'auto' }}>

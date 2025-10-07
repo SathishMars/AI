@@ -13,13 +13,14 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   WorkflowTemplate,
   WorkflowDefinition,
   CreateWorkflowTemplateInput,
   shouldAutoSave,
-  TemplateStatus
+  TemplateStatus,
+  TemplateMetadata
 } from '@/app/types/workflow-template-v2';
 import { 
   templateToWorkflowJSON,
@@ -28,6 +29,52 @@ import {
 import { WorkflowJSON } from '@/app/types/workflow';
 import { useUnifiedUserContext } from '@/app/contexts/UnifiedUserContext';
 import { generateShortId } from '@/app/utils/short-id-generator';
+
+type DateLike = Date | string | number | undefined | null;
+
+const coerceDate = (value: DateLike): Date => {
+  if (value instanceof Date) {
+    return value;
+  }
+  if (typeof value === 'string' || typeof value === 'number') {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  }
+  return new Date();
+};
+
+const normalizeTemplateForState = (
+  template: WorkflowTemplate,
+  fallbackAuthor: string
+): WorkflowTemplate => {
+  const metadataSource = {
+    ...(template.metadata || {})
+  } as Partial<TemplateMetadata> & { createdAt?: DateLike; updatedAt?: DateLike };
+
+  const resolvedName = metadataSource.name || template.name || 'New Workflow';
+  const resolvedStatus = metadataSource.status || template.status || 'draft';
+  const resolvedAuthor = metadataSource.author || fallbackAuthor;
+  const resolvedCreatedAt = coerceDate(metadataSource.createdAt ?? new Date());
+  const resolvedUpdatedAt = coerceDate(metadataSource.updatedAt ?? new Date());
+  const resolvedTags = metadataSource.tags || [];
+
+  const normalized: WorkflowTemplate = {
+    ...template,
+    name: resolvedName,
+    status: resolvedStatus,
+    metadata: {
+      ...metadataSource,
+      name: resolvedName,
+      status: resolvedStatus,
+      author: resolvedAuthor,
+      createdAt: resolvedCreatedAt,
+      updatedAt: resolvedUpdatedAt,
+      tags: resolvedTags
+    } as TemplateMetadata
+  };
+
+  return normalized;
+};
 
 interface UseWorkflowTemplateV2Options {
   templateId?: string;      // 10-char short-id
@@ -86,6 +133,12 @@ export function useWorkflowTemplateV2(
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const templateRef = useRef<WorkflowTemplate | null>(null);
+  const normalizeTemplate = useCallback(
+    (templateData: WorkflowTemplate): WorkflowTemplate =>
+      normalizeTemplateForState(templateData, account?.name || 'Unknown'),
+    [account?.name]
+  );
   
   // Computed state
   const workflow = template?.workflowDefinition || null;
@@ -127,10 +180,12 @@ export function useWorkflowTemplateV2(
       const data = await response.json();
       
       // Normalize to WorkflowTemplate format (handles legacy WorkflowJSON)
-      const loadedTemplate = normalizeToTemplate(data, accountId || '', organizationId);
-      
-      setTemplate(loadedTemplate);
-      setOriginalTemplate(JSON.parse(JSON.stringify(loadedTemplate)));
+      const normalizedTemplate = normalizeTemplate(
+        normalizeToTemplate(data, accountId || '', organizationId)
+      );
+  templateRef.current = normalizedTemplate;
+      setTemplate(normalizedTemplate);
+      setOriginalTemplate(JSON.parse(JSON.stringify(normalizedTemplate)));
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load template';
       setError(errorMessage);
@@ -138,7 +193,7 @@ export function useWorkflowTemplateV2(
     } finally {
       setIsLoading(false);
     }
-  }, [accountId, organizationId, contextLoading]);
+  }, [accountId, organizationId, contextLoading, normalizeTemplate]);
   
   /**
    * Create new template
@@ -186,12 +241,14 @@ export function useWorkflowTemplateV2(
         throw new Error(`Failed to create template: ${response.statusText}`);
       }
       
-      const newTemplate = await response.json();
+  const newTemplate = await response.json();
+  const normalizedTemplate = normalizeTemplate(newTemplate);
       
-      setTemplate(newTemplate);
-      setOriginalTemplate(JSON.parse(JSON.stringify(newTemplate)));
+  templateRef.current = normalizedTemplate;
+  setTemplate(normalizedTemplate);
+  setOriginalTemplate(JSON.parse(JSON.stringify(normalizedTemplate)));
       
-      return newTemplate;
+  return normalizedTemplate;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create template';
       setError(errorMessage);
@@ -199,7 +256,7 @@ export function useWorkflowTemplateV2(
     } finally {
       setIsLoading(false);
     }
-  }, [accountId, organizationId, account, contextLoading]);
+  }, [accountId, organizationId, account, contextLoading, normalizeTemplate]);
   
   /**
    * Initialize a new template in memory without saving to database
@@ -231,16 +288,19 @@ export function useWorkflowTemplateV2(
       }
     };
     
+    const normalizedTemplate = normalizeTemplate(newTemplate);
+    
     console.log('🆕 Initialized new template:', {
-      id: newTemplate.id,
-      name: newTemplate.metadata.name,
-      account: newTemplate.account,
-      organization: newTemplate.organization
+      id: normalizedTemplate.id,
+      name: normalizedTemplate.metadata.name,
+      account: normalizedTemplate.account,
+      organization: normalizedTemplate.organization
     });
     
-    setTemplate(newTemplate);
-    setOriginalTemplate(JSON.parse(JSON.stringify(newTemplate)));
-  }, [accountId, organizationId, account]);
+    templateRef.current = normalizedTemplate;
+    setTemplate(normalizedTemplate);
+    setOriginalTemplate(JSON.parse(JSON.stringify(normalizedTemplate)));
+  }, [accountId, organizationId, account, normalizeTemplate]);
   
   /**
    * Update workflow definition (steps)
@@ -250,27 +310,30 @@ export function useWorkflowTemplateV2(
   const updateWorkflowDefinition = useCallback(async (
     definition: WorkflowDefinition
   ) => {
-    if (!template) {
+    const currentTemplate = templateRef.current;
+    if (!currentTemplate) {
       throw new Error('No template loaded');
     }
     
     // Update local state immediately
     const updatedTemplate: WorkflowTemplate = {
-      ...template,
+      ...currentTemplate,
       workflowDefinition: definition,
       metadata: {
-        ...template.metadata,
+        ...currentTemplate.metadata,
         updatedAt: new Date()
       }
     };
+    const normalizedUpdatedTemplate = normalizeTemplate(updatedTemplate);
     
-    setTemplate(updatedTemplate);
+    templateRef.current = normalizedUpdatedTemplate;
+    setTemplate(normalizedUpdatedTemplate);
     
     // Auto-save if enabled and criteria met
-    if (autoSave && shouldAutoSave(updatedTemplate)) {
+    if (autoSave && shouldAutoSave(normalizedUpdatedTemplate)) {
       console.log('💾 [Frontend] Auto-save triggered');
-      console.log('  - Template has _id:', !!template._id);
-      console.log('  - Template has version:', template.version);
+      console.log('  - Template has _id:', !!currentTemplate._id);
+      console.log('  - Template has version:', currentTemplate.version);
       console.log('  - Account:', accountId);
       console.log('  - Organization:', organizationId);
       
@@ -278,7 +341,7 @@ export function useWorkflowTemplateV2(
         setIsSaving(true);
         
         // For new workflows (no _id in database), create with POST; for existing, update with PUT
-        const isNewWorkflow = !template._id || !template.version;
+        const isNewWorkflow = !currentTemplate._id || !currentTemplate.version;
         console.log('  - Is new workflow:', isNewWorkflow);
         
         if (isNewWorkflow) {
@@ -286,11 +349,11 @@ export function useWorkflowTemplateV2(
           const requestBody = {
             account: accountId || 'groupize-demos',
             organization: organizationId || null,
-            name: template.metadata.name || 'New Workflow',
-            description: template.metadata.description,
+            name: normalizedUpdatedTemplate.metadata.name || 'New Workflow',
+            description: normalizedUpdatedTemplate.metadata.description,
             workflowDefinition: definition,
             author: 'system',
-            tags: template.metadata.tags || []
+            tags: normalizedUpdatedTemplate.metadata.tags || []
           };
           
           console.log('📤 [Frontend] Sending POST to create template:');
@@ -318,7 +381,7 @@ export function useWorkflowTemplateV2(
           }
           
           const result = await response.json();
-          const savedTemplate = result.data || result;
+          const savedTemplate = normalizeTemplate(result.data || result);
           
           console.log('✅ [Frontend] Template created successfully:');
           console.log('  - ID:', savedTemplate.id);
@@ -327,6 +390,7 @@ export function useWorkflowTemplateV2(
           console.log('  - Status:', savedTemplate.metadata?.status);
           console.log('  - Name:', savedTemplate.metadata?.name);
           
+          templateRef.current = savedTemplate;
           setTemplate(savedTemplate);
           setOriginalTemplate(JSON.parse(JSON.stringify(savedTemplate)));
           
@@ -337,7 +401,7 @@ export function useWorkflowTemplateV2(
           }
         } else {
           // Update existing template with PUT
-          const response = await fetch(`/api/workflow-templates/${template.id}`, {
+          const response = await fetch(`/api/workflow-templates/${currentTemplate.id}`, {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
@@ -345,7 +409,7 @@ export function useWorkflowTemplateV2(
               'x-organization': organizationId || ''
             },
             body: JSON.stringify({
-              version: template.version || '1.0.0',
+              version: currentTemplate.version || '1.0.0',
               action: 'update',
               updates: {
                 workflowDefinition: definition
@@ -359,7 +423,8 @@ export function useWorkflowTemplateV2(
           }
           
           const result = await response.json();
-          const savedTemplate = result.data || result;
+          const savedTemplate = normalizeTemplate(result.data || result);
+          templateRef.current = savedTemplate;
           setTemplate(savedTemplate);
           setOriginalTemplate(JSON.parse(JSON.stringify(savedTemplate)));
         }
@@ -371,13 +436,16 @@ export function useWorkflowTemplateV2(
         setIsSaving(false);
       }
     }
-  }, [template, autoSave, accountId, organizationId, onTemplateSaved]);
+  }, [autoSave, accountId, organizationId, onTemplateSaved, templateRef, normalizeTemplate]);
   
   /**
    * Update template name
+   * For new unsaved templates, just updates in-memory state
+   * For existing saved templates, calls API to update
    */
   const updateTemplateName = useCallback(async (name: string) => {
-    if (!template) {
+    const currentTemplate = templateRef.current;
+    if (!currentTemplate) {
       throw new Error('No template loaded');
     }
     
@@ -385,7 +453,35 @@ export function useWorkflowTemplateV2(
       setIsSaving(true);
       setError(null);
       
-      const response = await fetch(`/api/workflow-templates/${template.id}`, {
+      // Check if this is a new template that hasn't been saved yet
+      // For in-memory new templates (created via initializeNewTemplate) we keep
+      // name updates local so the generated short-id remains the template id
+      const isUnsavedNew = !currentTemplate.workflowDefinition.steps ||
+                           currentTemplate.workflowDefinition.steps.length === 0;
+
+      if (isUnsavedNew) {
+        // For new unsaved templates, just update in-memory state
+        console.log('📝 Updating name for unsaved template (in-memory only):', name);
+        const updatedTemplate: WorkflowTemplate = {
+          ...currentTemplate,
+          metadata: {
+            ...currentTemplate.metadata,
+            name,
+            updatedAt: new Date()
+          }
+        };
+
+        const normalizedUpdatedTemplate = normalizeTemplate(updatedTemplate);
+
+        templateRef.current = normalizedUpdatedTemplate;
+        setTemplate(normalizedUpdatedTemplate);
+        setIsSaving(false);
+        return;
+      }
+      
+      // For existing saved templates, call API
+      console.log('📝 Updating name for saved template (API call):', name);
+      const response = await fetch(`/api/workflow-templates/${currentTemplate.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -393,7 +489,7 @@ export function useWorkflowTemplateV2(
           'x-organization': organizationId || ''
         },
         body: JSON.stringify({ 
-          version: template.version || '1.0.0',
+          version: currentTemplate.version || '1.0.0',
           action: 'update',
           updates: {
             name
@@ -406,10 +502,11 @@ export function useWorkflowTemplateV2(
         throw new Error(`Failed to update template name: ${errorData.error || response.statusText}`);
       }
       
-      const result = await response.json();
-      const updatedTemplate = result.data || result;
-      setTemplate(updatedTemplate);
-      setOriginalTemplate(JSON.parse(JSON.stringify(updatedTemplate)));
+  const result = await response.json();
+  const updatedTemplate = normalizeTemplate(result.data || result);
+  templateRef.current = updatedTemplate;
+  setTemplate(updatedTemplate);
+  setOriginalTemplate(JSON.parse(JSON.stringify(updatedTemplate)));
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update template name';
       setError(errorMessage);
@@ -417,13 +514,14 @@ export function useWorkflowTemplateV2(
     } finally {
       setIsSaving(false);
     }
-  }, [template, accountId, organizationId]);
+  }, [accountId, organizationId, templateRef, normalizeTemplate]);
   
   /**
    * Save template immediately (manual save)
    */
   const saveTemplate = useCallback(async () => {
-    if (!template) {
+    const currentTemplate = templateRef.current;
+    if (!currentTemplate) {
       throw new Error('No template to save');
     }
     
@@ -431,7 +529,7 @@ export function useWorkflowTemplateV2(
       setIsSaving(true);
       setError(null);
       
-      const response = await fetch(`/api/workflow-templates/${template.id}`, {
+      const response = await fetch(`/api/workflow-templates/${currentTemplate.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -439,8 +537,8 @@ export function useWorkflowTemplateV2(
           'x-organization': organizationId || ''
         },
         body: JSON.stringify({
-          workflowDefinition: template.workflowDefinition,
-          name: template.metadata.name
+          workflowDefinition: currentTemplate.workflowDefinition,
+          name: currentTemplate.metadata.name
         })
       });
       
@@ -448,9 +546,10 @@ export function useWorkflowTemplateV2(
         throw new Error(`Failed to save template: ${response.statusText}`);
       }
       
-      const savedTemplate = await response.json();
-      setTemplate(savedTemplate);
-      setOriginalTemplate(JSON.parse(JSON.stringify(savedTemplate)));
+  const savedTemplate = normalizeTemplate(await response.json());
+  templateRef.current = savedTemplate;
+  setTemplate(savedTemplate);
+  setOriginalTemplate(JSON.parse(JSON.stringify(savedTemplate)));
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to save template';
       setError(errorMessage);
@@ -458,7 +557,7 @@ export function useWorkflowTemplateV2(
     } finally {
       setIsSaving(false);
     }
-  }, [template, accountId, organizationId]);
+  }, [accountId, organizationId, templateRef, normalizeTemplate]);
   
   /**
    * Clear error message
@@ -472,9 +571,12 @@ export function useWorkflowTemplateV2(
    */
   const reset = useCallback(() => {
     if (originalTemplate) {
-      setTemplate(JSON.parse(JSON.stringify(originalTemplate)));
+      const restored = JSON.parse(JSON.stringify(originalTemplate));
+      const normalizedRestored = normalizeTemplate(restored as WorkflowTemplate);
+      templateRef.current = normalizedRestored;
+      setTemplate(normalizedRestored);
     }
-  }, [originalTemplate]);
+  }, [normalizeTemplate, originalTemplate]);
   
   /**
    * Auto-load template on mount if specified

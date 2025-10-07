@@ -9,7 +9,6 @@ import {
   Chip,
   Tabs,
   Tab,
-  IconButton,
   Button,
   CircularProgress,
   Dialog,
@@ -20,7 +19,6 @@ import {
 } from '@mui/material';
 import {
   AccountTree as WorkflowIcon,
-  Fullscreen as FullscreenIcon,
   Error as ErrorIcon,
   Refresh as RefreshIcon,
   AutoAwesome as AIIcon
@@ -310,25 +308,20 @@ export default function VisualizationPane({
       flexDirection: 'column', 
       p: fullScreen ? 3 : 2 
     }}>
-      {/* Header */}
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-        <WorkflowIcon sx={{ mr: 1, color: 'primary.main' }} />
-        <Typography variant="h6" component="h3">
-          Workflow Visualization
-        </Typography>
-        {fullScreen && (
-          <Chip label="Full Screen" size="small" sx={{ ml: 'auto' }} />
-        )}
-        {!fullScreen && (
-          <IconButton sx={{ ml: 'auto' }} size="small">
-            <FullscreenIcon />
-          </IconButton>
-        )}
-      </Box>
-      
-      {/* Tabs */}
-      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-        <Tabs value={tabValue} onChange={handleTabChange} aria-label="workflow visualization tabs">
+      {/* Tabs with title integrated */}
+      <Box sx={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        borderBottom: 1, 
+        borderColor: 'divider' 
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', px: 2 }}>
+          <WorkflowIcon sx={{ mr: 1, color: 'primary.main', fontSize: 20 }} />
+          <Typography variant="subtitle1" component="h3" sx={{ fontWeight: 500 }}>
+            Workflow Visualization
+          </Typography>
+        </Box>
+        <Tabs value={tabValue} onChange={handleTabChange} aria-label="workflow visualization tabs" sx={{ ml: 2 }}>
           <Tab label="Step Tree" {...a11yProps(0)} />
           <Tab 
             label={

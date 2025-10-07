@@ -57,9 +57,10 @@ export default function WorkflowConfigurePage({ params }: PageProps) {
           
           // Check if this is a new template request
           if (id === 'new' || id === 'create') {
-            // Initialize a new workflow in memory
+            // Initialize a new workflow in memory with empty name so the
+            // name dialog forces the user to enter a valid name.
             initializeNewTemplate(
-              'New Workflow',
+              '',
               'Created from workflow builder'
             );
           } else {
@@ -195,6 +196,7 @@ export default function WorkflowConfigurePage({ params }: PageProps) {
         isNewWorkflow={isNewTemplate}
         currentTemplateId={template?.id || templateId || 'new'}
         currentTemplateName={template?.metadata?.name || 'New Workflow'}
+        lastUpdated={template?.metadata?.updatedAt}
         onTemplateNameChange={handleTemplateNameChange}
         refreshTrigger={refreshTrigger}
       />

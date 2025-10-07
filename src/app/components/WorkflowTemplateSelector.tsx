@@ -3,12 +3,13 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import {
+  Box,
   FormControl,
   Select,
   MenuItem,
+  Typography,
   CircularProgress,
-  Box,
-  Typography
+  Tooltip
 } from '@mui/material';
 import {
   Add as AddIcon
@@ -200,7 +201,7 @@ export default function WorkflowTemplateSelector({
   });
 
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 250 }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 250, maxWidth: 400 }}>
       <FormControl size="small" fullWidth>
         <Select
           value={isNewTemplate ? '' : currentTemplateId}
@@ -208,6 +209,7 @@ export default function WorkflowTemplateSelector({
           displayEmpty
           sx={{ 
             minWidth: 200,
+            maxWidth: 400,
             '& .MuiSelect-select': {
               py: 1
             }
@@ -223,12 +225,31 @@ export default function WorkflowTemplateSelector({
           
           {displayTemplates.map((template) => (
             <MenuItem key={template.id} value={template.id}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-                <Typography>{template.metadata.name}</Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-                  v{template.version} • {template.metadata.status}
-                </Typography>
-              </Box>
+              <Tooltip title={template.metadata.name} placement="top" arrow>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', gap: 1 }}>
+                  <Typography 
+                    sx={{ 
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      flex: 1,
+                      minWidth: 0
+                    }}
+                  >
+                    {template.metadata.name}
+                  </Typography>
+                  <Typography 
+                    variant="caption" 
+                    color="text.secondary" 
+                    sx={{ 
+                      flexShrink: 0,
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    v{template.version} • {template.metadata.status}
+                  </Typography>
+                </Box>
+              </Tooltip>
             </MenuItem>
           ))}
           

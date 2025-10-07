@@ -11,7 +11,8 @@ import {
   AppBar,
   IconButton,
   Typography,
-  Button
+  Button,
+  Tooltip
 } from '@mui/material';
 import {
   Save as SaveIcon,
@@ -21,7 +22,8 @@ import {
   Chat as ChatIcon,
   AccountTree as VisualizationIcon,
   DragIndicator as DragIcon,
-  History as HistoryIcon
+  History as HistoryIcon,
+  Edit as EditIcon
 } from '@mui/icons-material';
 import { WorkflowJSON, ValidationResult } from '@/app/types/workflow';
 import { WorkflowDefinition } from '@/app/types/workflow-template-v2';
@@ -29,9 +31,40 @@ import { workflowDefinitionToJSON } from '@/app/utils/workflow-template-migratio
 import WorkflowCreationPane from './WorkflowCreationPane';
 import VisualizationPane from './VisualizationPane';
 import HistoryPanel from './HistoryPanel';
-import EditModeIndicator from './EditModeIndicator';
 import WorkflowTemplateSelector from './WorkflowTemplateSelector';
 import WorkflowTemplateNameDialog from './WorkflowTemplateNameDialog';
+
+/**
+ * Format a date as relative time (e.g., "2 minutes ago", "3 hours ago")
+ * Handles both Date objects and ISO date strings
+ */
+function formatRelativeTime(date: Date | string): string {
+  // Convert string to Date if needed
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  
+  // Check if date is valid
+  if (isNaN(dateObj.getTime())) {
+    return 'recently';
+  }
+  
+  const now = new Date();
+  const diffMs = now.getTime() - dateObj.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHour = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHour / 24);
+
+  if (diffSec < 60) return 'just now';
+  if (diffMin === 1) return '1 minute ago';
+  if (diffMin < 60) return `${diffMin} minutes ago`;
+  if (diffHour === 1) return '1 hour ago';
+  if (diffHour < 24) return `${diffHour} hours ago`;
+  if (diffDay === 1) return 'yesterday';
+  if (diffDay < 7) return `${diffDay} days ago`;
+  
+  // For older dates, show formatted date
+  return dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
 
 interface ConversationState {
   activeConversationId: string;
@@ -60,6 +93,7 @@ interface ResponsiveWorkflowConfiguratorProps {
   isNewWorkflow: boolean;
   currentTemplateId?: string; // 10-char composite key identifier
   currentTemplateName?: string; // Template name (for backward compatibility during migration)
+  lastUpdated?: Date; // Last updated timestamp
   onTemplateNameChange?: (name: string) => Promise<void>;
   refreshTrigger?: number; // External trigger to refresh template list
 }
@@ -72,6 +106,7 @@ export default function ResponsiveWorkflowConfigurator({
   isNewWorkflow,
   currentTemplateId = 'new',
   currentTemplateName,
+  lastUpdated,
   onTemplateNameChange,
   refreshTrigger: externalRefreshTrigger
 }: ResponsiveWorkflowConfiguratorProps) {
@@ -103,16 +138,19 @@ export default function ResponsiveWorkflowConfigurator({
   // Template naming state
   const [showNameDialog, setShowNameDialog] = useState(false);
   const [internalRefreshTrigger, setInternalRefreshTrigger] = useState(0);
+  const [hasAutoShownDialog, setHasAutoShownDialog] = useState(false);
   
   // Use external refresh trigger if provided, otherwise use internal
   const refreshTrigger = externalRefreshTrigger !== undefined ? externalRefreshTrigger : internalRefreshTrigger;
   
-  // Auto-show dialog for new templates
+  // Auto-show dialog for new templates that need naming (only once)
   useEffect(() => {
-    if (isNewWorkflow && (currentTemplateName === 'new' || currentTemplateName === 'create')) {
+    if (!hasAutoShownDialog && isNewWorkflow && (currentTemplateName === 'new' || currentTemplateName === 'create' || currentTemplateName === 'New Workflow')) {
+      console.log('🆕 Auto-showing name dialog for new template');
       setShowNameDialog(true);
+      setHasAutoShownDialog(true);
     }
-  }, [isNewWorkflow, currentTemplateName]);
+  }, [isNewWorkflow, currentTemplateName, hasAutoShownDialog]);
   
   // Conversation continuity state
   const conversationStateRef = useRef<ConversationState | null>(null);
@@ -220,16 +258,35 @@ export default function ResponsiveWorkflowConfigurator({
         gap: { xs: 2, sm: 1 }
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-          <WorkflowTemplateSelector
-            currentTemplateId={currentTemplateId}
-            currentTemplateName={currentTemplateName}
-            refreshTrigger={refreshTrigger}
-          />
-          
-          <EditModeIndicator 
-            workflow={workflow}
-            hasUnsavedChanges={false} // TODO: Implement unsaved changes detection
-          />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <WorkflowTemplateSelector
+              currentTemplateId={currentTemplateId}
+              currentTemplateName={currentTemplateName}
+              refreshTrigger={refreshTrigger}
+            />
+            
+            {/* Edit Template Name Button - Show when template has been saved (has real ID) */}
+            {currentTemplateId && currentTemplateId !== 'new' && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Tooltip title="Rename template">
+                  <IconButton
+                    size="small"
+                    onClick={() => setShowNameDialog(true)}
+                    sx={{ color: 'text.secondary' }}
+                  >
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+                
+                {/* Last Updated Timestamp */}
+                {lastUpdated && (
+                  <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+                    Updated {formatRelativeTime(lastUpdated)}
+                  </Typography>
+                )}
+              </Box>
+            )}
+          </Box>
         </Box>
         
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
@@ -488,7 +545,13 @@ export default function ResponsiveWorkflowConfigurator({
         open={showNameDialog}
         onClose={() => setShowNameDialog(false)}
         onSubmit={handleTemplateNameSubmit}
-        currentName={currentTemplateName === 'new' || currentTemplateName === 'create' ? '' : currentTemplateName}
+        currentName={
+          (currentTemplateName === 'new' || 
+           currentTemplateName === 'create' || 
+           currentTemplateName === 'New Workflow') 
+            ? '' 
+            : currentTemplateName
+        }
         mode={isNewWorkflow ? 'create' : 'rename'}
       />
     </Container>

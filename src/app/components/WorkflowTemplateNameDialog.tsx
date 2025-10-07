@@ -95,7 +95,7 @@ export default function WorkflowTemplateNameDialog({
       <DialogContent>
         {mode === 'create' && (
           <Alert severity="info" sx={{ mb: 2 }}>
-            Give your workflow template a descriptive name. This name cannot be changed later.
+            Give your workflow template a descriptive name to help identify it later.
           </Alert>
         )}
         
@@ -132,7 +132,7 @@ export default function WorkflowTemplateNameDialog({
           startIcon={isSubmitting && <CircularProgress size={16} />}
           fullWidth
         >
-          {mode === 'create' ? 'Create Template' : 'Rename'}
+          {mode === 'create' ? 'Create Template' : 'Save'}
         </Button>
       </DialogActions>
     </Dialog>

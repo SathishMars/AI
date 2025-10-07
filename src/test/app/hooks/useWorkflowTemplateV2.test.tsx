@@ -8,6 +8,7 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useWorkflowTemplateV2 } from '@/app/hooks/useWorkflowTemplateV2';
 import { WorkflowTemplate, WorkflowDefinition } from '@/app/types/workflow-template-v2';
+import { isValidShortId } from '@/app/utils/short-id-generator';
 import * as UnifiedUserContext from '@/app/contexts/UnifiedUserContext';
 
 // Mock the context
@@ -44,9 +45,12 @@ describe('useWorkflowTemplateV2', () => {
       ]
     },
     metadata: {
+      name: 'Test Workflow',
+      status: 'draft',
       createdAt: new Date('2024-01-01'),
       updatedAt: new Date('2024-01-01'),
-      author: 'Test User'
+      author: 'Test User',
+      tags: []
     }
   };
   
@@ -189,6 +193,10 @@ describe('useWorkflowTemplateV2', () => {
       const newTemplate: WorkflowTemplate = {
         ...mockTemplate,
         name: 'New Workflow',
+        metadata: {
+          ...mockTemplate.metadata,
+          name: 'New Workflow'
+        },
         workflowDefinition: { steps: [] }
       };
       
@@ -262,8 +270,9 @@ describe('useWorkflowTemplateV2', () => {
       });
       
       expect(result.current.template).toBeTruthy();
-      expect(result.current.template?.name).toBe('Test Workflow');
-      expect(result.current.template?.id).toBe('new');
+  expect(result.current.template?.name).toBe('Test Workflow');
+  expect(result.current.template?.id).toBeDefined();
+  expect(isValidShortId(result.current.template?.id ?? '')).toBe(true);
       expect(result.current.template?.status).toBe('draft');
       expect(result.current.template?.metadata.description).toBe('Test description');
       expect(result.current.template?.metadata.author).toBe('Test Account');
@@ -354,7 +363,11 @@ describe('useWorkflowTemplateV2', () => {
       // Set initial template with valid name
       const validTemplate: WorkflowTemplate = {
         ...mockTemplate,
-        name: 'Valid Workflow'  // Valid name for auto-save
+        name: 'Valid Workflow',  // Valid name for auto-save
+        metadata: {
+          ...mockTemplate.metadata,
+          name: 'Valid Workflow'
+        }
       };
       
       (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -420,7 +433,11 @@ describe('useWorkflowTemplateV2', () => {
       // Set initial template with invalid name
       const invalidTemplate: WorkflowTemplate = {
         ...mockTemplate,
-        name: 'new'  // Invalid name - should not auto-save
+        name: 'new',  // Invalid name - should not auto-save
+        metadata: {
+          ...mockTemplate.metadata,
+          name: 'new'
+        }
       };
       
       (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -501,7 +518,11 @@ describe('useWorkflowTemplateV2', () => {
       
       const updatedTemplate = {
         ...mockTemplate,
-        name: 'Updated Name'
+        name: 'Updated Name',
+        metadata: {
+          ...mockTemplate.metadata,
+          name: 'Updated Name'
+        }
       };
       
       (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -693,23 +714,48 @@ describe('useWorkflowTemplateV2', () => {
         await result.current.loadTemplate('a1b2c3d4e5');
       });
       
-      expect(result.current.canAutoSave).toBe(false);
-      
-      // Update to valid name
-      const validTemplate = {
-        ...invalidTemplate,
-        name: 'Valid Name'
+      expect(result.current.canAutoSave).toBe(true);
+
+      // Update to invalid name
+      const invalidTemplateUpdate = {
+        ...mockTemplate,
+        name: 'new',
+        metadata: {
+          ...mockTemplate.metadata,
+          name: 'new'
+        }
       };
-      
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => invalidTemplateUpdate
+      });
+
+      await act(async () => {
+        await result.current.updateTemplateName('new');
+      });
+
+      expect(result.current.canAutoSave).toBe(false);
+
+      // Update back to valid name
+      const validTemplate = {
+        ...invalidTemplateUpdate,
+        name: 'Valid Name',
+        metadata: {
+          ...invalidTemplateUpdate.metadata,
+          name: 'Valid Name'
+        }
+      };
+
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => validTemplate
       });
-      
+
       await act(async () => {
         await result.current.updateTemplateName('Valid Name');
       });
-      
+
       expect(result.current.canAutoSave).toBe(true);
     });
     

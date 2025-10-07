@@ -97,6 +97,10 @@ export interface WorkflowTemplate {
   organization?: string | null;         // Department ID (composite key - nullable for account-wide)
   version: string;                      // Semantic version (composite key)
   
+  // Legacy compatibility fields (will be fully migrated to metadata)
+  name?: string;
+  status?: TemplateStatus;
+  
   // Workflow Definition (CLEAN - no metadata duplication)
   workflowDefinition: WorkflowDefinition;
   
