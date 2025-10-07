@@ -165,8 +165,23 @@ export default function MermaidRenderer({
     if (!svgElement) return;
     
     // Find all step nodes and add click/hover listeners
-    Object.keys(workflow.steps).forEach(stepId => {
-      const stepElement = svgElement.querySelector(`#${stepId}`);
+    // Steps are in nested array format with human-readable IDs
+    const steps = Array.isArray(workflow.steps) ? workflow.steps : [];
+    const getAllStepIds = (stepList: { id?: string; children?: unknown[] }[]): string[] => {
+      const ids: string[] = [];
+      stepList.forEach((step: { id?: string; children?: unknown[] }) => {
+        if (step.id) ids.push(step.id);
+        if (step.children && Array.isArray(step.children)) {
+          ids.push(...getAllStepIds(step.children as { id?: string; children?: unknown[] }[]));
+        }
+      });
+      return ids;
+    };
+    
+    const stepIds = getAllStepIds(steps);
+    stepIds.forEach(stepId => {
+      const sanitizedId = stepId.replace(/[^a-zA-Z0-9]/g, '_');
+      const stepElement = svgElement.querySelector(`#${sanitizedId}`);
       if (stepElement) {
         // Click handler
         stepElement.addEventListener('click', (event) => {

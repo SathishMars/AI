@@ -45,14 +45,18 @@ export interface WorkflowDefinition {
 /**
  * Template Metadata
  * 
- * Timestamps, author, and descriptive information
+ * UPDATED: Now includes name and status (moved from top level)
+ * Descriptive fields that belong in metadata object per new schema
  */
 export interface TemplateMetadata {
+  name: string; // Template name (user-editable, descriptive)
+  description?: string;
+  status: TemplateStatus; // Template lifecycle status
+  author: string; // User who created this version
+  updatedBy?: string; // User who last updated this version
   createdAt: Date;
   updatedAt: Date;
   publishedAt?: Date;
-  author?: string;
-  description?: string;
   category?: string;
   tags?: string[];
 }
@@ -87,24 +91,22 @@ export interface WorkflowTemplate {
   // MongoDB document ID (optional for new documents)
   _id?: string;
   
-  // Composite Key Fields
-  account: string;                      // Company ID (required)
-  organization: string | null;          // Department ID (null = account-wide)
-  id: string;                           // 10-char short-id (auto-generated)
-  version: string;                      // Semantic version (e.g., "1.0.0")
+  // Composite Key Fields (AT TOP LEVEL)
+  id: string;                           // 10-char short-id (auto-generated, composite key)
+  account: string;                      // Company ID (composite key)
+  organization?: string | null;         // Department ID (composite key - nullable for account-wide)
+  version: string;                      // Semantic version (composite key)
   
-  // Template Properties
-  name: string;                         // User-editable name (NOT part of key)
-  status: TemplateStatus;               // Lifecycle status
-  
-  // Workflow Definition (CLEAN - no metadata)
+  // Workflow Definition (CLEAN - no metadata duplication)
   workflowDefinition: WorkflowDefinition;
   
   // Generated Visualization
   mermaidDiagram?: string;
   
-  // Metadata & Tracking
+  // Metadata Object (DESCRIPTIVE FIELDS - name, status, author, timestamps)
   metadata: TemplateMetadata;
+  
+  // Version Tracking
   parentVersion?: string;               // For version lineage tracking
   usageStats?: TemplateUsageStats;
 }
@@ -391,7 +393,8 @@ export function hasSteps(definition: WorkflowDefinition): boolean {
 /**
  * Check if template name is valid (not 'new' or 'create')
  */
-export function isValidTemplateName(name: string): boolean {
+export function isValidTemplateName(name: string | undefined): boolean {
+  if (!name) return false;
   const invalidNames = ['new', 'create', '', 'untitled'];
   return !invalidNames.includes(name.toLowerCase().trim());
 }
@@ -399,7 +402,8 @@ export function isValidTemplateName(name: string): boolean {
 /**
  * Should auto-save template?
  * Rules: Must have ≥1 step AND valid name
+ * UPDATED: Name is now in metadata.name (not top level)
  */
 export function shouldAutoSave(template: WorkflowTemplate): boolean {
-  return hasSteps(template.workflowDefinition) && isValidTemplateName(template.name);
+  return hasSteps(template.workflowDefinition) && isValidTemplateName(template.metadata?.name);
 }

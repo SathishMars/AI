@@ -382,8 +382,8 @@ export class AIUpdateAutoSave {
   private isCompleteWorkflow(workflow: Partial<WorkflowJSON>): boolean {
     return !!(
       workflow.metadata &&
-      workflow.steps &&
-      Object.keys(workflow.steps).length > 0 &&
+      Array.isArray(workflow.steps) &&
+      workflow.steps.length > 0 &&
       workflow.schemaVersion
     );
   }

@@ -1,20 +1,10 @@
 // src/app/utils/workflow-format-adapter.ts
 /**
- * Workflow Format Adapter
+ * Workflow Format Utilities
  * 
- * Temporary utility to convert between old and new workflow formats.
- * This allows the new UI to work with existing data without requiring
- * immediate database migration.
+ * Utilities for working with workflow nested array format.
  * 
- * OLD FORMAT (Numbered Object Keys):
- * {
- *   steps: {
- *     "1": { name: "Start", nextSteps: ["1.1"] },
- *     "1.1": { name: "Check", onSuccess: "1.1.1" }
- *   }
- * }
- * 
- * NEW FORMAT (Nested Arrays with Human-Readable IDs):
+ * WORKFLOW FORMAT (Nested Arrays with Human-Readable IDs):
  * {
  *   steps: [
  *     {
@@ -26,391 +16,109 @@
  *     }
  *   ]
  * }
+ * 
+ * See: ai-implementation-summaries/workflow-template-architecture-complete.md
  */
 
 import { WorkflowStep, WorkflowJSON } from '@/app/types/workflow';
 
 /**
- * Legacy workflow step format (old numbered object key structure)
+ * Validate that workflow is in correct nested array format
  */
-interface LegacyWorkflowStep {
-  name: string;
-  type: 'trigger' | 'condition' | 'action' | 'end' | 'branch' | 'merge' | 'workflow';
-  action?: string;
-  params?: Record<string, unknown>;
-  condition?: unknown;
-  nextSteps?: string[];
-  onSuccess?: string;
-  onFailure?: string;
-  onApproval?: string;
-  onReject?: string;
-  onYes?: string;
-  onNo?: string;
-  result?: 'success' | 'failure' | 'cancelled' | 'timeout';
-}
-
-interface LegacyWorkflowFormat {
-  steps: Record<string, LegacyWorkflowStep>;
-  [key: string]: unknown;
-}
-
-/**
- * Check if workflow uses old numbered object key format
- */
-export function isLegacyFormat(workflow: unknown): boolean {
+export function isValidNestedFormat(workflow: unknown): boolean {
   if (!workflow || typeof workflow !== 'object') {
     return false;
   }
 
   const w = workflow as Record<string, unknown>;
   
-  // Check if steps is an object (not array) with numbered keys
-  if (w.steps && typeof w.steps === 'object' && !Array.isArray(w.steps)) {
-    const keys = Object.keys(w.steps);
-    // If any key is a number or dotted number (1, 1.1, 1.1.1), it's legacy format
-    return keys.some(key => /^[0-9]+(\.[0-9]+)*$/.test(key));
-  }
-
-  return false;
+  // Must have steps as an array
+  return !!(w.steps && Array.isArray(w.steps));
 }
 
 /**
- * Generate a human-readable step ID from step data
+ * Ensure workflow steps are in nested array format
  * 
- * Pattern: {verb}{Object} in camelCase
- * Examples: "startWorkflow", "checkBudget", "sendEmail"
- */
-function generateStepId(
-  step: LegacyWorkflowStep,
-  stepKey: string,
-  existingIds: Set<string>
-): string {
-  // Extract action verb and object from step name
-  const name = step.name || '';
-  
-  // Try to extract from name pattern "Action: Do Something"
-  const match = name.match(/^(Start|Check|Action|End|Branch|Merge):\s*(.+)$/i);
-  
-  let baseId = '';
-  
-  if (match) {
-    const verb = match[1].toLowerCase();
-    const object = match[2]
-      .trim()
-      .replace(/[^a-zA-Z0-9\s]/g, '') // Remove special chars
-      .split(/\s+/)
-      .map((word, index) => 
-        index === 0 ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-      )
-      .join('');
-    
-    baseId = verb + object.charAt(0).toUpperCase() + object.slice(1);
-  } else {
-    // Fallback: use name directly
-    baseId = name
-      .trim()
-      .replace(/[^a-zA-Z0-9\s]/g, '')
-      .split(/\s+/)
-      .map((word, index) => 
-        index === 0 ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-      )
-      .join('');
-  }
-  
-  // If baseId is empty or invalid, use step type
-  if (!baseId || baseId.length < 3) {
-    baseId = `${step.type}Step${stepKey.replace(/\./g, '_')}`;
-  }
-  
-  // Ensure uniqueness
-  let finalId = baseId;
-  let counter = 1;
-  while (existingIds.has(finalId)) {
-    finalId = `${baseId}${counter}`;
-    counter++;
-  }
-  
-  existingIds.add(finalId);
-  return finalId;
-}
-
-/**
- * Convert legacy workflow format to nested array format
- * 
- * @param legacyWorkflow - Workflow in old numbered object key format
- * @returns Workflow in new nested array format
- */
-export function convertLegacyToNestedArray(legacyWorkflow: LegacyWorkflowFormat): WorkflowStep[] {
-  const legacySteps = legacyWorkflow.steps;
-  const existingIds = new Set<string>();
-  
-  // Map old keys to new IDs
-  const keyToIdMap = new Map<string, string>();
-  
-  // First pass: Generate IDs for all steps
-  Object.entries(legacySteps).forEach(([key, step]) => {
-    const id = generateStepId(step, key, existingIds);
-    keyToIdMap.set(key, id);
-  });
-  
-  // Find root steps (steps not referenced by any other step)
-  const referencedKeys = new Set<string>();
-  
-  Object.entries(legacySteps).forEach(([, step]) => {
-    if (step.nextSteps) {
-      step.nextSteps.forEach(nextKey => referencedKeys.add(nextKey));
-    }
-    if (step.onSuccess) referencedKeys.add(step.onSuccess);
-    if (step.onFailure) referencedKeys.add(step.onFailure);
-    if (step.onApproval) referencedKeys.add(step.onApproval);
-    if (step.onReject) referencedKeys.add(step.onReject);
-    if (step.onYes) referencedKeys.add(step.onYes);
-    if (step.onNo) referencedKeys.add(step.onNo);
-  });
-  
-  const rootKeys = Object.keys(legacySteps)
-    .filter(key => !referencedKeys.has(key))
-    .sort((a, b) => {
-      // Sort by number (1, 2, 3, etc.)
-      const aNum = parseFloat(a);
-      const bNum = parseFloat(b);
-      return aNum - bNum;
-    });
-  
-  // Track processed steps to avoid infinite loops
-  const processedKeys = new Set<string>();
-  
-  /**
-   * Recursively convert a legacy step to new format
-   */
-  function convertStep(key: string): WorkflowStep | null {
-    // Avoid infinite loops
-    if (processedKeys.has(key)) {
-      return null;
-    }
-    processedKeys.add(key);
-    
-    const legacyStep = legacySteps[key];
-    if (!legacyStep) {
-      return null;
-    }
-    
-    const newStep: WorkflowStep = {
-      id: keyToIdMap.get(key) || key,
-      name: legacyStep.name,
-      type: legacyStep.type,
-    };
-    
-    // Add optional fields
-    if (legacyStep.action) newStep.action = legacyStep.action;
-    if (legacyStep.params) newStep.params = legacyStep.params;
-    if (legacyStep.condition) newStep.condition = legacyStep.condition as WorkflowStep['condition'];
-    if (legacyStep.result) newStep.result = legacyStep.result;
-    
-    // Convert children (nextSteps array)
-    if (legacyStep.nextSteps && legacyStep.nextSteps.length > 0) {
-      const children: WorkflowStep[] = [];
-      
-      legacyStep.nextSteps.forEach(nextKey => {
-        const child = convertStep(nextKey);
-        if (child) {
-          children.push(child);
-        }
-      });
-      
-      if (children.length > 0) {
-        newStep.children = children;
-      }
-    }
-    
-    // Convert conditional paths to references (not inline steps)
-    // Use onSuccessGoTo/onFailureGoTo for references
-    if (legacyStep.onSuccess && !processedKeys.has(legacyStep.onSuccess)) {
-      const successId = keyToIdMap.get(legacyStep.onSuccess);
-      if (successId) {
-        newStep.onSuccessGoTo = successId;
-      }
-    }
-    
-    if (legacyStep.onFailure && !processedKeys.has(legacyStep.onFailure)) {
-      const failureId = keyToIdMap.get(legacyStep.onFailure);
-      if (failureId) {
-        newStep.onFailureGoTo = failureId;
-      }
-    }
-    
-    // Handle other conditional paths (approval workflow paths)
-    if (legacyStep.onApproval && !processedKeys.has(legacyStep.onApproval)) {
-      const approvalId = keyToIdMap.get(legacyStep.onApproval);
-      if (approvalId) {
-        // Store as success path for now
-        newStep.onSuccessGoTo = approvalId;
-      }
-    }
-    
-    if (legacyStep.onReject && !processedKeys.has(legacyStep.onReject)) {
-      const rejectId = keyToIdMap.get(legacyStep.onReject);
-      if (rejectId) {
-        // Store as failure path for now
-        newStep.onFailureGoTo = rejectId;
-      }
-    }
-    
-    return newStep;
-  }
-  
-  // Convert all root steps
-  const newSteps: WorkflowStep[] = [];
-  
-  rootKeys.forEach(rootKey => {
-    const step = convertStep(rootKey);
-    if (step) {
-      newSteps.push(step);
-    }
-  });
-  
-  // If no root steps found (shouldn't happen), convert all steps
-  if (newSteps.length === 0) {
-    Object.keys(legacySteps).forEach(key => {
-      if (!processedKeys.has(key)) {
-        const step = convertStep(key);
-        if (step) {
-          newSteps.push(step);
-        }
-      }
-    });
-  }
-  
-  return newSteps;
-}
-
-/**
- * Flatten nested array back to numbered object keys (for backward compatibility)
- * 
- * NOTE: This is for backward compatibility only. New workflows should use nested arrays.
- * 
- * @param steps - Workflow steps in nested array format
- * @returns Workflow in old numbered object key format
- */
-export function convertNestedArrayToLegacy(steps: WorkflowStep[]): Record<string, LegacyWorkflowStep> {
-  const legacySteps: Record<string, LegacyWorkflowStep> = {};
-  let counter = 1;
-  
-  // Map step IDs to numbered keys
-  const idToKeyMap = new Map<string, string>();
-  
-  /**
-   * Recursively convert steps to legacy format
-   */
-  function convertToLegacy(step: WorkflowStep, parentKey?: string, childIndex?: number): string {
-    // Generate numbered key
-    let key: string;
-    if (parentKey && childIndex !== undefined) {
-      key = `${parentKey}.${childIndex + 1}`;
-    } else {
-      key = `${counter}`;
-      counter++;
-    }
-    
-    idToKeyMap.set(step.id, key);
-    
-    const legacyStep: LegacyWorkflowStep = {
-      name: step.name,
-      type: step.type,
-    };
-    
-    // Add optional fields
-    if (step.action) legacyStep.action = step.action;
-    if (step.params) legacyStep.params = step.params;
-    if (step.condition) legacyStep.condition = step.condition;
-    if (step.result) legacyStep.result = step.result;
-    
-    // Convert children
-    if (step.children && step.children.length > 0) {
-      legacyStep.nextSteps = [];
-      step.children.forEach((child, index) => {
-        const childKey = convertToLegacy(child, key, index);
-        legacyStep.nextSteps!.push(childKey);
-      });
-    }
-    
-    // Store step
-    legacySteps[key] = legacyStep;
-    
-    return key;
-  }
-  
-  // Convert all root steps
-  steps.forEach(step => {
-    convertToLegacy(step);
-  });
-  
-  // Second pass: Convert step references
-  steps.forEach(step => {
-    const key = idToKeyMap.get(step.id);
-    if (key && legacySteps[key]) {
-      if (step.onSuccessGoTo) {
-        const successKey = idToKeyMap.get(step.onSuccessGoTo);
-        if (successKey) {
-          legacySteps[key].onSuccess = successKey;
-        }
-      }
-      if (step.onFailureGoTo) {
-        const failureKey = idToKeyMap.get(step.onFailureGoTo);
-        if (failureKey) {
-          legacySteps[key].onFailure = failureKey;
-        }
-      }
-    }
-  });
-  
-  return legacySteps;
-}
-
-/**
- * Detect and convert workflow to new format if needed
- * 
- * @param workflow - Workflow in any format
+ * @param workflow - Workflow with steps as array
  * @returns Workflow steps in nested array format
  */
-export function ensureNestedArrayFormat(workflow: WorkflowJSON | LegacyWorkflowFormat): WorkflowStep[] {
-  // If already in nested array format, return as-is
-  if (Array.isArray((workflow as WorkflowJSON).steps)) {
-    return (workflow as WorkflowJSON).steps as WorkflowStep[];
+export function ensureNestedArrayFormat(workflow: WorkflowJSON): WorkflowStep[] {
+  // Workflow steps must be an array
+  if (!Array.isArray(workflow.steps)) {
+    console.error('Invalid workflow format: steps must be an array', workflow);
+    return [];
   }
   
-  // Check for hybrid format: numbered object keys with new-format step contents
-  // This happens when LLM generates proper nested steps but they're stored in an object
-  if (isLegacyFormat(workflow)) {
-    const w = workflow as Record<string, unknown>;
-    const stepsObj = w.steps as Record<string, unknown>;
-    
-    // Check if the steps already have new format properties (children, onSuccess inline)
-    const firstStep = Object.values(stepsObj)[0] as Record<string, unknown>;
-    const isHybridFormat = firstStep && (
-      Array.isArray(firstStep.children) ||
-      (firstStep.onSuccess && typeof firstStep.onSuccess === 'object' && 'id' in firstStep.onSuccess) ||
-      (firstStep.onFailure && typeof firstStep.onFailure === 'object' && 'id' in firstStep.onFailure)
-    );
-    
-    if (isHybridFormat) {
-      // Simple conversion: extract values from object and sort by numeric key
-      console.log('Hybrid workflow format detected (numbered keys with new format steps), converting to array...');
-      const steps = Object.entries(stepsObj)
-        .sort(([keyA], [keyB]) => {
-          const numA = parseFloat(keyA);
-          const numB = parseFloat(keyB);
-          return numA - numB;
-        })
-        .map(([, step]) => step as WorkflowStep);
-      return steps;
+  return workflow.steps as WorkflowStep[];
+}
+
+/**
+ * Validate workflow structure
+ * 
+ * @param workflow - Workflow to validate
+ * @returns True if valid, false otherwise
+ */
+export function validateWorkflowStructure(workflow: WorkflowJSON): boolean {
+  // Check steps is an array
+  if (!Array.isArray(workflow.steps)) {
+    console.error('Invalid workflow: steps must be an array');
+    return false;
+  }
+  
+  // Check each step has required fields
+  const validateStep = (step: WorkflowStep): boolean => {
+    if (!step.id || !step.name || !step.type) {
+      console.error('Invalid step: missing required fields (id, name, type)', step);
+      return false;
     }
     
-    // True legacy format: convert using full conversion logic
-    return convertLegacyToNestedArray(workflow as LegacyWorkflowFormat);
+    // Validate ID format (camelCase)
+    if (!/^[a-z][a-zA-Z0-9]*$/.test(step.id)) {
+      console.error(`Invalid step ID format: "${step.id}" (must be camelCase)`, step);
+      return false;
+    }
+    
+    // Recursively validate children
+    if (step.children) {
+      if (!Array.isArray(step.children)) {
+        console.error('Invalid step: children must be an array', step);
+        return false;
+      }
+      for (const child of step.children) {
+        if (!validateStep(child)) {
+          return false;
+        }
+      }
+    }
+    
+    // Validate inline branches
+    if (step.onSuccess && typeof step.onSuccess === 'object') {
+      if (!validateStep(step.onSuccess)) {
+        return false;
+      }
+    }
+    
+    if (step.onFailure && typeof step.onFailure === 'object') {
+      if (!validateStep(step.onFailure)) {
+        return false;
+      }
+    }
+    
+    return true;
+  };
+  
+  // Validate all root steps
+  for (const step of workflow.steps) {
+    if (!validateStep(step)) {
+      return false;
+    }
   }
   
-  // Fallback: empty array
-  console.warn('Unknown workflow format, returning empty array');
-  return [];
+  return true;
 }
+
+/*
+ * NOTE: All legacy format conversion functions have been removed.
+ * Workflows must now be stored and used in nested array format only.
+ * See: ai-implementation-summaries/workflow-template-architecture-complete.md
+ */

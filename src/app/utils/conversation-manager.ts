@@ -25,7 +25,7 @@ export class ConversationStateManager {
   private autosaveDelay: number = 2000; // 2 seconds after last activity
   private autosaveTimeout: NodeJS.Timeout | null = null;
   private workflowContext: WorkflowContext | null = null;
-  private currentWorkflow: { steps?: Record<string, unknown> } | null = null;
+  private currentWorkflow: { steps?: unknown[] } | null = null;
   
   constructor(initialState: ConversationState, workflowContext?: WorkflowContext) {
     this.state = initialState;
@@ -42,20 +42,17 @@ export class ConversationStateManager {
   /**
    * Set the current workflow for validation before saving
    */
-  setCurrentWorkflow(workflow: { steps?: Record<string, unknown> } | null): void {
+  setCurrentWorkflow(workflow: { steps?: unknown[] } | null): void {
     this.currentWorkflow = workflow;
   }
   
   /**
-   * Check if the workflow has real steps (excluding 'start' and 'end')
+   * Check if the workflow has real steps
    */
   private hasWorkflowSteps(): boolean {
-    if (!this.currentWorkflow?.steps) return false;
+    if (!this.currentWorkflow?.steps || !Array.isArray(this.currentWorkflow.steps)) return false;
     
-    const stepKeys = Object.keys(this.currentWorkflow.steps);
-    const realSteps = stepKeys.filter(key => key !== 'start' && key !== 'end');
-    
-    return realSteps.length > 0;
+    return this.currentWorkflow.steps.length > 0;
   }
   
   // Message management

@@ -15,25 +15,31 @@ describe('Workflow Validation', () => {
       status: 'draft',
       tags: []
     },
-    steps: {
-      start: {
-        name: 'Start',
+    steps: [
+      {
+        id: 'start',
+        name: 'Start: On MRF Submit',
         type: 'trigger',
         action: 'onMRFSubmit',
         params: { mrfID: 'test' },
-        nextSteps: ['end']
-      },
-      end: {
-        name: 'End',
-        type: 'end',
-        result: 'success'
+        children: [
+          {
+            id: 'end',
+            name: 'End: Workflow Complete',
+            type: 'end',
+            params: { result: 'success' }
+          }
+        ]
       }
-    }
+    ]
   };
 
   describe('validateWorkflow', () => {
     it('should validate a valid workflow', async () => {
       const result = await validateWorkflow(validWorkflow, functionsLibraryManager.getLibrary());
+      if (!result.isValid) {
+        console.log('Validation errors:', JSON.stringify(result.errors, null, 2));
+      }
       expect(result.isValid).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
@@ -41,16 +47,32 @@ describe('Workflow Validation', () => {
     it('should validate function references', async () => {
       const workflowWithValidFunction: WorkflowJSON = {
         ...validWorkflow,
-        steps: {
-          ...validWorkflow.steps,
-          approval: {
-            name: 'Request Approval',
-            type: 'action',
-            action: 'functions.requestApproval',
-            params: { to: 'manager@example.com' },
-            nextSteps: ['end']
+        steps: [
+          {
+            id: 'start',
+            name: 'Start: On MRF Submit',
+            type: 'trigger',
+            action: 'onMRFSubmit',
+            params: { mrfID: 'test' },
+            children: [
+              {
+                id: 'approval',
+                name: 'Action: Request Approval',
+                type: 'action',
+                action: 'functions.requestApproval',
+                params: { to: 'manager@example.com' },
+                children: [
+                  {
+                    id: 'end',
+                    name: 'End: Workflow Complete',
+                    type: 'end',
+                    params: { result: 'success' }
+                  }
+                ]
+              }
+            ]
           }
-        }
+        ]
       };
 
       const result = await validateWorkflow(workflowWithValidFunction, functionsLibraryManager.getLibrary());
@@ -61,16 +83,32 @@ describe('Workflow Validation', () => {
     it('should detect invalid function references', async () => {
       const workflowWithInvalidFunction: WorkflowJSON = {
         ...validWorkflow,
-        steps: {
-          ...validWorkflow.steps,
-          invalid: {
-            name: 'Invalid Function',
-            type: 'action',
-            action: 'functions.nonExistentFunction',
-            params: {},
-            nextSteps: ['end']
+        steps: [
+          {
+            id: 'start',
+            name: 'Start: On MRF Submit',
+            type: 'trigger',
+            action: 'onMRFSubmit',
+            params: { mrfID: 'test' },
+            children: [
+              {
+                id: 'invalid',
+                name: 'Action: Invalid Function',
+                type: 'action',
+                action: 'functions.nonExistentFunction',
+                params: {},
+                children: [
+                  {
+                    id: 'end',
+                    name: 'End: Workflow Complete',
+                    type: 'end',
+                    params: { result: 'success' }
+                  }
+                ]
+              }
+            ]
           }
-        }
+        ]
       };
 
       const result = await validateWorkflow(workflowWithInvalidFunction, functionsLibraryManager.getLibrary());
@@ -82,16 +120,32 @@ describe('Workflow Validation', () => {
     it('should detect missing required parameters', async () => {
       const workflowWithMissingParams: WorkflowJSON = {
         ...validWorkflow,
-        steps: {
-          ...validWorkflow.steps,
-          approval: {
-            name: 'Request Approval',
-            type: 'action',
-            action: 'functions.requestApproval',
-            params: {}, // Missing required 'to' parameter
-            nextSteps: ['end']
+        steps: [
+          {
+            id: 'start',
+            name: 'Start: On MRF Submit',
+            type: 'trigger',
+            action: 'onMRFSubmit',
+            params: { mrfID: 'test' },
+            children: [
+              {
+                id: 'approval',
+                name: 'Action: Request Approval',
+                type: 'action',
+                action: 'functions.requestApproval',
+                params: {}, // Missing required 'to' parameter
+                children: [
+                  {
+                    id: 'end',
+                    name: 'End: Workflow Complete',
+                    type: 'end',
+                    params: { result: 'success' }
+                  }
+                ]
+              }
+            ]
           }
-        }
+        ]
       };
 
       const result = await validateWorkflow(workflowWithMissingParams, functionsLibraryManager.getLibrary());
@@ -126,61 +180,69 @@ describe('Workflow Validation', () => {
     it('should detect circular dependencies', () => {
       const circularWorkflow: WorkflowJSON = {
         ...validWorkflow,
-        steps: {
-          step1: {
-            name: 'Step 1',
+        steps: [
+          {
+            id: 'step1',
+            name: 'Action: Request Approval',
             type: 'action',
             action: 'functions.requestApproval',
             params: { to: 'test@example.com' },
-            nextSteps: ['step2']
+            onSuccessGoTo: 'step2'
           },
-          step2: {
-            name: 'Step 2',
+          {
+            id: 'step2',
+            name: 'Action: Create Event',
             type: 'action',
             action: 'functions.createAnEvent',
             params: {},
-            nextSteps: ['step1'] // Circular reference
+            onSuccessGoTo: 'step1' // Circular reference
           }
-        }
+        ]
       };
 
       const errors = detectCircularDependencies(circularWorkflow);
       expect(errors).toHaveLength(1);
-      expect(errors[0].technicalMessage).toContain('Circular dependency detected');
+      expect(errors[0].technicalMessage).toContain('Circular reference detected');
     });
 
     it('should not detect false positives for valid workflows', () => {
       const validComplexWorkflow: WorkflowJSON = {
         ...validWorkflow,
-        steps: {
-          start: {
-            name: 'Start',
+        steps: [
+          {
+            id: 'start',
+            name: 'Start: On MRF Submit',
             type: 'trigger',
             action: 'onMRFSubmit',
             params: { mrfID: 'test' },
-            nextSteps: ['approval']
+            children: [
+              {
+                id: 'approval',
+                name: 'Action: Request Approval',
+                type: 'action',
+                action: 'functions.requestApproval',
+                params: { to: 'manager@example.com' },
+                onSuccessGoTo: 'createEvent',
+                onFailureGoTo: 'end'
+              }
+            ]
           },
-          approval: {
-            name: 'Approval',
-            type: 'action',
-            action: 'functions.requestApproval',
-            params: { to: 'manager@example.com' },
-            onSuccess: 'createEvent',
-            onFailure: 'end'
-          },
-          createEvent: {
-            name: 'Create Event',
+          {
+            id: 'createEvent',
+            name: 'Action: Create Event',
             type: 'action',
             action: 'functions.createAnEvent',
             params: {},
-            nextSteps: ['end']
-          },
-          end: {
-            name: 'End',
-            type: 'end',
-            result: 'success'
+            children: [
+              {
+                id: 'end',
+                name: 'End: Workflow Complete',
+                type: 'end',
+                params: { result: 'success' }
+              }
+            ]
           }
-        }
+        ]
       };
 
       const errors = detectCircularDependencies(validComplexWorkflow);

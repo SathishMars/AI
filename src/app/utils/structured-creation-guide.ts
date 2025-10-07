@@ -64,7 +64,7 @@ export class StructuredCreationGuide {
    * Setup conditions phase guidance
    */
   private setupConditionsPhase(workflow: Partial<WorkflowJSON>): StructuredGuidance {
-    const hasSteps = workflow.steps && Object.keys(workflow.steps).length > 0;
+    const hasSteps = Array.isArray(workflow.steps) && workflow.steps.length > 0;
     
     return {
       currentPhase: 'condition_setup',
@@ -132,7 +132,7 @@ export class StructuredCreationGuide {
    * Refinement phase guidance
    */
   private refinementPhase(workflow: Partial<WorkflowJSON>): StructuredGuidance {
-    const stepCount = workflow.steps ? Object.keys(workflow.steps).length : 0;
+    const stepCount = Array.isArray(workflow.steps) ? workflow.steps.length : 0;
     
     return {
       currentPhase: 'refinement',
@@ -432,13 +432,13 @@ export class StructuredCreationGuide {
   calculateCompletionPercentage(workflow: Partial<WorkflowJSON>, phase: CreationPhase): number {
     const basePercentage = this.getPhaseBasePercentage(phase);
     
-    if (!workflow.steps) return basePercentage;
+    if (!Array.isArray(workflow.steps)) return basePercentage;
     
-    const stepCount = Object.keys(workflow.steps).length;
+    const stepCount = workflow.steps.length;
     const hasValidSteps = stepCount > 0;
-    const hasTrigger = Object.values(workflow.steps).some(step => step.type === 'trigger');
-    const hasActions = Object.values(workflow.steps).some(step => step.type === 'action');
-    const hasEndStates = Object.values(workflow.steps).some(step => step.type === 'end');
+    const hasTrigger = workflow.steps.some((step: { type?: string }) => step.type === 'trigger');
+    const hasActions = workflow.steps.some((step: { type?: string }) => step.type === 'action');
+    const hasEndStates = workflow.steps.some((step: { type?: string }) => step.type === 'end');
     
     let bonus = 0;
     if (hasValidSteps) bonus += 5;

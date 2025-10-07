@@ -76,17 +76,19 @@ export const WorkflowStepSchema: z.ZodSchema = z.lazy(() =>
   })
 );
 
-// Workflow metadata
+// Workflow metadata (LLM-generated format - will be transformed for database)
+// NOTE: This is what the LLM generates. When saving to database, we transform:
+// - id, account, organization, version → top level (composite key)
+// - name, description, status, author, timestamps → metadata object
 export const WorkflowMetadataSchema = z.object({
-  id: z.string(),
   name: z.string(),
   description: z.string().optional(),
-  version: z.string().default('1.0.0'),
-  status: z.enum(['draft', 'published']).default('draft'),
-  createdAt: z.date().optional(),
-  updatedAt: z.date().optional(),
-  createdBy: z.string().optional(),
-  tags: z.array(z.string()).default([])
+  status: z.enum(['draft', 'published', 'deprecated', 'archived']).default('draft'),
+  author: z.string().optional(), // User creating the workflow
+  createdAt: z.string().optional(), // ISO date string from LLM
+  updatedAt: z.string().optional(), // ISO date string from LLM
+  category: z.string().optional(),
+  tags: z.array(z.string()).default(['ai-generated'])
 });
 
 // Workflow definition interface (ONLY steps array - no metadata duplication)
@@ -99,12 +101,21 @@ export const WorkflowDefinitionSchema = z.object({
   steps: z.array(WorkflowStepSchema)
 });
 
-// Main workflow schema (for backward compatibility - will be migrated to WorkflowDefinition)
+// Internal workflow format (simple - just steps array)
+// Used throughout the application for workflow editing and manipulation
 export const WorkflowJSONSchema = z.object({
-  schemaVersion: z.string().default(CURRENT_SCHEMA_VERSION),
-  metadata: WorkflowMetadataSchema,
-  steps: z.array(WorkflowStepSchema), // UPDATED: Now array instead of record
-  mermaidDiagram: z.string().optional() // LLM-generated Mermaid markdown
+  steps: z.array(WorkflowStepSchema) // Nested array of workflow steps
+});
+
+// LLM-generated workflow format (includes full context)
+// This is what the LLM generates when creating/updating workflows
+export const LLMWorkflowResponseSchema = z.object({
+  account: z.string().optional(), // Account identifier (from context)
+  organization: z.string().nullable().optional(), // Organization identifier (from context)
+  metadata: WorkflowMetadataSchema, // Descriptive fields (name, description, status, author, tags)
+  workflowDefinition: z.object({
+    steps: z.array(WorkflowStepSchema) // Nested array of workflow steps
+  })
 });
 
 // TypeScript types derived from schemas
@@ -126,7 +137,8 @@ export interface WorkflowStep {
 }
 
 export type WorkflowMetadata = z.infer<typeof WorkflowMetadataSchema>;
-export type WorkflowJSON = z.infer<typeof WorkflowJSONSchema>;
+export type WorkflowJSON = z.infer<typeof WorkflowJSONSchema>; // Simple format: { steps: [] }
+export type LLMWorkflowResponse = z.infer<typeof LLMWorkflowResponseSchema>; // Full format from LLM
 
 // Validation error types
 export interface ValidationError {

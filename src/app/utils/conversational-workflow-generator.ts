@@ -99,242 +99,33 @@ export class ConversationalWorkflowGenerator {
 
   /**
    * Generate basic workflow structure (uses existing LLM logic)
+   * TODO: Template workflows below use legacy object format and need conversion to array format
+   * For now, this returns a minimal structure - real workflows should come from LLM generation
    */
   private async generateBasicWorkflow(
     userInput: string,
     context: CreationContext,
     currentWorkflow?: Partial<WorkflowJSON>
   ): Promise<Partial<WorkflowJSON>> {
-    // This would call the existing LLM workflow generation
-    // For now, let's create a realistic workflow based on common patterns
+    // TODO: Re-enable template workflows after converting to nested array format
+    // These templates currently use legacy object format: { steps: { "step1": {}, "step2": {} } }
+    // Need to convert to: { steps: [ { id: "step1", ... }, { id: "step2", ... } ] }
     
-    if (userInput.toLowerCase().includes('approval') || userInput.toLowerCase().includes('mrf')) {
-      return this.generateMRFApprovalWorkflow(userInput, context, currentWorkflow);
-    }
-    
-    if (userInput.toLowerCase().includes('schedule') || userInput.toLowerCase().includes('reminder')) {
-      return this.generateScheduledWorkflow(userInput, context, currentWorkflow);
-    }
-    
-    if (userInput.toLowerCase().includes('notification') || userInput.toLowerCase().includes('email')) {
-      return this.generateNotificationWorkflow(userInput, context, currentWorkflow);
-    }
-    
-    // Default workflow structure
-    return this.generateDefaultWorkflow(userInput, context, currentWorkflow);
-  }
-
-  /**
-   * Generate MRF approval workflow template
-   */
-  private generateMRFApprovalWorkflow(
-    userInput: string,
-    context: CreationContext,
-    currentWorkflow?: Partial<WorkflowJSON>
-  ): Partial<WorkflowJSON> {
     const workflowId = currentWorkflow?.metadata?.id || `workflow-${Date.now()}`;
     
+    // Return minimal workflow structure - real workflows come from LLM
     return {
       schemaVersion: '1.0.0',
       metadata: {
         id: workflowId,
-        name: 'MRF Approval Workflow',
+        name: 'New Workflow',
         description: `Workflow for: ${userInput}`,
         version: '1.0.0',
         status: 'draft',
         createdAt: new Date(),
-        tags: ['mrf', 'approval', 'ai-generated']
+        tags: ['ai-generated']
       },
-      steps: {
-        start: {
-          name: 'MRF Submitted',
-          type: 'trigger',
-          action: 'onMRFSubmit',
-          params: {}, // Empty - needs parameter collection
-          nextSteps: ['checkApprovalNeeded']
-        },
-        checkApprovalNeeded: {
-          name: 'Check if Approval Needed',
-          type: 'condition',
-          condition: {
-            any: [
-              { fact: 'mrf.maxAttendees', operator: 'greaterThan', value: 100 },
-              { fact: 'mrf.purpose', operator: 'equal', value: 'external' }
-            ]
-          },
-          onSuccess: 'requestApproval',
-          onFailure: 'proceedDirectly'
-        },
-        requestApproval: {
-          name: 'Request Approval',
-          type: 'action',
-          action: 'requestApproval',
-          params: {}, // Empty - needs parameter collection
-          onSuccess: 'createEvent',
-          onFailure: 'notifyRejection'
-        },
-        proceedDirectly: {
-          name: 'Proceed Without Approval',
-          type: 'action',
-          action: 'createEvent',
-          params: {}, // Empty - needs parameter collection
-          nextSteps: ['end']
-        },
-        createEvent: {
-          name: 'Create Event',
-          type: 'action',
-          action: 'createEvent',
-          params: {}, // Empty - needs parameter collection
-          nextSteps: ['end']
-        },
-        notifyRejection: {
-          name: 'Notify Rejection',
-          type: 'action',
-          action: 'sendNotification',
-          params: {}, // Empty - needs parameter collection
-          nextSteps: ['end']
-        },
-        end: {
-          name: 'Workflow Complete',
-          type: 'end',
-          result: 'success'
-        }
-      }
-    };
-  }
-
-  /**
-   * Generate scheduled workflow template
-   */
-  private generateScheduledWorkflow(
-    userInput: string,
-    context: CreationContext,
-    currentWorkflow?: Partial<WorkflowJSON>
-  ): Partial<WorkflowJSON> {
-    const workflowId = currentWorkflow?.metadata?.id || `workflow-${Date.now()}`;
-    
-    return {
-      schemaVersion: '1.0.0',
-      metadata: {
-        id: workflowId,
-        name: 'Scheduled Workflow',
-        description: `Scheduled workflow for: ${userInput}`,
-        version: '1.0.0',
-        status: 'draft',
-        createdAt: new Date(),
-        tags: ['scheduled', 'reminder', 'ai-generated']
-      },
-      steps: {
-        start: {
-          name: 'Scheduled Trigger',
-          type: 'trigger',
-          action: 'onScheduledEvent',
-          params: {}, // Empty - needs parameter collection
-          nextSteps: ['sendReminder']
-        },
-        sendReminder: {
-          name: 'Send Reminder',
-          type: 'action',
-          action: 'sendNotification',
-          params: {}, // Empty - needs parameter collection
-          nextSteps: ['end']
-        },
-        end: {
-          name: 'Workflow Complete',
-          type: 'end',
-          result: 'success'
-        }
-      }
-    };
-  }
-
-  /**
-   * Generate notification workflow template
-   */
-  private generateNotificationWorkflow(
-    userInput: string,
-    context: CreationContext,
-    currentWorkflow?: Partial<WorkflowJSON>
-  ): Partial<WorkflowJSON> {
-    const workflowId = currentWorkflow?.metadata?.id || `workflow-${Date.now()}`;
-    
-    return {
-      schemaVersion: '1.0.0',
-      metadata: {
-        id: workflowId,
-        name: 'Notification Workflow',
-        description: `Notification workflow for: ${userInput}`,
-        version: '1.0.0',
-        status: 'draft',
-        createdAt: new Date(),
-        tags: ['notification', 'email', 'ai-generated']
-      },
-      steps: {
-        start: {
-          name: 'Event Trigger',
-          type: 'trigger',
-          action: 'onMRFSubmit',
-          params: {}, // Empty - needs parameter collection
-          nextSteps: ['sendNotification']
-        },
-        sendNotification: {
-          name: 'Send Notification',
-          type: 'action',
-          action: 'sendNotification',
-          params: {}, // Empty - needs parameter collection
-          nextSteps: ['end']
-        },
-        end: {
-          name: 'Workflow Complete',
-          type: 'end',
-          result: 'success'
-        }
-      }
-    };
-  }
-
-  /**
-   * Generate default workflow template
-   */
-  private generateDefaultWorkflow(
-    userInput: string,
-    context: CreationContext,
-    currentWorkflow?: Partial<WorkflowJSON>
-  ): Partial<WorkflowJSON> {
-    const workflowId = currentWorkflow?.metadata?.id || `workflow-${Date.now()}`;
-    
-    return {
-      schemaVersion: '1.0.0',
-      metadata: {
-        id: workflowId,
-        name: 'Custom Workflow',
-        description: `Workflow for: ${userInput}`,
-        version: '1.0.0',
-        status: 'draft',
-        createdAt: new Date(),
-        tags: ['custom', 'ai-generated']
-      },
-      steps: {
-        start: {
-          name: 'Start',
-          type: 'trigger',
-          action: 'onMRFSubmit',
-          params: {}, // Empty - needs parameter collection
-          nextSteps: ['processRequest']
-        },
-        processRequest: {
-          name: 'Process Request',
-          type: 'action',
-          action: 'createEvent',
-          params: {}, // Empty - needs parameter collection
-          nextSteps: ['end']
-        },
-        end: {
-          name: 'Workflow Complete',
-          type: 'end',
-          result: 'success'
-        }
-      }
+      steps: [] // Empty array - LLM will populate
     };
   }
 
@@ -344,24 +135,41 @@ export class ConversationalWorkflowGenerator {
   private analyzeIncompleteSteps(workflow: Partial<WorkflowJSON>): IncompleteStep[] {
     const incompleteSteps: IncompleteStep[] = [];
     
-    if (!workflow.steps) {
+    if (!workflow.steps || !Array.isArray(workflow.steps)) {
       return incompleteSteps;
     }
 
-    Object.entries(workflow.steps).forEach(([stepId, step]) => {
-      if (step.type === 'trigger' || step.type === 'action') {
+    // Recursively check steps in nested array structure
+    const checkStep = (step: unknown, parentPath: string = '') => {
+      const s = step as Record<string, unknown>;
+      if (s.type === 'trigger' || s.type === 'action') {
         // Check if step has empty params and requires parameters
-        if (step.action && (!step.params || Object.keys(step.params).length === 0)) {
+        if (s.action && (!s.params || Object.keys(s.params as Record<string, unknown>).length === 0)) {
           incompleteSteps.push({
-            stepId,
-            stepName: step.name,
-            functionName: step.action,
-            missingParameters: this.getRequiredParameters(step.action),
-            stepType: step.type as 'trigger' | 'action'
+            stepId: (s.id || s.name) as string,
+            stepName: s.name as string,
+            functionName: s.action as string,
+            missingParameters: this.getRequiredParameters(s.action as string),
+            stepType: s.type as 'trigger' | 'action'
           });
         }
       }
-    });
+      
+      // Check children
+      if (s.children && Array.isArray(s.children)) {
+        s.children.forEach((child: unknown) => checkStep(child, `${parentPath}.children`));
+      }
+      
+      // Check onSuccess/onFailure branches
+      if (s.onSuccess) {
+        checkStep(s.onSuccess, `${parentPath}.onSuccess`);
+      }
+      if (s.onFailure) {
+        checkStep(s.onFailure, `${parentPath}.onFailure`);
+      }
+    };
+
+    workflow.steps.forEach((step: unknown) => checkStep(step));
 
     return incompleteSteps;
   }
@@ -395,7 +203,7 @@ export class ConversationalWorkflowGenerator {
     incompleteSteps: IncompleteStep[]
   ): string {
     const workflowName = workflow.metadata?.name || 'workflow';
-    const stepCount = Object.keys(workflow.steps || {}).length;
+    const stepCount = Array.isArray(workflow.steps) ? workflow.steps.length : 0;
     
     let response = `Great! I've created a ${workflowName.toLowerCase()} with ${stepCount} steps based on your request: "${userInput}".`;
     
@@ -483,7 +291,7 @@ export class ConversationalWorkflowGenerator {
     });
     
     // Add workflow-level questions
-    if (workflow.steps && Object.keys(workflow.steps).length > 2) {
+    if (Array.isArray(workflow.steps) && workflow.steps.length > 2) {
       questions.push(`🔄 Would you like to add any additional steps or modify the workflow flow?`);
     }
     
@@ -523,7 +331,7 @@ export class ConversationalWorkflowGenerator {
     workflow: Partial<WorkflowJSON>,
     incompleteSteps: IncompleteStep[]
   ): CreationPhase {
-    if (!workflow.steps || Object.keys(workflow.steps).length === 0) {
+    if (!Array.isArray(workflow.steps) || workflow.steps.length === 0) {
       return 'trigger_definition';
     }
     

@@ -432,6 +432,10 @@ export function buildWorkflowGenerationPrompt(context: {
     }>;
     example: Record<string, unknown>;
   }>;
+  account?: string; // Account identifier (REQUIRED for template storage)
+  organization?: string | null; // Organization identifier (nullable)
+  author?: string; // User creating the workflow
+  userEmail?: string; // Fallback for author
   userRole?: string;
   userDepartment?: string;
   currentDate?: string;
@@ -468,18 +472,21 @@ ${functionDetails}
 RESPONSE FORMAT:
 Your response should be a JSON object with this structure:
 {
-  "workflow": { 
-    "schemaVersion": "1.0.0",
+  "workflow": {
+    "account": "${context.account || 'ACCOUNT_REQUIRED'}",
+    "organization": ${context.organization ? `"${context.organization}"` : 'null'},
     "metadata": {
-      "id": "workflow-{timestamp}",
-      "name": "string", 
+      "name": "string",
       "description": "string",
-      "version": "1.0.0",
       "status": "draft",
+      "author": "${context.author || context.userEmail || 'USER_REQUIRED'}",
       "createdAt": "${context.currentDate || new Date().toISOString()}",
+      "updatedAt": "${context.currentDate || new Date().toISOString()}",
       "tags": ["ai-generated"]
     },
-    "steps": [ /* NESTED ARRAY FORMAT - See structure guide above */ ]
+    "workflowDefinition": {
+      "steps": [ /* NESTED ARRAY FORMAT - See structure guide above */ ]
+    }
   },
   "conversationalResponse": "your explanation to the user",
   "followUpQuestions": ["question 1", "question 2"],

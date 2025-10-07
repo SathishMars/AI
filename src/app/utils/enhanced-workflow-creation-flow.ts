@@ -121,6 +121,37 @@ export class EnhancedWorkflowCreationFlow {
   }
 
   /**
+   * Find a step by ID in the nested array structure
+   */
+  private findStepById(steps: unknown[], stepId: string): Record<string, unknown> | null {
+    for (const step of steps) {
+      const s = step as Record<string, unknown>;
+      if (s.id === stepId) return s;
+      if (s.children && Array.isArray(s.children)) {
+        const found = this.findStepById(s.children, stepId);
+        if (found) return found;
+      }
+      if (s.onSuccess) {
+        const success = s.onSuccess as Record<string, unknown>;
+        if (success.id === stepId) return success;
+        if (success.children && Array.isArray(success.children)) {
+          const found = this.findStepById([success], stepId);
+          if (found) return found;
+        }
+      }
+      if (s.onFailure) {
+        const failure = s.onFailure as Record<string, unknown>;
+        if (failure.id === stepId) return failure;
+        if (failure.children && Array.isArray(failure.children)) {
+          const found = this.findStepById([failure], stepId);
+          if (found) return found;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
    * Integrate collected parameters into workflow
    */
   private integrateParametersIntoWorkflow(
@@ -129,20 +160,21 @@ export class EnhancedWorkflowCreationFlow {
   ): void {
     console.log('🔗 Integrating parameters into workflow:', { stepId, parameters });
 
-    if (!this.currentState.currentWorkflow.steps || !stepId) {
+    if (!this.currentState.currentWorkflow.steps || !Array.isArray(this.currentState.currentWorkflow.steps) || !stepId) {
       return;
     }
 
-    const step = this.currentState.currentWorkflow.steps[stepId];
+    const step = this.findStepById(this.currentState.currentWorkflow.steps, stepId);
     if (step) {
       // Merge parameters into step
-      step.params = { ...step.params, ...parameters };
+      const existingParams = (step.params as Record<string, unknown>) || {};
+      step.params = { ...existingParams, ...parameters };
       
       console.log('✅ Parameters integrated for step:', stepId, step.params);
       
       // Add success message to conversation
       this.conversationManager.addAimeMessage(
-        `✅ Great! I've configured the "${step.name}" step with your parameters.`,
+        `✅ Great! I've configured the "${step.name as string}" step with your parameters.`,
         'text'
       );
     }
@@ -309,8 +341,8 @@ export class EnhancedWorkflowCreationFlow {
   isWorkflowComplete(): boolean {
     const incompleteSteps = this.findIncompleteSteps();
     return incompleteSteps.length === 0 && 
-           !!this.currentState.currentWorkflow.steps && 
-           Object.keys(this.currentState.currentWorkflow.steps).length > 0;
+           Array.isArray(this.currentState.currentWorkflow.steps) && 
+           this.currentState.currentWorkflow.steps.length > 0;
   }
 
   /**

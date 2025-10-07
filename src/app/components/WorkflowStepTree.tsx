@@ -244,7 +244,7 @@ export default function WorkflowStepTree({ steps, onStepEdit }: WorkflowStepTree
         defaultExpandedItems={expandedItemIds}
         sx={{
           '& .MuiTreeItem-content': {
-            padding: '4px 8px',
+            // padding: '4px 8px',
             borderRadius: 1,
             '&:hover': {
               backgroundColor: 'action.hover'
@@ -257,7 +257,7 @@ export default function WorkflowStepTree({ steps, onStepEdit }: WorkflowStepTree
             }
           },
           '& .MuiTreeItem-label': {
-            padding: 0
+            // padding: 0
           }
         }}
       >

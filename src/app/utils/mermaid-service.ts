@@ -1,5 +1,5 @@
 // src/app/utils/mermaid-service.ts
-import { WorkflowJSON } from '@/app/types/workflow';
+import { WorkflowJSON, WorkflowStep } from '@/app/types/workflow';
 
 // Simple cache to avoid regenerating diagrams for unchanged workflows
 const diagramCache = new Map<string, string>();
@@ -59,13 +59,19 @@ export function clearMermaidCache(): void {
 
 // Enhanced fallback diagram for when generation fails
 export function createFallbackDiagram(workflow: WorkflowJSON): string {
-  const steps = Object.entries(workflow.steps);
+  // Workflow steps are always in nested array format
+  const steps = workflow.steps as WorkflowStep[];
   
   let diagram = 'flowchart TD\n';
   
-  // Add nodes with detailed information but clean styling
-  steps.forEach(([stepId, step]) => {
-    const sanitizedId = stepId.replace(/[^a-zA-Z0-9]/g, '_');
+  // Recursive function to add all steps including nested ones
+  const processedSteps = new Set<string>();
+  
+  const addStep = (step: WorkflowStep): void => {
+    if (processedSteps.has(step.id)) return;
+    processedSteps.add(step.id);
+    
+    const sanitizedId = step.id.replace(/[^a-zA-Z0-9]/g, '_');
     let nodeShape = '';
     
     switch (step.type) {
@@ -75,8 +81,13 @@ export function createFallbackDiagram(workflow: WorkflowJSON): string {
       case 'condition':
         // Add condition details if available
         let conditionLabel = step.name;
-        if (step.condition && step.condition.fact && step.condition.operator && step.condition.value !== undefined) {
-          conditionLabel += `<br/>${step.condition.fact} ${step.condition.operator} ${step.condition.value}`;
+        if (step.condition && step.condition.all) {
+          const firstCondition = step.condition.all[0];
+          if (firstCondition && firstCondition.fact && firstCondition.operator && firstCondition.value !== undefined) {
+            conditionLabel += `<br/>${firstCondition.fact} ${firstCondition.operator} ${firstCondition.value}`;
+          }
+        } else if (step.condition && step.condition.any) {
+          conditionLabel += `<br/>OR condition`;
         }
         nodeShape = `${sanitizedId}{"${conditionLabel}"}`;
         break;
@@ -107,31 +118,69 @@ export function createFallbackDiagram(workflow: WorkflowJSON): string {
     }
     
     diagram += `    ${nodeShape}\n`;
-  });
+    
+    // Process nested children
+    if (step.children && Array.isArray(step.children)) {
+      step.children.forEach((child) => addStep(child));
+    }
+    
+    // Process inline onSuccess/onFailure branches
+    if (step.onSuccess && typeof step.onSuccess === 'object') {
+      addStep(step.onSuccess);
+    }
+    if (step.onFailure && typeof step.onFailure === 'object') {
+      addStep(step.onFailure);
+    }
+  };
+  
+  // Add all steps
+  steps.forEach((step) => addStep(step));
   
   diagram += '\n';
   
-  // Add connections with enhanced labels
-  steps.forEach(([stepId, step]) => {
-    const sanitizedId = stepId.replace(/[^a-zA-Z0-9]/g, '_');
+  // Add connections
+  const addConnections = (step: WorkflowStep): void => {
+    const sanitizedId = step.id.replace(/[^a-zA-Z0-9]/g, '_');
     
-    if (step.nextSteps) {
-      step.nextSteps.forEach(nextStep => {
-        const sanitizedNext = nextStep.replace(/[^a-zA-Z0-9]/g, '_');
-        diagram += `    ${sanitizedId} --> ${sanitizedNext}\n`;
-      });
+    // Handle children connections
+    if (step.children && Array.isArray(step.children) && step.children.length > 0) {
+      const firstChild = step.children[0];
+      const sanitizedChild = firstChild.id.replace(/[^a-zA-Z0-9]/g, '_');
+      diagram += `    ${sanitizedId} --> ${sanitizedChild}\n`;
+      
+      // Process children recursively
+      step.children.forEach((child) => addConnections(child));
     }
     
+    // Handle inline branches
     if (step.onSuccess) {
-      const sanitizedNext = step.onSuccess.replace(/[^a-zA-Z0-9]/g, '_');
-      diagram += `    ${sanitizedId} -->|Success| ${sanitizedNext}\n`;
+      if (typeof step.onSuccess === 'object' && step.onSuccess !== null && 'id' in step.onSuccess) {
+        const sanitizedNext = (step.onSuccess.id as string).replace(/[^a-zA-Z0-9]/g, '_');
+        diagram += `    ${sanitizedId} -->|Success| ${sanitizedNext}\n`;
+        addConnections(step.onSuccess as WorkflowStep);
+      }
     }
     
     if (step.onFailure) {
-      const sanitizedNext = step.onFailure.replace(/[^a-zA-Z0-9]/g, '_');
+      if (typeof step.onFailure === 'object' && step.onFailure !== null && 'id' in step.onFailure) {
+        const sanitizedNext = (step.onFailure.id as string).replace(/[^a-zA-Z0-9]/g, '_');
+        diagram += `    ${sanitizedId} -->|Failure| ${sanitizedNext}\n`;
+        addConnections(step.onFailure as WorkflowStep);
+      }
+    }
+    
+    // Handle onSuccessGoTo/onFailureGoTo references
+    if (step.onSuccessGoTo) {
+      const sanitizedNext = step.onSuccessGoTo.replace(/[^a-zA-Z0-9]/g, '_');
+      diagram += `    ${sanitizedId} -->|Success| ${sanitizedNext}\n`;
+    }
+    if (step.onFailureGoTo) {
+      const sanitizedNext = step.onFailureGoTo.replace(/[^a-zA-Z0-9]/g, '_');
       diagram += `    ${sanitizedId} -->|Failure| ${sanitizedNext}\n`;
     }
-  });
+  };
+  
+  steps.forEach((step) => addConnections(step));
   
   // Add professional styling classes with accessibility compliance
   diagram += '\n    %% Professional styling with detailed content focus\n';
@@ -140,11 +189,31 @@ export function createFallbackDiagram(workflow: WorkflowJSON): string {
   diagram += '    classDef actionClass fill:#E3F2FD,stroke:#1976D2,stroke-width:2px,color:#0D47A1\n';
   diagram += '    classDef endClass fill:#FFEBEE,stroke:#B71C1C,stroke-width:2px,color:#B71C1C\n\n';
   
-  // Apply classes to nodes based on step type
-  steps.forEach(([stepId, step]) => {
+  // Apply classes to all processed steps
+  processedSteps.forEach(stepId => {
     const sanitizedId = stepId.replace(/[^a-zA-Z0-9]/g, '_');
-    let className = '';
+    // Find the step to get its type
+    const findStep = (steps: WorkflowStep[]): WorkflowStep | null => {
+      for (const step of steps) {
+        if (step.id === stepId) return step;
+        if (step.children) {
+          const found = findStep(step.children);
+          if (found) return found;
+        }
+        if (step.onSuccess && typeof step.onSuccess === 'object' && step.onSuccess.id === stepId) {
+          return step.onSuccess;
+        }
+        if (step.onFailure && typeof step.onFailure === 'object' && step.onFailure.id === stepId) {
+          return step.onFailure;
+        }
+      }
+      return null;
+    };
     
+    const step = findStep(steps);
+    if (!step) return;
+    
+    let className = '';
     switch (step.type) {
       case 'trigger':
         className = 'triggerClass';

@@ -1,309 +1,448 @@
 // src/test/app/utils/workflow-format-adapter.test.ts
+/**
+ * Tests for workflow format adapter utilities
+ * 
+ * IMPORTANT: Legacy format conversion functions have been removed.
+ * Only nested array format is supported now.
+ * See: ai-implementation-summaries/workflow-template-architecture-complete.md
+ */
 import { describe, it, expect } from '@jest/globals';
 import {
-  isLegacyFormat,
-  convertLegacyToNestedArray,
-  convertNestedArrayToLegacy,
-  ensureNestedArrayFormat
+  isValidNestedFormat,
+  ensureNestedArrayFormat,
+  validateWorkflowStructure
 } from '@/app/utils/workflow-format-adapter';
 import { WorkflowStep, WorkflowJSON } from '@/app/types/workflow';
 
 describe('workflow-format-adapter', () => {
-  describe('isLegacyFormat', () => {
-    it('should detect legacy format with numbered keys', () => {
-      const legacy = {
-        steps: {
-          "1": { name: "Start", type: "trigger" },
-          "1.1": { name: "Check", type: "condition" }
-        }
-      };
-      
-      expect(isLegacyFormat(legacy)).toBe(true);
-    });
-
-    it('should detect new format with array', () => {
-      const newFormat = {
+  describe('isValidNestedFormat', () => {
+    it('should return true for valid nested array format', () => {
+      const validWorkflow = {
         steps: [
           { id: "start", name: "Start", type: "trigger" },
           { id: "check", name: "Check", type: "condition" }
         ]
       };
       
-      expect(isLegacyFormat(newFormat)).toBe(false);
+      expect(isValidNestedFormat(validWorkflow)).toBe(true);
+    });
+
+    it('should return false for object-keyed format', () => {
+      const objectFormat = {
+        steps: {
+          "1": { name: "Start", type: "trigger" },
+          "1.1": { name: "Check", type: "condition" }
+        }
+      };
+      
+      expect(isValidNestedFormat(objectFormat)).toBe(false);
     });
 
     it('should return false for invalid input', () => {
-      expect(isLegacyFormat(null)).toBe(false);
-      expect(isLegacyFormat(undefined)).toBe(false);
-      expect(isLegacyFormat({})).toBe(false);
-      expect(isLegacyFormat({ steps: [] })).toBe(false);
-    });
-  });
-
-  describe('convertLegacyToNestedArray', () => {
-    it('should convert simple linear workflow', () => {
-      const legacy = {
-        steps: {
-          "1": {
-            name: "Start: On MRF Submission",
-            type: "trigger" as const,
-            nextSteps: ["1.1"]
-          },
-          "1.1": {
-            name: "Action: Send Email",
-            type: "action" as const,
-            action: "sendEmail"
-          }
-        }
-      };
-
-      const result = convertLegacyToNestedArray(legacy);
-
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe("Start: On MRF Submission");
-      expect(result[0].id).toMatch(/^start/i);
-      expect(result[0].children).toBeDefined();
-      expect(result[0].children).toHaveLength(1);
-      expect(result[0].children![0].name).toBe("Action: Send Email");
+      expect(isValidNestedFormat(null)).toBe(false);
+      expect(isValidNestedFormat(undefined)).toBe(false);
+      expect(isValidNestedFormat({})).toBe(false);
+      expect(isValidNestedFormat({ steps: "invalid" })).toBe(false);
     });
 
-    it('should convert workflow with conditional paths', () => {
-      const legacy = {
-        steps: {
-          "1": {
-            name: "Check: Budget Exceeds $10K",
-            type: "condition" as const,
-            condition: { fact: "budget", operator: "greaterThan", value: 10000 },
-            onSuccess: "2",
-            onFailure: "3"
-          },
-          "2": {
-            name: "Action: Request Approval",
-            type: "action" as const
-          },
-          "3": {
-            name: "Action: Auto Approve",
-            type: "action" as const
-          }
-        }
-      };
-
-      const result = convertLegacyToNestedArray(legacy);
-
-      // Only root step (1) should be at top level since 2 and 3 are referenced
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe("Check: Budget Exceeds $10K");
-      expect(result[0].onSuccessGoTo).toBeDefined();
-      expect(result[0].onFailureGoTo).toBeDefined();
-      
-      // References should use human-readable IDs
-      expect(result[0].onSuccessGoTo).toMatch(/action/i);
-      expect(result[0].onFailureGoTo).toMatch(/action/i);
-    });
-
-    it('should generate human-readable IDs', () => {
-      const legacy = {
-        steps: {
-          "1": {
-            name: "Start: On MRF Submission",
-            type: "trigger" as const
-          },
-          "2": {
-            name: "Check: Attendee Count Over 100",
-            type: "condition" as const
-          },
-          "3": {
-            name: "Action: Send Notification Email",
-            type: "action" as const
-          }
-        }
-      };
-
-      const result = convertLegacyToNestedArray(legacy);
-
-      // Check that IDs are camelCase and descriptive
-      expect(result[0].id).toMatch(/^start/i);
-      expect(result[1].id).toMatch(/^check/i);
-      expect(result[2].id).toMatch(/^action/i);
-      
-      // Check uniqueness
-      const ids = result.map(s => s.id);
-      expect(new Set(ids).size).toBe(ids.length);
-    });
-
-    it('should handle nested children', () => {
-      const legacy = {
-        steps: {
-          "1": {
-            name: "Start: On MRF Submission",
-            type: "trigger" as const,
-            nextSteps: ["1.1"]
-          },
-          "1.1": {
-            name: "Check: Budget Available",
-            type: "condition" as const,
-            nextSteps: ["1.1.1"]
-          },
-          "1.1.1": {
-            name: "Action: Approve Request",
-            type: "action" as const
-          }
-        }
-      };
-
-      const result = convertLegacyToNestedArray(legacy);
-
-      expect(result).toHaveLength(1);
-      expect(result[0].children).toBeDefined();
-      expect(result[0].children).toHaveLength(1);
-      expect(result[0].children![0].children).toBeDefined();
-      expect(result[0].children![0].children).toHaveLength(1);
-    });
-  });
-
-  describe('convertNestedArrayToLegacy', () => {
-    it('should convert new format back to legacy', () => {
-      const newFormat: WorkflowStep[] = [
-        {
-          id: "startWorkflow",
-          name: "Start: On MRF Submission",
-          type: "trigger",
-          children: [
-            {
-              id: "sendEmail",
-              name: "Action: Send Email",
-              type: "action"
-            }
-          ]
-        }
-      ];
-
-      const result = convertNestedArrayToLegacy(newFormat);
-
-      expect(result["1"]).toBeDefined();
-      expect(result["1"].name).toBe("Start: On MRF Submission");
-      expect(result["1"].nextSteps).toBeDefined();
-      expect(result["1"].nextSteps).toHaveLength(1);
-      expect(result["1.1"]).toBeDefined();
-      expect(result["1.1"].name).toBe("Action: Send Email");
-    });
-
-    it('should preserve step references', () => {
-      const newFormat: WorkflowStep[] = [
-        {
-          id: "checkBudget",
-          name: "Check: Budget Exceeds $10K",
-          type: "condition",
-          onSuccessGoTo: "requestApproval",
-          onFailureGoTo: "autoApprove"
-        },
-        {
-          id: "requestApproval",
-          name: "Action: Request Approval",
-          type: "action"
-        },
-        {
-          id: "autoApprove",
-          name: "Action: Auto Approve",
-          type: "action"
-        }
-      ];
-
-      const result = convertNestedArrayToLegacy(newFormat);
-
-      expect(result["1"].onSuccess).toBeDefined();
-      expect(result["1"].onFailure).toBeDefined();
-      expect(result["2"]).toBeDefined();
-      expect(result["3"]).toBeDefined();
+    it('should return true for empty array', () => {
+      const emptyWorkflow = { steps: [] };
+      expect(isValidNestedFormat(emptyWorkflow)).toBe(true);
     });
   });
 
   describe('ensureNestedArrayFormat', () => {
-    it('should return array as-is if already in new format', () => {
-      const newFormat = {
+    it('should return steps array for valid workflow', () => {
+      const workflow: WorkflowJSON = {
         steps: [
-          { id: "start", name: "Start", type: "trigger" as const }
-        ]
-      } as Partial<WorkflowJSON>;
-
-      const result = ensureNestedArrayFormat(newFormat as WorkflowJSON);
-
-      expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("start");
-    });
-
-    it('should convert legacy format to new format', () => {
-      const legacy = {
-        steps: {
-          "1": { name: "Start", type: "trigger" as const }
+          { 
+            id: "start", 
+            name: "Start: On MRF Submission", 
+            type: "trigger",
+            action: "onMRFSubmit",
+            params: {}
+          }
+        ],
+        schemaVersion: "1.0.0",
+        metadata: {
+          id: "test123",
+          name: "Test Workflow",
+          status: "draft",
+          version: "1.0.0",
+          tags: []
         }
       };
-
-      const result = ensureNestedArrayFormat(legacy);
-
+      
+      const result = ensureNestedArrayFormat(workflow);
+      
+      expect(Array.isArray(result)).toBe(true);
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBeDefined();
-      expect(result[0].name).toBe("Start");
+      expect(result[0].id).toBe("start");
+      expect(result[0].name).toBe("Start: On MRF Submission");
+    });
+
+    it('should return empty array for invalid workflow structure', () => {
+      const invalidWorkflow = {
+        steps: { "1": { name: "Bad" } }
+      } as unknown as WorkflowJSON;
+      
+      const result = ensureNestedArrayFormat(invalidWorkflow);
+      
+      expect(Array.isArray(result)).toBe(true);
+      expect(result).toHaveLength(0);
     });
 
     it('should return empty array for invalid input', () => {
-      const invalidInput = {} as WorkflowJSON;
-      const result = ensureNestedArrayFormat(invalidInput);
-      expect(result).toEqual([]);
+      const invalidWorkflow = {} as unknown as WorkflowJSON;
+      const result = ensureNestedArrayFormat(invalidWorkflow);
+      
+      expect(Array.isArray(result)).toBe(true);
+      expect(result).toHaveLength(0);
+    });
+
+    it('should handle nested children correctly', () => {
+      const workflow: WorkflowJSON = {
+        steps: [
+          {
+            id: "start",
+            name: "Start",
+            type: "trigger",
+            action: "onMRFSubmit",
+            params: {},
+            children: [
+              {
+                id: "check",
+                name: "Check",
+                type: "condition",
+                params: {}
+              }
+            ]
+          }
+        ],
+        schemaVersion: "1.0.0",
+        metadata: {
+          id: "test123",
+          name: "Test Workflow",
+          status: "draft",
+          version: "1.0.0",
+          tags: []
+        }
+      };
+      
+      const result = ensureNestedArrayFormat(workflow);
+      
+      expect(result).toHaveLength(1);
+      expect(result[0].children).toBeDefined();
+      expect(result[0].children).toHaveLength(1);
+      expect(result[0].children![0].id).toBe("check");
     });
   });
 
-  describe('ID generation edge cases', () => {
-    it('should handle steps with no name prefix', () => {
-      const legacy = {
-        steps: {
-          "1": {
-            name: "Submit Form",
-            type: "action" as const
+  describe('validateWorkflowStructure', () => {
+    it('should validate correct workflow structure', () => {
+      const validWorkflow: WorkflowJSON = {
+        steps: [
+          {
+            id: "startWorkflow",
+            name: "Start: On MRF Submission",
+            type: "trigger",
+            action: "onMRFSubmit",
+            params: {}
           }
+        ],
+        schemaVersion: "1.0.0",
+        metadata: {
+          id: "test123",
+          name: "Test Workflow",
+          status: "draft",
+          version: "1.0.0",
+          tags: []
         }
       };
-
-      const result = convertLegacyToNestedArray(legacy);
-
-      expect(result[0].id).toBeDefined();
-      expect(result[0].id.length).toBeGreaterThan(2);
+      
+      expect(validateWorkflowStructure(validWorkflow)).toBe(true);
     });
 
-    it('should handle duplicate names', () => {
-      const legacy = {
-        steps: {
-          "1": {
-            name: "Check: Budget",
-            type: "condition" as const
-          },
-          "2": {
-            name: "Check: Budget",
-            type: "condition" as const
-          }
+    it('should reject workflow with non-array steps', () => {
+      const invalidWorkflow = {
+        steps: { "1": { name: "Bad" } },
+        schemaVersion: "1.0.0",
+        metadata: {
+          id: "test123",
+          name: "Test Workflow",
+          status: "draft",
+          version: "1.0.0",
+          tags: []
         }
-      };
-
-      const result = convertLegacyToNestedArray(legacy);
-
-      expect(result).toHaveLength(2);
-      expect(result[0].id).not.toBe(result[1].id);
+      } as unknown as WorkflowJSON;
+      
+      expect(validateWorkflowStructure(invalidWorkflow)).toBe(false);
     });
 
-    it('should handle special characters in names', () => {
-      const legacy = {
-        steps: {
-          "1": {
-            name: "Action: Send Email (Important!)",
-            type: "action" as const
-          }
+    it('should reject step with missing id', () => {
+      const invalidWorkflow: WorkflowJSON = {
+        steps: [
+          {
+            name: "Missing ID",
+            type: "trigger",
+            action: "onMRFSubmit",
+            params: {}
+          } as WorkflowStep
+        ],
+        schemaVersion: "1.0.0",
+        metadata: {
+          id: "test123",
+          name: "Test Workflow",
+          status: "draft",
+          version: "1.0.0",
+          tags: []
         }
       };
+      
+      expect(validateWorkflowStructure(invalidWorkflow)).toBe(false);
+    });
 
-      const result = convertLegacyToNestedArray(legacy);
+    it('should reject step with missing name', () => {
+      const invalidWorkflow: WorkflowJSON = {
+        steps: [
+          {
+            id: "test",
+            type: "trigger",
+            action: "onMRFSubmit",
+            params: {}
+          } as WorkflowStep
+        ],
+        schemaVersion: "1.0.0",
+        metadata: {
+          id: "test123",
+          name: "Test Workflow",
+          status: "draft",
+          version: "1.0.0",
+          tags: []
+        }
+      };
+      
+      expect(validateWorkflowStructure(invalidWorkflow)).toBe(false);
+    });
 
-      // Should remove special characters and create valid ID
-      expect(result[0].id).toMatch(/^[a-zA-Z][a-zA-Z0-9]*$/);
+    it('should reject step with missing type', () => {
+      const invalidWorkflow: WorkflowJSON = {
+        steps: [
+          {
+            id: "test",
+            name: "Test Step",
+            action: "onMRFSubmit",
+            params: {}
+          } as WorkflowStep
+        ],
+        schemaVersion: "1.0.0",
+        metadata: {
+          id: "test123",
+          name: "Test Workflow",
+          status: "draft",
+          version: "1.0.0",
+          tags: []
+        }
+      };
+      
+      expect(validateWorkflowStructure(invalidWorkflow)).toBe(false);
+    });
+
+    it('should reject step with invalid ID format (not camelCase)', () => {
+      const invalidWorkflow: WorkflowJSON = {
+        steps: [
+          {
+            id: "Invalid-ID-123",
+            name: "Test Step",
+            type: "trigger",
+            action: "onMRFSubmit",
+            params: {}
+          }
+        ],
+        schemaVersion: "1.0.0",
+        metadata: {
+          id: "test123",
+          name: "Test Workflow",
+          status: "draft",
+          version: "1.0.0",
+          tags: []
+        }
+      };
+      
+      expect(validateWorkflowStructure(invalidWorkflow)).toBe(false);
+    });
+
+    it('should accept step with proper camelCase ID', () => {
+      const validWorkflow: WorkflowJSON = {
+        steps: [
+          {
+            id: "startWorkflowOnMRF",
+            name: "Start: On MRF Submission",
+            type: "trigger",
+            action: "onMRFSubmit",
+            params: {}
+          }
+        ],
+        schemaVersion: "1.0.0",
+        metadata: {
+          id: "test123",
+          name: "Test Workflow",
+          status: "draft",
+          version: "1.0.0",
+          tags: []
+        }
+      };
+      
+      expect(validateWorkflowStructure(validWorkflow)).toBe(true);
+    });
+
+    it('should validate nested children', () => {
+      const validWorkflow: WorkflowJSON = {
+        steps: [
+          {
+            id: "start",
+            name: "Start",
+            type: "trigger",
+            action: "onMRFSubmit",
+            params: {},
+            children: [
+              {
+                id: "check",
+                name: "Check",
+                type: "condition",
+                params: {}
+              }
+            ]
+          }
+        ],
+        schemaVersion: "1.0.0",
+        metadata: {
+          id: "test123",
+          name: "Test Workflow",
+          status: "draft",
+          version: "1.0.0",
+          tags: []
+        }
+      };
+      
+      expect(validateWorkflowStructure(validWorkflow)).toBe(true);
+    });
+
+    it('should reject if children is not an array', () => {
+      const invalidWorkflow: WorkflowJSON = {
+        steps: [
+          {
+            id: "start",
+            name: "Start",
+            type: "trigger",
+            action: "onMRFSubmit",
+            params: {},
+            children: { "bad": "format" } as unknown as WorkflowStep[]
+          }
+        ],
+        schemaVersion: "1.0.0",
+        metadata: {
+          id: "test123",
+          name: "Test Workflow",
+          status: "draft",
+          version: "1.0.0",
+          tags: []
+        }
+      };
+      
+      expect(validateWorkflowStructure(invalidWorkflow)).toBe(false);
+    });
+
+    it('should reject if child step is invalid', () => {
+      const invalidWorkflow: WorkflowJSON = {
+        steps: [
+          {
+            id: "start",
+            name: "Start",
+            type: "trigger",
+            action: "onMRFSubmit",
+            params: {},
+            children: [
+              {
+                id: "Invalid-ID",
+                name: "Bad Child",
+                type: "condition",
+                params: {}
+              }
+            ]
+          }
+        ],
+        schemaVersion: "1.0.0",
+        metadata: {
+          id: "test123",
+          name: "Test Workflow",
+          status: "draft",
+          version: "1.0.0",
+          tags: []
+        }
+      };
+      
+      expect(validateWorkflowStructure(invalidWorkflow)).toBe(false);
+    });
+
+    it('should validate inline onSuccess branch', () => {
+      const validWorkflow: WorkflowJSON = {
+        steps: [
+          {
+            id: "check",
+            name: "Check",
+            type: "condition",
+            params: {},
+            onSuccess: {
+              id: "success",
+              name: "Success",
+              type: "action",
+              action: "doSomething",
+              params: {}
+            }
+          }
+        ],
+        schemaVersion: "1.0.0",
+        metadata: {
+          id: "test123",
+          name: "Test Workflow",
+          status: "draft",
+          version: "1.0.0",
+          tags: []
+        }
+      };
+      
+      expect(validateWorkflowStructure(validWorkflow)).toBe(true);
+    });
+
+    it('should reject invalid inline onSuccess branch', () => {
+      const invalidWorkflow: WorkflowJSON = {
+        steps: [
+          {
+            id: "check",
+            name: "Check",
+            type: "condition",
+            params: {},
+            onSuccess: {
+              id: "Bad-ID",
+              name: "Success",
+              type: "action",
+              action: "doSomething",
+              params: {}
+            }
+          }
+        ],
+        schemaVersion: "1.0.0",
+        metadata: {
+          id: "test123",
+          name: "Test Workflow",
+          status: "draft",
+          version: "1.0.0",
+          tags: []
+        }
+      };
+      
+      expect(validateWorkflowStructure(invalidWorkflow)).toBe(false);
     });
   });
 });

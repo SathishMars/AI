@@ -215,7 +215,7 @@ flowchart TD
       workflowId: currentWorkflow?.metadata?.id,
       workflowName: currentWorkflow?.metadata?.name,
       conversationGoal: 'create' as const,
-      currentWorkflowSteps: currentWorkflow?.steps ? Object.keys(currentWorkflow.steps) : [],
+      currentWorkflowSteps: Array.isArray(currentWorkflow?.steps) ? currentWorkflow.steps.map((s: { id?: string; name?: string }) => s.id || s.name || '') : [],
       availableFunctions: fullContext.availableFunctions || [],
       functionDefinitions: functionDefs,
       conversationHistory: fullContext.conversationHistory || [],

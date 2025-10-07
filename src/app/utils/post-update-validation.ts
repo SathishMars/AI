@@ -223,7 +223,7 @@ export class PostUpdateValidationSystem {
       });
     }
 
-    if (!workflow.steps || Object.keys(workflow.steps).length === 0) {
+    if (!Array.isArray(workflow.steps) || workflow.steps.length === 0) {
       simpleValidation.errors.push({
         id: 'missing_workflow_steps',
         severity: 'error',
@@ -351,7 +351,7 @@ export class PostUpdateValidationSystem {
   }
 
   private isValidatableWorkflow(workflow: Partial<WorkflowJSON>): boolean {
-    return !!(workflow.metadata?.id && workflow.steps && Object.keys(workflow.steps).length > 0);
+    return !!(workflow.metadata?.id && Array.isArray(workflow.steps) && workflow.steps.length > 0);
   }
 
   private ensureCompleteWorkflow(partialWorkflow: Partial<WorkflowJSON>): WorkflowJSON {

@@ -57,7 +57,7 @@ export class StreamingWorkflowGenerator {
         if (workflow) {
           console.log('📝 Received workflow update from API:', workflow);
           this.accumulatedWorkflow = this.mergeWorkflowUpdate(this.accumulatedWorkflow, workflow);
-          this.stepCount = Object.keys(this.accumulatedWorkflow.steps || {}).length;
+          this.stepCount = Array.isArray(this.accumulatedWorkflow.steps) ? this.accumulatedWorkflow.steps.length : 0;
           
           // Log conversational data if present
           if (conversationalResponse || parameterCollectionNeeded) {
@@ -160,7 +160,7 @@ export class StreamingWorkflowGenerator {
       
       if (workflowUpdate) {
         this.accumulatedWorkflow = this.mergeWorkflowUpdate(this.accumulatedWorkflow, workflowUpdate);
-        this.stepCount = Object.keys(this.accumulatedWorkflow.steps || {}).length;
+        this.stepCount = Array.isArray(this.accumulatedWorkflow.steps) ? this.accumulatedWorkflow.steps.length : 0;
       }
       
       this.buffer += ' ' + chunk;
@@ -208,33 +208,10 @@ export class StreamingWorkflowGenerator {
     return null;
   }
 
-  /**
-   * Generate trigger step
-   */
-  private generateTriggerStep(): Partial<WorkflowJSON> {
-    return {
-      metadata: {
-        id: `workflow-${Date.now()}`,
-        name: 'AI Generated Workflow',
-        description: 'Workflow created through AI assistance',
-        version: '1.0.0',
-        status: 'draft',
-        createdAt: new Date(),
-        tags: ['ai-generated', 'mrf-workflow']
-      },
-      steps: {
-        start: {
-          name: 'MRF Submitted',
-          type: 'trigger',
-          action: 'onMRFSubmit',
-          params: { mrfID: 'dynamic' },
-          nextSteps: ['checkApprovalNeeded']
-        }
-      }
-    };
-  }
 
   /**
+   * Merge workflow update with accumulated workflow
+```  /**
    * Generate approval condition step based on user requirements
    */
   private generateApprovalConditionStep(): Partial<WorkflowJSON> {
