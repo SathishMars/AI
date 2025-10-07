@@ -111,28 +111,39 @@ export default function VisualizationPane({
     return [];
   }, [workflow]);
 
-  const handleEditStep = (stepId: string, step: WorkflowStep) => {
-    setEditingStepId(stepId);
-    setEditingStep({ ...step });
-  };
-
   const handleSaveStep = () => {
-    if (editingStepId && editingStep) {
+    if (editingStep) {
+      // Find and update the step in the workflow
+      const updateStepInTree = (steps: WorkflowStep[]): WorkflowStep[] => {
+        return steps.map(step => {
+          if (step.id === editingStep.id) {
+            return editingStep;
+          }
+          const updated = { ...step };
+          if (step.children) {
+            updated.children = updateStepInTree(step.children);
+          }
+          if (step.onSuccess && step.onSuccess.id === editingStep.id) {
+            updated.onSuccess = editingStep;
+          }
+          if (step.onFailure && step.onFailure.id === editingStep.id) {
+            updated.onFailure = editingStep;
+          }
+          return updated;
+        });
+      };
+
+      const updatedSteps = updateStepInTree(workflowSteps);
       const updatedWorkflow = {
         ...workflow,
-        steps: {
-          ...workflow.steps,
-          [editingStepId]: editingStep
-        }
+        steps: updatedSteps
       };
       onWorkflowChange(updatedWorkflow);
-      setEditingStepId(null);
       setEditingStep(null);
     }
   };
 
   const handleCancelEdit = () => {
-    setEditingStepId(null);
     setEditingStep(null);
   };
 
@@ -181,8 +192,8 @@ export default function VisualizationPane({
           const step = stepData as WorkflowStep;
           const stepErrors = getStepErrors(stepId);
           const hasErrors = stepErrors.length > 0;
-          const isEditing = editingStepId === stepId;
-          const currentStep = isEditing ? editingStep! : step;
+          const isEditing = editingStep?.id === stepId;
+          const currentStep = isEditing && editingStep ? editingStep : step;
 
           return (
             <Card 
@@ -215,7 +226,7 @@ export default function VisualizationPane({
                       </IconButton>
                     </Box>
                   ) : (
-                    <IconButton onClick={() => handleEditStep(stepId, step)} size="small">
+                    <IconButton onClick={() => setEditingStep({ ...step })} size="small">
                       <EditIcon />
                     </IconButton>
                   )
