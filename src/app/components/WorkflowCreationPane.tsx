@@ -277,48 +277,21 @@ export default function WorkflowCreationPane({
         // Set the context state
         setConversationContext(context);
         
-        // Try to load existing conversation first
-        const existingConversationKey = `conversation_${currentWorkflowId}`;
-        let manager: ConversationStateManager | null = null;
+        // TODO: For saved templates (not 'new-workflow'), load conversation from database
+        // For now, always create fresh conversation state
+        // Database integration will be added in future to persist conversations for saved templates
         
-        if (typeof window !== 'undefined' && window.localStorage) {
-          const savedData = localStorage.getItem(existingConversationKey);
-          if (savedData) {
-            try {
-              const parsedState = JSON.parse(savedData);
-              // Restore conversation state with proper Date objects
-              const restoredState = {
-                ...parsedState,
-                messages: parsedState.messages.map((msg: ConversationMessage) => ({
-                  ...msg,
-                  timestamp: new Date(msg.timestamp)
-                })),
-                lastActivity: new Date(parsedState.lastActivity),
-                context: { ...context, ...parsedState.context } // Merge with current context
-              };
-              
-              manager = new ConversationStateManager(restoredState, workflowContextForDb);
-              console.log('✅ Loaded existing conversation with', restoredState.messages.length, 'messages');
-            } catch (error) {
-              console.warn('⚠️ Failed to restore conversation, creating new one:', error);
-            }
-          }
-        }
+        const conversationState = createEmptyConversationState(currentWorkflowId, context);
+        const manager = new ConversationStateManager(conversationState, workflowContextForDb);
         
-        // Create new conversation if no existing one found
-        if (!manager) {
-          const conversationState = createEmptyConversationState(currentWorkflowId, context);
-          manager = new ConversationStateManager(conversationState, workflowContextForDb);
-          
-          // Add combined welcome and guidance message only for new conversations
-          const welcomeMessage = mrfData 
-            ? `Hi! I'm aime, your AI workflow assistant powered by LangChain. I see you want to create a workflow for "${mrfData.title}". Let's build this together step by step! I remember our entire conversation and can help refine the workflow as we go. Just describe what you want the workflow to do.`
-            : isNewWorkflow
-              ? `Hi! I'm aime, your AI workflow assistant powered by LangChain. I'm here to help you create a new workflow from scratch with persistent conversation memory. What would you like to build or modify?\n\nTo get started, you can describe your workflow in natural language. For example: 'When an MRF is submitted, check if it needs approval based on budget or location, then either send for approval or proceed directly.' I'll remember our conversation and can help you refine the workflow iteratively.`
-              : `Hi! I'm aime, your AI workflow assistant powered by LangChain. I'm here to help you edit your existing workflow with full conversation context. What would you like to build or modify?`;          
-          manager.addAimeMessage(welcomeMessage, 'text');
-          console.log('✅ Created new conversation with welcome message');
-        }
+        // Add welcome message for new conversation
+        const welcomeMessage = mrfData 
+          ? `Hi! I'm aime, your AI workflow assistant powered by LangChain. I see you want to create a workflow for "${mrfData.title}". Let's build this together step by step! Just describe what you want the workflow to do.`
+          : isNewWorkflow
+            ? `Hi! I'm aime, your AI workflow assistant powered by LangChain. I'm here to help you create a new workflow from scratch. What would you like to build?\n\nTo get started, you can describe your workflow in natural language. For example: 'When an MRF is submitted, check if it needs approval based on budget or location, then either send for approval or proceed directly.'`
+            : `Hi! I'm aime, your AI workflow assistant powered by LangChain. I'm here to help you edit your existing workflow. What would you like to modify?`;          
+        manager.addAimeMessage(welcomeMessage, 'text');
+        console.log('✅ Created fresh conversation session');
         
         setConversationManager(manager);
         
@@ -724,39 +697,10 @@ export default function WorkflowCreationPane({
     }
   }, [conversationManager, messages.length]);
   
-  // Simple background persistence - save messages occasionally without affecting UI
-  useEffect(() => {
-    if (!conversationManager || messages.length === 0) return;
-    
-    // Save to localStorage periodically (non-intrusive)
-    const saveInterval = setInterval(() => {
-      try {
-        const workflowId = workflow.metadata?.id || 'new-workflow';
-        const conversationKey = `conversation_${workflowId}`;
-        const state = conversationManager.getState();
-        
-        // Update conversation manager with current local messages if they differ
-        const managerMessages = conversationManager.getMessages();
-        if (messages.length > managerMessages.length) {
-          // Local state has more messages, sync the difference
-          const newMessages = messages.slice(managerMessages.length);
-          newMessages.forEach(msg => {
-            if (msg.sender === 'user') {
-              conversationManager.addUserMessage(msg.content);
-            } else {
-              conversationManager.addAimeMessage(msg.content, msg.type);
-            }
-          });
-        }
-        
-        localStorage.setItem(conversationKey, JSON.stringify(state));
-      } catch (error) {
-        console.warn('Failed to save conversation:', error);
-      }
-    }, 5000); // Save every 5 seconds
-    
-    return () => clearInterval(saveInterval);
-  }, [conversationManager, messages, workflow.metadata?.id]);
+  // TODO: Database persistence for saved templates
+  // For saved templates (with real IDs), conversations should be persisted to database
+  // This will be implemented when database conversation storage is added
+  // New/unsaved templates will have ephemeral conversations (session-only)
   
 
   // Auto-scroll to bottom when new messages are added (not when existing ones are updated)

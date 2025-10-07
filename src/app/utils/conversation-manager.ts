@@ -220,20 +220,17 @@ export class ConversationStateManager {
     try {
       const conversationData = this.getState();
       
-      // Save to database if we have workflow context
+      // Save to database if we have workflow context (saved templates only)
       if (this.workflowContext && shouldUseDatabaseConversations(
         this.workflowContext.account, 
         this.workflowContext.workflowTemplateName
       )) {
         await this.saveToDatabaseAPI(conversationData);
+        console.log('Conversation autosaved to database:', this.state.conversationId);
+      } else {
+        // No database context - conversation is ephemeral (not persisted)
+        console.log('Ephemeral conversation (no persistence):', this.state.conversationId);
       }
-      
-      // Always save to localStorage as fallback
-      if (typeof window !== 'undefined' && window.localStorage) {
-        localStorage.setItem(`conversation_${this.state.conversationId}`, JSON.stringify(conversationData));
-      }
-      
-      console.log('Conversation autosaved:', this.state.conversationId);
     } catch (error) {
       console.error('Failed to autosave conversation:', error);
     } finally {
@@ -266,7 +263,7 @@ export class ConversationStateManager {
   
   async loadConversation(conversationId: string): Promise<boolean> {
     try {
-      // Try to load from database first if we have workflow context
+      // Load from database only if we have workflow context (saved templates)
       if (this.workflowContext && shouldUseDatabaseConversations(
         this.workflowContext.account, 
         this.workflowContext.workflowTemplateName
@@ -274,17 +271,15 @@ export class ConversationStateManager {
         const databaseData = await this.loadFromDatabaseAPI();
         if (databaseData) {
           this.restoreConversationState(databaseData);
+          console.log('Loaded conversation from database:', conversationId);
           return true;
         }
       }
       
-      // Fallback to localStorage
-      const savedData = localStorage.getItem(`conversation_${conversationId}`);
-      if (!savedData) return false;
-      
-      const parsedState = JSON.parse(savedData) as ConversationState;
-      this.restoreConversationState(parsedState);
-      return true;
+      // No database context or no saved conversation - return false
+      // New/unsaved templates will start with fresh conversation
+      console.log('No saved conversation found for:', conversationId);
+      return false;
     } catch (error) {
       console.error('Failed to load conversation:', error);
       return false;

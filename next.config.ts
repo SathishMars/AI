@@ -8,6 +8,18 @@ const nextConfig: NextConfig = {
     // TODO: Fix pre-existing TypeScript errors in legacy workflow visualization code
     ignoreBuildErrors: true,
   },
+  
+  // Redirects for backward compatibility with old URL structure
+  // The [id] route now handles both "new"/"create" and existing template IDs
+  async redirects() {
+    return [
+      {
+        source: '/configureMyWorkflow/:id',
+        destination: '/workflows/configure/:id',
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

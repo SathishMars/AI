@@ -1,13 +1,14 @@
-// src/test/app/configureMyWorkflow/page-integration.test.tsx
+// src/test/app/workflows/configure/id-page-integration.test.tsx
 /**
- * Integration Tests for ConfigureMyWorkflowPage with useWorkflowTemplateV2
+ * Integration Tests for EditWorkflowPage (formerly EditWorkflowPage) with useWorkflowTemplateV2
  * 
  * Tests the page component integration with the new hook.
+ * Updated to use new URL structure: /workflows/configure/[id]
  */
 
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import ConfigureMyWorkflowPage from '@/app/configureMyWorkflow/[id]/page';
+import EditWorkflowPage from '@/app/workflows/configure/[id]/page';
 import * as UnifiedUserContext from '@/app/contexts/UnifiedUserContext';
 
 // Mock the context
@@ -45,7 +46,7 @@ jest.mock('@/app/components/ResponsiveWorkflowConfigurator', () => {
 // Mock fetch globally
 global.fetch = jest.fn();
 
-describe('ConfigureMyWorkflowPage Integration', () => {
+describe('EditWorkflowPage Integration', () => {
   const mockAccountId = 'account123';
   const mockOrgId = 'org456';
   const mockAccount = { id: mockAccountId, name: 'Test Account' };
@@ -89,22 +90,12 @@ describe('ConfigureMyWorkflowPage Integration', () => {
         })
       });
       
-      render(<ConfigureMyWorkflowPage params={mockParams} />);
+      render(<EditWorkflowPage params={mockParams} />);
       
-      // Wait for template creation
-      await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith(
-          '/api/workflow-templates',
-          expect.objectContaining({
-            method: 'POST',
-            body: expect.stringContaining('New Workflow')
-          })
-        );
-      });
-      
-      // Should show configurator
+      // Should show configurator in new mode
       await waitFor(() => {
         expect(screen.getByTestId('workflow-configurator')).toBeInTheDocument();
+        expect(screen.getByTestId('is-new')).toHaveTextContent('true');
       });
     });
     
@@ -114,6 +105,7 @@ describe('ConfigureMyWorkflowPage Integration', () => {
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => ({
+          _id: 'mongo123',
           id: 'a1b2c3d4e5',
           account: mockAccountId,
           organization: mockOrgId,
@@ -129,13 +121,10 @@ describe('ConfigureMyWorkflowPage Integration', () => {
         })
       });
       
-      render(<ConfigureMyWorkflowPage params={mockParams} />);
+      render(<EditWorkflowPage params={mockParams} />);
       
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith(
-          '/api/workflow-templates',
-          expect.objectContaining({ method: 'POST' })
-        );
+        expect(screen.getByTestId('is-new')).toHaveTextContent('true');
       });
     });
   });
@@ -172,7 +161,7 @@ describe('ConfigureMyWorkflowPage Integration', () => {
         })
       });
       
-      render(<ConfigureMyWorkflowPage params={mockParams} />);
+      render(<EditWorkflowPage params={mockParams} />);
       
       // Wait for template load
       await waitFor(() => {
@@ -208,7 +197,7 @@ describe('ConfigureMyWorkflowPage Integration', () => {
         statusText: 'Not Found'
       });
       
-      render(<ConfigureMyWorkflowPage params={mockParams} />);
+      render(<EditWorkflowPage params={mockParams} />);
       
       // Should show error alert
       await waitFor(() => {
@@ -242,7 +231,7 @@ describe('ConfigureMyWorkflowPage Integration', () => {
         })
       });
       
-      render(<ConfigureMyWorkflowPage params={mockParams} />);
+      render(<EditWorkflowPage params={mockParams} />);
       
       await waitFor(() => {
         expect(screen.getByTestId('workflow-configurator')).toBeInTheDocument();
@@ -307,7 +296,7 @@ describe('ConfigureMyWorkflowPage Integration', () => {
         })
       });
       
-      render(<ConfigureMyWorkflowPage params={mockParams} />);
+      render(<EditWorkflowPage params={mockParams} />);
       
       await waitFor(() => {
         expect(screen.getByTestId('workflow-configurator')).toBeInTheDocument();
@@ -371,7 +360,7 @@ describe('ConfigureMyWorkflowPage Integration', () => {
         })
       });
       
-      render(<ConfigureMyWorkflowPage params={mockParams} />);
+      render(<EditWorkflowPage params={mockParams} />);
       
       await waitFor(() => {
         expect(screen.getByTestId('workflow-configurator')).toBeInTheDocument();
@@ -436,7 +425,7 @@ describe('ConfigureMyWorkflowPage Integration', () => {
         })
       });
       
-      render(<ConfigureMyWorkflowPage params={mockParams} />);
+      render(<EditWorkflowPage params={mockParams} />);
       
       // Should show auto-save warning
       await waitFor(() => {
@@ -454,7 +443,7 @@ describe('ConfigureMyWorkflowPage Integration', () => {
         new Promise(() => {}) // Never resolves
       );
       
-      render(<ConfigureMyWorkflowPage params={mockParams} />);
+      render(<EditWorkflowPage params={mockParams} />);
       
       // Should show "No Workflow Loaded" text (loading state)
       await waitFor(() => {
@@ -470,7 +459,7 @@ describe('ConfigureMyWorkflowPage Integration', () => {
         statusText: 'Server Error'
       });
       
-      render(<ConfigureMyWorkflowPage params={mockParams} />);
+      render(<EditWorkflowPage params={mockParams} />);
       
       // Wait for error to appear
       await waitFor(() => {

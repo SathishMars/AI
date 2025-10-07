@@ -83,11 +83,11 @@ export default function WorkflowTemplateSelector({
 
   const handleTemplateChange = (templateName: string) => {
     if (templateName === 'new') {
-      router.push('/configureMyWorkflow/new');
+      router.push('/workflows/configure/new');
     } else if (onTemplateChange) {
       onTemplateChange(templateName);
     } else {
-      router.push(`/configureMyWorkflow/${templateName}`);
+      router.push(`/workflows/configure/${templateName}`);
     }
   };
 
