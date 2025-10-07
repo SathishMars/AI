@@ -36,7 +36,12 @@ interface CompactStepNodeProps {
  * - Professional accordion format
  */
 function CompactStepNode({ step, path, allSteps, onStepClick }: CompactStepNodeProps) {
-  const [expanded, setExpanded] = useState(false);
+  // Check if step has inline branches (to determine default expand state)
+  const hasInlineSuccess = step.onSuccess !== undefined;
+  const hasInlineFailure = step.onFailure !== undefined;
+  const shouldExpandByDefault = (step.type === 'condition' && (hasInlineSuccess || hasInlineFailure));
+  
+  const [expanded, setExpanded] = useState(shouldExpandByDefault);
   
   // Generate tree-based numbering from path (1, 1.1, 1.1.1, etc.)
   const stepNumber = path.map(i => i + 1).join('.');
@@ -56,9 +61,18 @@ function CompactStepNode({ step, path, allSteps, onStepClick }: CompactStepNodeP
   
   // Check if step has any children or next steps
   const hasChildren = step.children && step.children.length > 0;
-  const hasInlineSuccess = step.onSuccess !== undefined;
-  const hasInlineFailure = step.onFailure !== undefined;
   const hasNextSteps = onSuccessStepName || onFailureStepName || hasChildren || hasInlineSuccess || hasInlineFailure;
+  
+  // Count nested steps for badge display when collapsed
+  const countNestedSteps = () => {
+    let count = 0;
+    if (hasInlineSuccess) count++;
+    if (hasInlineFailure) count++;
+    if (hasChildren) count += step.children!.length;
+    return count;
+  };
+  
+  const nestedStepCount = countNestedSteps();
   
   const handleAccordionChange = (event: React.SyntheticEvent, isExpanded: boolean) => {
     setExpanded(isExpanded);
@@ -113,6 +127,7 @@ function CompactStepNode({ step, path, allSteps, onStepClick }: CompactStepNodeP
               display: 'flex',
               alignItems: 'center',
               gap: 1,
+              flex: 1,
             }}
           >
             <Box component="span" sx={{ color: 'text.secondary', minWidth: '40px' }}>
@@ -120,6 +135,22 @@ function CompactStepNode({ step, path, allSteps, onStepClick }: CompactStepNodeP
             </Box>
             {step.name}
           </Typography>
+          
+          {/* Show badge with nested step count when collapsed */}
+          {!expanded && nestedStepCount > 0 && (
+            <Chip
+              label={`${nestedStepCount} nested step${nestedStepCount > 1 ? 's' : ''}`}
+              size="small"
+              sx={{ 
+                ml: 1,
+                height: 20,
+                fontSize: '0.7rem',
+                backgroundColor: 'primary.main',
+                color: 'primary.contrastText',
+                fontWeight: 500,
+              }}
+            />
+          )}
         </AccordionSummary>
         
         {hasNextSteps && (
