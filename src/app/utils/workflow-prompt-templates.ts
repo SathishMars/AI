@@ -141,6 +141,71 @@ STRUCTURE RULES:
 - References: When using "GoTo", reference steps by their human-readable ID
 - IDs: Every step must have a unique, descriptive "id" field
 
+CONDITION LOGIC PATTERNS (json-rules-engine format):
+
+AND Logic (all conditions must be true):
+\`\`\`json
+{
+  "id": "checkBudgetAndLocation",
+  "name": "Check: Budget High and Location Foreign",
+  "type": "condition",
+  "condition": {
+    "all": [
+      { "fact": "mrf.budget", "operator": "greaterThan", "value": 10000 },
+      { "fact": "mrf.location", "operator": "notEqual", "value": "US" }
+    ]
+  },
+  "onSuccess": { "id": "complexApproval", ... },
+  "onFailure": { "id": "standardProcess", ... }
+}
+\`\`\`
+
+OR Logic (any condition must be true):
+\`\`\`json
+{
+  "id": "checkBudgetOrLocation",
+  "name": "Check: Budget High or Location Foreign",
+  "type": "condition",
+  "condition": {
+    "any": [
+      { "fact": "mrf.budget", "operator": "greaterThan", "value": 10000 },
+      { "fact": "mrf.location", "operator": "notEqual", "value": "US" }
+    ]
+  },
+  "onSuccess": { "id": "requireApproval", ... },
+  "onFailure": { "id": "autoApprove", ... }
+}
+\`\`\`
+
+Nested Logic (complex conditions):
+\`\`\`json
+{
+  "id": "complexCheck",
+  "name": "Check: Complex Approval Criteria",
+  "type": "condition",
+  "condition": {
+    "any": [
+      {
+        "all": [
+          { "fact": "mrf.maxAttendees", "operator": "greaterThan", "value": 100 },
+          { "fact": "mrf.budget", "operator": "greaterThan", "value": 50000 }
+        ]
+      },
+      { "fact": "mrf.location", "operator": "notEqual", "value": "US" }
+    ]
+  },
+  "onSuccess": { "id": "vpApproval", ... },
+  "onFailure": { "id": "managerApproval", ... }
+}
+\`\`\`
+
+Common Operators:
+- "equal", "notEqual"
+- "greaterThan", "greaterThanInclusive"
+- "lessThan", "lessThanInclusive"
+- "contains", "doesNotContain"
+- "in", "notIn"
+
 BRANCHING PATTERNS:
 
 Pattern 1: Inline nested steps (for simple success/failure paths)
@@ -148,15 +213,20 @@ Pattern 1: Inline nested steps (for simple success/failure paths)
 {
   "id": "checkBudget",
   "type": "condition",
+  "condition": {
+    "all": [{ "fact": "mrf.budget", "operator": "greaterThan", "value": 5000 }]
+  },
   "onSuccess": {
     "id": "sendApproval",
     "type": "action",
-    ...
+    "action": "requestApproval",
+    "params": {}
   },
   "onFailure": {
     "id": "sendRejection",
     "type": "action",
-    ...
+    "action": "notifyUsers",
+    "params": {}
   }
 }
 \`\`\`
@@ -166,12 +236,16 @@ Pattern 2: Step references (for complex flows or shared endpoints)
 {
   "id": "checkBudget",
   "type": "condition",
+  "condition": {
+    "all": [{ "fact": "mrf.budget", "operator": "greaterThan", "value": 5000 }]
+  },
   "onSuccessGoTo": "sendApproval",
   "onFailureGoTo": "sendRejection"
 }
 \`\`\`
 
-Choose the pattern that best fits the workflow structure!
+IMPORTANT: Always include the "condition" field with proper json-rules-engine format!
+Choose the branching pattern that best fits the workflow structure!
 `;
 
 /**
@@ -249,6 +323,99 @@ Examples of poor descriptions:
 `;
 
 /**
+ * User requirement interpretation guide for LLM
+ */
+export const USER_REQUIREMENT_INTERPRETATION_GUIDE = `
+INTERPRETING USER REQUIREMENTS INTO WORKFLOWS:
+
+Boolean Logic Translation:
+- "if X OR Y" → use "any": [X, Y] in json-rules-engine
+- "if X AND Y" → use "all": [X, Y] in json-rules-engine
+- "either X or Y" → use "any": [X, Y]
+- "both X and Y" → use "all": [X, Y]
+- "if not X" or "if X is not Y" → use "notEqual" operator
+
+Comparison Operators:
+- "greater than", "more than", "over" → "greaterThan"
+- "at least", "greater than or equal" → "greaterThanInclusive"
+- "less than", "under", "below" → "lessThan"
+- "at most", "less than or equal" → "lessThanInclusive"
+- "equals", "is" → "equal"
+- "not equal", "is not", "different from" → "notEqual"
+
+Common Patterns:
+1. **Approval if condition met**: "If X, request approval, else proceed"
+   → Condition step with approval action in onSuccess, proceed action in onFailure
+
+2. **Complex conditions**: "If X or Y, do A"
+   → Condition with "any": [X, Y], action A in onSuccess
+
+3. **Multiple checks**: "If X and Y, do A"
+   → Condition with "all": [X, Y], action A in onSuccess
+
+4. **Negation**: "If location is not US"
+   → { "fact": "mrf.location", "operator": "notEqual", "value": "US" }
+
+Example User Requirements:
+
+Requirement: "If attendees > 100 or location is not US, request approval"
+Translation:
+{
+  "id": "checkApprovalNeeded",
+  "name": "Check: Attendees Over 100 or Location Not US",
+  "type": "condition",
+  "condition": {
+    "any": [
+      { "fact": "mrf.maxAttendees", "operator": "greaterThan", "value": 100 },
+      { "fact": "mrf.location", "operator": "notEqual", "value": "US" }
+    ]
+  },
+  "onSuccess": {
+    "id": "requestManagerApproval",
+    "name": "Action: Request Manager Approval",
+    "type": "action",
+    "action": "requestApproval",
+    "params": {}
+  },
+  "onFailure": {
+    "id": "createEventDirectly",
+    "name": "Action: Create Event",
+    "type": "action",
+    "action": "createAnEvent",
+    "params": {}
+  }
+}
+
+Requirement: "If budget > $50k and department is Sales, need VP approval"
+Translation:
+{
+  "id": "checkVPApprovalNeeded",
+  "name": "Check: Budget Over 50K and Sales Department",
+  "type": "condition",
+  "condition": {
+    "all": [
+      { "fact": "mrf.budget", "operator": "greaterThan", "value": 50000 },
+      { "fact": "user.department", "operator": "equal", "value": "Sales" }
+    ]
+  },
+  "onSuccess": {
+    "id": "requestVPApproval",
+    "name": "Action: Request VP Approval",
+    "type": "action",
+    "action": "requestApproval",
+    "params": { "approvalLevel": "VP" }
+  },
+  "onFailure": {
+    "id": "proceedWithoutVP",
+    "name": "Action: Proceed to Next Step",
+    "type": "action",
+    "action": "notifyUsers",
+    "params": {}
+  }
+}
+`;
+
+/**
  * Complete system prompt for workflow generation (NEW FORMAT)
  */
 export function buildWorkflowGenerationPrompt(context: {
@@ -286,6 +453,8 @@ ${params}
     : 'No functions available';
 
   return `You are Aime, an expert workflow designer assistant. You help users create workflows through conversation.
+
+${USER_REQUIREMENT_INTERPRETATION_GUIDE}
 
 ${NESTED_ARRAY_STRUCTURE_PROMPT}
 
