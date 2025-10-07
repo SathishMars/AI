@@ -27,7 +27,7 @@ describe('Enhanced Functions Library', () => {
       const library = functionsLibraryManager.getLibrary();
       expect(library.version).toBe('2.0.0');
       expect(library.metadata.name).toBe('Event Planning Functions Library');
-      expect(library.metadata.totalFunctions).toBe(10);
+      expect(library.metadata.totalFunctions).toBe(16);
       expect(library.categories).toHaveLength(7);
     });
 
@@ -97,7 +97,7 @@ describe('Enhanced Functions Library', () => {
       expect(approvalFunctions[0].name).toBe('requestApproval');
 
       const workflowFunctions = functionsLibraryManager.getFunctionsByCategory('workflow-control');
-      expect(workflowFunctions).toHaveLength(3);
+      expect(workflowFunctions).toHaveLength(4);
       expect(workflowFunctions.map(f => f.name)).toContain('terminateWorkflow');
     });
 
@@ -115,7 +115,7 @@ describe('Enhanced Functions Library', () => {
 
     it('should retrieve functions by lifecycle', () => {
       const activeFunctions = functionsLibraryManager.getFunctionsByLifecycle('active');
-      expect(activeFunctions).toHaveLength(10); // All functions should be active
+      expect(activeFunctions).toHaveLength(16); // All functions should be active
 
       const deprecatedFunctions = functionsLibraryManager.getFunctionsByLifecycle('deprecated');
       expect(deprecatedFunctions).toHaveLength(0);
@@ -134,7 +134,7 @@ describe('Enhanced Functions Library', () => {
     it('should generate AI function context', () => {
       const aiContext = functionsLibraryManager.getAIFunctionContext();
       
-      expect(aiContext.availableFunctions).toHaveLength(10);
+      expect(aiContext.availableFunctions).toHaveLength(16);
       expect(aiContext.categoryDescriptions).toHaveProperty('approval');
       expect(aiContext.usagePatterns).toHaveLength(3);
       expect(aiContext.exampleWorkflows).toHaveLength(3);
@@ -277,7 +277,7 @@ describe('Enhanced Functions Library', () => {
     it('should maintain backward compatibility with old manager', () => {
       const oldManager = new EnhancedFunctionsLibraryManager();
       expect(oldManager.getFunction('requestApproval')).toBeDefined();
-      expect(oldManager.getAllFunctions()).toHaveLength(10);
+      expect(oldManager.getAllFunctions()).toHaveLength(16);
     });
 
     it('should export default library for backward compatibility', () => {
@@ -295,7 +295,7 @@ describe('Enhanced Functions Library', () => {
 
     it('should handle empty queries in discovery', () => {
       const results = functionsLibraryManager.discoverFunctions('');
-      expect(results).toHaveLength(0);
+      expect(results).toHaveLength(16);
     });
   });
 });
