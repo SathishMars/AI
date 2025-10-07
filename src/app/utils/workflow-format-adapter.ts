@@ -379,8 +379,34 @@ export function ensureNestedArrayFormat(workflow: WorkflowJSON | LegacyWorkflowF
     return (workflow as WorkflowJSON).steps as WorkflowStep[];
   }
   
-  // If in legacy format, convert
+  // Check for hybrid format: numbered object keys with new-format step contents
+  // This happens when LLM generates proper nested steps but they're stored in an object
   if (isLegacyFormat(workflow)) {
+    const w = workflow as Record<string, unknown>;
+    const stepsObj = w.steps as Record<string, unknown>;
+    
+    // Check if the steps already have new format properties (children, onSuccess inline)
+    const firstStep = Object.values(stepsObj)[0] as Record<string, unknown>;
+    const isHybridFormat = firstStep && (
+      Array.isArray(firstStep.children) ||
+      (firstStep.onSuccess && typeof firstStep.onSuccess === 'object' && 'id' in firstStep.onSuccess) ||
+      (firstStep.onFailure && typeof firstStep.onFailure === 'object' && 'id' in firstStep.onFailure)
+    );
+    
+    if (isHybridFormat) {
+      // Simple conversion: extract values from object and sort by numeric key
+      console.log('Hybrid workflow format detected (numbered keys with new format steps), converting to array...');
+      const steps = Object.entries(stepsObj)
+        .sort(([keyA], [keyB]) => {
+          const numA = parseFloat(keyA);
+          const numB = parseFloat(keyB);
+          return numA - numB;
+        })
+        .map(([, step]) => step as WorkflowStep);
+      return steps;
+    }
+    
+    // True legacy format: convert using full conversion logic
     return convertLegacyToNestedArray(workflow as LegacyWorkflowFormat);
   }
   
