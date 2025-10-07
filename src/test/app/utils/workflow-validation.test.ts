@@ -339,9 +339,9 @@ describe('workflow-validation', () => {
 
     it('should return no errors for valid workflow', () => {
       const steps: WorkflowStep[] = [
-        { id: 'startTrigger', name: 'Start', type: 'trigger' },
-        { id: 'processAction', name: 'Process', type: 'action' },
-        { id: 'workflowEnd', name: 'End', type: 'end' }
+        { id: 'startTrigger', name: 'Start: Workflow Trigger', type: 'trigger' },
+        { id: 'processAction', name: 'Action: Process Data', type: 'action' },
+        { id: 'workflowEnd', name: 'End: Workflow Complete', type: 'end' }
       ];
 
       const errors = validateWorkflow(steps);
@@ -355,19 +355,19 @@ describe('workflow-validation', () => {
       const steps: WorkflowStep[] = [
         {
           id: 'start',
-          name: 'Start',
+          name: 'Start: On MRF Submission',
           type: 'trigger',
           children: [
             {
               id: 'condition',
-              name: 'Check',
+              name: 'Check: Budget Threshold',
               type: 'condition',
-              onSuccess: { id: 'approve', name: 'Approve', type: 'action' },
-              onFailure: { id: 'reject', name: 'Reject', type: 'action' }
+              onSuccess: { id: 'approve', name: 'Action: Approve Request', type: 'action' },
+              onFailure: { id: 'reject', name: 'Action: Reject Request', type: 'action' }
             }
           ]
         },
-        { id: 'end', name: 'End', type: 'end' }
+        { id: 'end', name: 'End: Workflow Complete', type: 'end' }
       ];
 
       const errors = validateWorkflow(steps);
@@ -627,6 +627,163 @@ describe('workflow-validation', () => {
       
       // Should detect the circular reference between step1 and step2
       expect(errors.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('validateStepNames', () => {
+    it('should pass validation for properly formatted step names', () => {
+      const steps: WorkflowStep[] = [
+        { id: 'mrfTrigger', name: 'Start: On MRF Submission', type: 'trigger' },
+        { id: 'checkBudget', name: 'Check: Budget Exceeds Threshold', type: 'condition' },
+        { id: 'sendEmail', name: 'Action: Send Approval Email', type: 'action' },
+        { id: 'workflowEnd', name: 'End: Workflow Complete', type: 'end' }
+      ];
+
+      const errors = import('@/app/utils/workflow-validation').then(mod => mod.validateStepNames(steps));
+      
+      return errors.then(result => {
+        expect(result.length).toBe(0);
+      });
+    });
+
+    it('should detect emojis in step names', () => {
+      const steps: WorkflowStep[] = [
+        { id: 'mrfTrigger', name: '🎯 Start: On MRF Submission', type: 'trigger' },
+        { id: 'checkBudget', name: '✅ Check: Budget Exceeds Threshold', type: 'condition' },
+        { id: 'sendEmail', name: '📧 Action: Send Email', type: 'action' }
+      ];
+
+      const errors = import('@/app/utils/workflow-validation').then(mod => mod.validateStepNames(steps));
+      
+      return errors.then(result => {
+        // Should detect 3 emoji errors + 3 prefix errors (emoji causes Start: not to be at position 0)
+        expect(result.length).toBe(6);
+        expect(result.filter(e => e.technicalMessage.includes('emojis')).length).toBe(3);
+        expect(result.filter(e => e.technicalMessage.includes('missing required prefix')).length).toBe(3);
+      });
+    });
+
+    it('should detect missing prefix for trigger steps', () => {
+      const steps: WorkflowStep[] = [
+        { id: 'mrfTrigger', name: 'On MRF Submission', type: 'trigger' }
+      ];
+
+      const errors = import('@/app/utils/workflow-validation').then(mod => mod.validateStepNames(steps));
+      
+      return errors.then(result => {
+        expect(result.length).toBe(1);
+        expect(result[0].severity).toBe('error');
+        expect(result[0].technicalMessage).toContain('Start:');
+      });
+    });
+
+    it('should detect missing prefix for condition steps', () => {
+      const steps: WorkflowStep[] = [
+        { id: 'checkBudget', name: 'Budget Exceeds Threshold', type: 'condition' }
+      ];
+
+      const errors = import('@/app/utils/workflow-validation').then(mod => mod.validateStepNames(steps));
+      
+      return errors.then(result => {
+        expect(result.length).toBe(1);
+        expect(result[0].severity).toBe('error');
+        expect(result[0].technicalMessage).toContain('Check:');
+      });
+    });
+
+    it('should detect missing prefix for action steps', () => {
+      const steps: WorkflowStep[] = [
+        { id: 'sendEmail', name: 'Send Approval Email', type: 'action' }
+      ];
+
+      const errors = import('@/app/utils/workflow-validation').then(mod => mod.validateStepNames(steps));
+      
+      return errors.then(result => {
+        expect(result.length).toBe(1);
+        expect(result[0].severity).toBe('error');
+        expect(result[0].technicalMessage).toContain('Action:');
+      });
+    });
+
+    it('should detect missing prefix for end steps', () => {
+      const steps: WorkflowStep[] = [
+        { id: 'workflowEnd', name: 'Workflow Complete', type: 'end' }
+      ];
+
+      const errors = import('@/app/utils/workflow-validation').then(mod => mod.validateStepNames(steps));
+      
+      return errors.then(result => {
+        expect(result.length).toBe(1);
+        expect(result[0].severity).toBe('error');
+        expect(result[0].technicalMessage).toContain('End:');
+      });
+    });
+
+    it('should warn about very long step names', () => {
+      const longName = 'Start: ' + 'A'.repeat(150);
+      const steps: WorkflowStep[] = [
+        { id: 'longNameStep', name: longName, type: 'trigger' }
+      ];
+
+      const errors = import('@/app/utils/workflow-validation').then(mod => mod.validateStepNames(steps));
+      
+      return errors.then(result => {
+        expect(result.length).toBe(1);
+        expect(result[0].severity).toBe('warning');
+        expect(result[0].technicalMessage).toContain('long name');
+      });
+    });
+
+    it('should validate nested step names in children', () => {
+      const steps: WorkflowStep[] = [
+        {
+          id: 'parent',
+          name: 'Start: Parent Step',
+          type: 'trigger',
+          children: [
+            { id: 'child1', name: '🎯 Check: Child Step', type: 'condition' },
+            { id: 'child2', name: 'Missing Prefix', type: 'action' }
+          ]
+        }
+      ];
+
+      const errors = import('@/app/utils/workflow-validation').then(mod => mod.validateStepNames(steps));
+      
+      return errors.then(result => {
+        // child1: emoji + prefix error (emoji makes Check: not at position 0)
+        // child2: missing prefix
+        expect(result.length).toBe(3);
+        expect(result.some(e => e.technicalMessage.includes('emojis'))).toBe(true);
+        expect(result.filter(e => e.technicalMessage.includes('Action:')).length).toBeGreaterThanOrEqual(1);
+      });
+    });
+
+    it('should validate names in onSuccess/onFailure nested steps', () => {
+      const steps: WorkflowStep[] = [
+        {
+          id: 'checkStep',
+          name: 'Check: Budget',
+          type: 'condition',
+          onSuccess: {
+            id: 'successStep',
+            name: '✅ Approve Request',
+            type: 'action'
+          },
+          onFailure: {
+            id: 'failureStep',
+            name: 'Reject Request',
+            type: 'action'
+          }
+        }
+      ];
+
+      const errors = import('@/app/utils/workflow-validation').then(mod => mod.validateStepNames(steps));
+      
+      return errors.then(result => {
+        // successStep: emoji + missing prefix (2 errors)
+        // failureStep: missing prefix (1 error)
+        expect(result.length).toBe(3);
+      });
     });
   });
 });

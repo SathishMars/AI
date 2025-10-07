@@ -216,6 +216,80 @@ export function validateWorkflowStructure(steps: WorkflowStep[]): ValidationErro
 }
 
 /**
+ * Validate step names for professional format
+ * 
+ * Checks:
+ * - Required prefixes by step type (Start:, Check:, Action:, End:)
+ * - No emojis or decorative symbols
+ * - Reasonable length
+ * 
+ * @param steps - Array of workflow steps
+ * @returns Array of validation errors
+ */
+export function validateStepNames(steps: WorkflowStep[]): ValidationError[] {
+  const errors: ValidationError[] = [];
+
+  // Emoji detection regex (covers most common emojis and symbols)
+  const emojiPattern = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{2B50}\u{2B55}\u{231A}-\u{231B}\u{2328}\u{23CF}\u{23E9}-\u{23FA}\u{25AA}-\u{25AB}\u{25B6}\u{25C0}\u{25FB}-\u{25FE}\u{2600}-\u{2604}\u{260E}\u{2611}\u{2614}-\u{2615}\u{2618}\u{261D}\u{2620}\u{2622}-\u{2623}\u{2626}\u{262A}\u{262E}-\u{262F}\u{2638}-\u{263A}\u{2640}\u{2642}\u{2648}-\u{2653}\u{265F}-\u{2660}\u{2663}\u{2665}-\u{2666}\u{2668}\u{267B}\u{267E}-\u{267F}\u{2692}-\u{2697}\u{2699}\u{269B}-\u{269C}\u{26A0}-\u{26A1}\u{26A7}\u{26AA}-\u{26AB}\u{26B0}-\u{26B1}\u{26BD}-\u{26BE}\u{26C4}-\u{26C5}\u{26C8}\u{26CE}-\u{26CF}\u{26D1}\u{26D3}-\u{26D4}\u{26E9}-\u{26EA}\u{26F0}-\u{26F5}\u{26F7}-\u{26FA}\u{26FD}\u{2702}\u{2705}\u{2708}-\u{270D}\u{270F}\u{2712}\u{2714}\u{2716}\u{271D}\u{2721}\u{2728}\u{2733}-\u{2734}\u{2744}\u{2747}\u{274C}\u{274E}\u{2753}-\u{2755}\u{2757}\u{2763}-\u{2764}\u{2795}-\u{2797}\u{27A1}\u{27B0}\u{27BF}\u{2934}-\u{2935}\u{2B05}-\u{2B07}\u{2B1B}-\u{2B1C}\u{2B50}\u{2B55}\u{3030}\u{303D}\u{3297}\u{3299}\u{FE0F}]/u;
+
+  // Prefix requirements by step type
+  const prefixRequirements: Record<string, string> = {
+    trigger: 'Start:',
+    condition: 'Check:',
+    action: 'Action:',
+    end: 'End:'
+  };
+
+  traverseWorkflow(steps, (step, path) => {
+    const stepNumber = path.map(i => i + 1).join('.');
+
+    // Check for emojis
+    if (emojiPattern.test(step.name)) {
+      errors.push({
+        id: generateErrorId(),
+        severity: 'error',
+        stepId: step.id,
+        technicalMessage: `Step ${stepNumber} (${step.id}) contains emojis in name: "${step.name}"`,
+        conversationalExplanation: `The step "${step.name}" contains emojis or decorative symbols. Please use professional naming without emojis. For example, instead of "🎯 Check Budget", use "Check: Budget Status".`,
+        suggestedFix: `Remove emojis from step name. Use professional format like "${step.type === 'action' ? 'Action' : step.type === 'condition' ? 'Check' : step.type === 'trigger' ? 'Start' : 'End'}: [description]"`,
+        documentationLink: '/docs/workflow-naming-conventions'
+      });
+    }
+
+    // Check for required prefix
+    if (step.type && prefixRequirements[step.type]) {
+      const requiredPrefix = prefixRequirements[step.type];
+      if (!step.name.startsWith(requiredPrefix)) {
+        errors.push({
+          id: generateErrorId(),
+          severity: 'error',
+          stepId: step.id,
+          technicalMessage: `Step ${stepNumber} (${step.id}) missing required prefix "${requiredPrefix}" for type "${step.type}"`,
+          conversationalExplanation: `The step "${step.name}" is a ${step.type} step and must start with "${requiredPrefix}". For example: "${requiredPrefix} ${step.name.replace(/^(Start:|Check:|Action:|End:)\s*/, '')}".`,
+          suggestedFix: `Rename step to start with "${requiredPrefix}"`,
+          documentationLink: '/docs/workflow-naming-conventions'
+        });
+      }
+    }
+
+    // Check for reasonable length
+    if (step.name.length > 100) {
+      errors.push({
+        id: generateErrorId(),
+        severity: 'warning',
+        stepId: step.id,
+        technicalMessage: `Step ${stepNumber} (${step.id}) has very long name (${step.name.length} characters)`,
+        conversationalExplanation: `The step "${step.name}" has a very long name. Consider shortening it to improve readability.`,
+        suggestedFix: 'Shorten step name to 100 characters or less',
+        documentationLink: '/docs/workflow-naming-conventions'
+      });
+    }
+  });
+
+  return errors;
+}
+
+/**
  * Validate complete workflow
  * 
  * Runs all validation checks and returns combined results
@@ -229,6 +303,7 @@ export function validateWorkflow(steps: WorkflowStep[]): ValidationError[] {
   // Run all validations
   errors.push(...validateStepIds(steps));
   errors.push(...validateStepReferences(steps));
+  errors.push(...validateStepNames(steps));
   errors.push(...validateWorkflowStructure(steps));
 
   return errors;

@@ -6,6 +6,7 @@ import { createWorkflowBuildModel, createConversationModel } from "./providers/l
 import { getWorkflowToolRegistry, WorkflowToolRegistry } from "./tools/workflow-tools";
 import { WorkflowJSON, ValidationResult } from "@/app/types/workflow";
 import { getLLMFactory, LLMProvider } from "./providers/llm-factory";
+import { buildWorkflowGenerationPrompt, ensureStepIds } from "@/app/utils/workflow-prompt-templates";
 
 export interface LangChainWorkflowConfig {
   provider?: 'openai' | 'anthropic' | 'lmstudio';
@@ -282,6 +283,52 @@ export class LangChainWorkflowGenerator {
    * Build system prompt for conversational workflow generation
    */
   private buildConversationalSystemPrompt(
+    context: WorkflowGenerationContext,
+    currentWorkflow?: Partial<WorkflowJSON>
+  ): string {
+    // Use rich function definitions if available, otherwise fall back to tool summaries
+    const functionDefinitions = context.functionDefinitions || 
+      this.toolRegistry.getToolSummaries().map(tool => ({
+        name: tool.name,
+        description: tool.description,
+        usage: tool.description,
+        parameters: [],
+        example: {}
+      }));
+
+    return buildWorkflowGenerationPrompt({
+      functionDefinitions,
+      userRole: context.userRole,
+      userDepartment: context.userDepartment,
+      currentDate: context.currentDate,
+      conversationHistory: context.conversationHistory,
+      referenceData: context.referenceData
+    }) + (currentWorkflow ? `
+
+CURRENT WORKFLOW TO MODIFY:
+${JSON.stringify(currentWorkflow, null, 2)}
+
+IMPORTANT: Modify and extend the existing workflow, don't create from scratch. Maintain the nested array format with human-readable IDs.
+` : '') + `
+
+USER CONTEXT:
+- User: ${context.user?.name || context.userRole} (${context.user?.role || context.userRole} in ${context.user?.department || context.userDepartment})
+- Manager: ${context.user?.manager || 'manager@company.com'}
+
+MRF CONTEXT:
+- Current MRF: ${context.mrf?.title || context.mrfData?.title || 'New Event'}
+- Max Attendees: ${context.mrf?.maxAttendees || context.mrfData?.maxAttendees || 50}
+- Location: ${context.mrf?.location || context.mrfData?.location || 'TBD'}
+- Purpose: ${context.mrf?.purpose || context.mrfData?.purpose || 'general'}
+
+Remember: Use nested array format with human-readable IDs and professional naming (no emojis)!`;
+  }
+
+  /**
+   * OLD IMPLEMENTATION - Kept for reference during migration
+   * TODO: Remove after validating new prompt system works
+   */
+  private buildConversationalSystemPromptOld(
     context: WorkflowGenerationContext,
     currentWorkflow?: Partial<WorkflowJSON>
   ): string {
@@ -564,20 +611,31 @@ CONDITIONS (json-rules-engine format):
     try {
       // Try to extract JSON from the response
       const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/) || response.match(/```\s*([\s\S]*?)\s*```/);
+      let parsed;
+      
       if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[1]);
-        return {
-          workflow: parsed.workflow || {},
-          conversationalResponse: parsed.conversationalResponse || "Workflow updated.",
-          followUpQuestions: parsed.followUpQuestions || [],
-          parameterCollectionNeeded: parsed.parameterCollectionNeeded || false
-        };
+        parsed = JSON.parse(jsonMatch[1]);
+      } else {
+        // If no JSON block, try to parse the entire response
+        parsed = JSON.parse(response);
       }
 
-      // If no JSON block, try to parse the entire response
-      const parsed = JSON.parse(response);
+      const workflow = parsed.workflow || {};
+
+      // Ensure workflow has steps in nested array format
+      if (workflow.steps && Array.isArray(workflow.steps)) {
+        // Ensure all steps have IDs (fallback ID generation)
+        ensureStepIds(workflow.steps);
+        console.log('✅ Workflow generated with nested array format and human-readable IDs');
+      } else if (workflow.steps && typeof workflow.steps === 'object') {
+        // Detected legacy format from LLM - log warning
+        console.warn('⚠️ LLM generated legacy numbered object key format. Workflow may need adapter.');
+        console.warn('   Expected: { steps: [{id: "...", ...}] }');
+        console.warn('   Received: { steps: {"1": {...}, "1.1": {...}} }');
+      }
+
       return {
-        workflow: parsed.workflow || {},
+        workflow,
         conversationalResponse: parsed.conversationalResponse || "Workflow updated.",
         followUpQuestions: parsed.followUpQuestions || [],
         parameterCollectionNeeded: parsed.parameterCollectionNeeded || false
