@@ -32,7 +32,7 @@ import {
 import { WorkflowJSON, ValidationResult, WorkflowStep } from '@/app/types/workflow';
 import { useMermaidGeneration } from '@/app/hooks/useMermaidGeneration';
 import MermaidChart from '@/app/components/MermaidChart';
-import WorkflowStepTreeCompact from '@/app/components/WorkflowStepTreeCompact';
+import WorkflowStepTree from '@/app/components/WorkflowStepTree';
 import { isLegacyFormat, ensureNestedArrayFormat } from '@/app/utils/workflow-format-adapter';
 
 
@@ -81,7 +81,6 @@ export default function VisualizationPane({
   fullScreen = false
 }: VisualizationPaneProps) {
   const [tabValue, setTabValue] = useState(0);
-  const [editingStepId, setEditingStepId] = useState<string | null>(null);
   const [editingStep, setEditingStep] = useState<WorkflowStep | null>(null);
   
   // Initialize Mermaid generation hook
@@ -673,10 +672,12 @@ export default function VisualizationPane({
                   />
                 )}
               </Box>
-              <WorkflowStepTreeCompact 
+              <WorkflowStepTree 
                 steps={workflowSteps}
-                onStepClick={(step, path) => {
-                  console.log('Step clicked:', step.id, 'at path:', path.map(i => i + 1).join('.'));
+                onStepEdit={(step: WorkflowStep) => {
+                  console.log('Edit step:', step.id);
+                  setEditingStep(step);
+                  setTabValue(2); // Switch to form view tab
                 }}
               />
             </Box>
