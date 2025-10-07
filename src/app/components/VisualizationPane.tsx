@@ -32,6 +32,7 @@ import {
 import { WorkflowJSON, ValidationResult, WorkflowStep } from '@/app/types/workflow';
 import { useMermaidGeneration } from '@/app/hooks/useMermaidGeneration';
 import MermaidChart from '@/app/components/MermaidChart';
+import WorkflowStepTreeCompact from '@/app/components/WorkflowStepTreeCompact';
 
 
 
@@ -613,7 +614,8 @@ export default function VisualizationPane({
       {/* Tabs */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
         <Tabs value={tabValue} onChange={handleTabChange} aria-label="workflow visualization tabs">
-          <Tab label="Workflow Forms" {...a11yProps(0)} />
+          <Tab label="Step Tree" {...a11yProps(0)} />
+          <Tab label="Workflow Forms" {...a11yProps(1)} />
           <Tab 
             label={
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -624,7 +626,7 @@ export default function VisualizationPane({
                 <AIIcon fontSize="small" color="primary" />
               </Box>
             } 
-            {...a11yProps(1)} 
+            {...a11yProps(2)} 
           />
         </Tabs>
       </Box>
@@ -632,10 +634,45 @@ export default function VisualizationPane({
       {/* Tab Content */}
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <TabPanel value={tabValue} index={0}>
-          {renderWorkflowForms()}
+          {Array.isArray(workflow.steps) && workflow.steps.length > 0 ? (
+            <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
+              <Typography variant="h6" gutterBottom>
+                Workflow Step Tree
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Compact view showing workflow structure with tree numbering
+              </Typography>
+              <WorkflowStepTreeCompact 
+                steps={workflow.steps as WorkflowStep[]}
+                onStepClick={(step, path) => {
+                  console.log('Step clicked:', step.id, 'at path:', path.map(i => i + 1).join('.'));
+                }}
+              />
+            </Box>
+          ) : (
+            <Box sx={{ 
+              flex: 1, 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center' 
+            }}>
+              <Alert severity="info">
+                <Typography variant="h6" gutterBottom>
+                  No Workflow Steps
+                </Typography>
+                <Typography variant="body2">
+                  Start a conversation with aime to create workflow steps.
+                </Typography>
+              </Alert>
+            </Box>
+          )}
         </TabPanel>
         
         <TabPanel value={tabValue} index={1}>
+          {renderWorkflowForms()}
+        </TabPanel>
+        
+        <TabPanel value={tabValue} index={2}>
           {renderMermaidDiagram()}
         </TabPanel>
       </Box>
