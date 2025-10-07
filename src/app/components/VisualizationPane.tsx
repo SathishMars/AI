@@ -33,6 +33,7 @@ import { WorkflowJSON, ValidationResult, WorkflowStep } from '@/app/types/workfl
 import { useMermaidGeneration } from '@/app/hooks/useMermaidGeneration';
 import MermaidChart from '@/app/components/MermaidChart';
 import WorkflowStepTreeCompact from '@/app/components/WorkflowStepTreeCompact';
+import { isLegacyFormat, ensureNestedArrayFormat } from '@/app/utils/workflow-format-adapter';
 
 
 
@@ -92,6 +93,24 @@ export default function VisualizationPane({
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
+
+  // Convert workflow to nested array format if needed (temporary adapter)
+  const workflowSteps = React.useMemo(() => {
+    if (!workflow) return [];
+    
+    // Check if workflow is in legacy format
+    if (isLegacyFormat(workflow)) {
+      console.log('Legacy workflow format detected, converting to nested array format...');
+      return ensureNestedArrayFormat(workflow);
+    }
+    
+    // Already in new format
+    if (Array.isArray(workflow.steps)) {
+      return workflow.steps as WorkflowStep[];
+    }
+    
+    return [];
+  }, [workflow]);
 
   const handleEditStep = (stepId: string, step: WorkflowStep) => {
     setEditingStepId(stepId);
@@ -634,16 +653,28 @@ export default function VisualizationPane({
       {/* Tab Content */}
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <TabPanel value={tabValue} index={0}>
-          {Array.isArray(workflow.steps) && workflow.steps.length > 0 ? (
+          {workflowSteps.length > 0 ? (
             <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
-              <Typography variant="h6" gutterBottom>
-                Workflow Step Tree
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Compact view showing workflow structure with tree numbering
-              </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Box>
+                  <Typography variant="h6">
+                    Workflow Step Tree
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Compact view showing workflow structure with tree numbering
+                  </Typography>
+                </Box>
+                {isLegacyFormat(workflow) && (
+                  <Chip 
+                    label="Legacy Format (Auto-Converted)" 
+                    size="small" 
+                    color="warning"
+                    variant="outlined"
+                  />
+                )}
+              </Box>
               <WorkflowStepTreeCompact 
-                steps={workflow.steps as WorkflowStep[]}
+                steps={workflowSteps}
                 onStepClick={(step, path) => {
                   console.log('Step clicked:', step.id, 'at path:', path.map(i => i + 1).join('.'));
                 }}
