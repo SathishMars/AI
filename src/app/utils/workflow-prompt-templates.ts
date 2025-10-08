@@ -423,7 +423,10 @@ export function buildWorkflowGenerationPrompt(context: {
     name: string;
     description: string;
     usage: string;
-    parameters: Array<{
+    stepType?: 'trigger' | 'action' | 'condition' | 'end';
+    supportedOutputs?: string[];
+    contextDescription?: string;
+    parameters?: Array<{
       name: string;
       type: string;
       description: string;
@@ -444,12 +447,20 @@ export function buildWorkflowGenerationPrompt(context: {
 }): string {
   const functionDetails = context.functionDefinitions
     ? context.functionDefinitions.map(func => {
-        const params = func.parameters ? func.parameters.map(p => 
-          `  - ${p.name} (${p.type}${p.required ? ', required' : ', optional'}): ${p.description}${p.options ? ` - Options: ${p.options.join(', ')}` : ''}`
-        ).join('\n') : '';
-        
+        const params = func.parameters && func.parameters.length > 0
+          ? func.parameters.map(p =>
+            `  - ${p.name} (${p.type}${p.required ? ', required' : ', optional'}): ${p.description}${p.options ? ` - Options: ${p.options.join(', ')}` : ''}`
+          ).join('\n')
+          : '  - None';
+
+        const stepTypeLine = func.stepType ? `  Step Type: ${func.stepType}\n` : '';
+        const outputsLine = func.supportedOutputs && func.supportedOutputs.length > 0
+          ? `  Supported Outputs: ${func.supportedOutputs.join(', ')}\n`
+          : '';
+        const contextLine = func.contextDescription ? `  Context: ${func.contextDescription}\n` : '';
+
         return `- ${func.name}: ${func.description}
-  Usage: ${func.usage}
+${stepTypeLine}${outputsLine}${contextLine}  Usage: ${func.usage}
   Parameters:
 ${params}
   Example: ${JSON.stringify(func.example, null, 2)}`;
@@ -516,6 +527,8 @@ CONVERSATIONAL GUIDELINES:
 8. DO NOT ask clarifying questions about workflow design
 9. Use conversation history to avoid asking for information already provided
 10. Set parameterCollectionNeeded: true ONLY when required parameters are missing
+11. When a function lists supported outputs (e.g. onApproval/onReject/onYes/onNo), either configure those targets explicitly or ask targeted follow-up questions to collect the destination step IDs or names.
+12. Confirm any routing identifiers with "#stepId" style references when asking follow-up questions so the user knows what to provide.
 
 USER CONTEXT:
 - User: ${context.userRole || 'User'}

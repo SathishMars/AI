@@ -39,7 +39,10 @@ export interface WorkflowGenerationContext {
     name: string;
     description: string;
     usage: string;
-    parameters: Array<{
+    stepType?: 'trigger' | 'action' | 'condition' | 'end';
+    supportedOutputs?: string[];
+    contextDescription?: string;
+    parameters?: Array<{
       name: string;
       type: string;
       description: string;

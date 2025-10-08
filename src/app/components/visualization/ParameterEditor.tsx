@@ -155,6 +155,26 @@ export default function ParameterEditor({
       });
     }
 
+    if (step.onSuccessGoTo) {
+      params.push({
+        name: 'onSuccessGoTo',
+        value: step.onSuccessGoTo,
+        type: 'string',
+        required: false,
+        description: 'Reference ID for success path'
+      });
+    }
+
+    if (step.onFailureGoTo) {
+      params.push({
+        name: 'onFailureGoTo',
+        value: step.onFailureGoTo,
+        type: 'string',
+        required: false,
+        description: 'Reference ID for failure path'
+      });
+    }
+
     // Enhanced condition outputs
     if ('onApproval' in step && step.onApproval) {
       params.push({

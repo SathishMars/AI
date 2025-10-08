@@ -36,6 +36,9 @@ function createSuggestion(item: WorkflowAutocompleteItem, input: string): Autoco
       parameters: item.parameters,
       hasRequiredParams: item.parameters?.some(p => p.required) || false,
       llmInstructions: item.llmInstructions,
+      llmUsageInstructions: item.llmUsageInstructions ?? item.llmInstructions?.usage,
+      llmJsonExample: item.llmJsonExample ?? item.llmInstructions?.jsonExample,
+      outputs: item.outputs,
       relevanceScore: calculateRelevance(item, input)
     }
   };

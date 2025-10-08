@@ -148,6 +148,29 @@ export function validateStepReferences(steps: WorkflowStep[]): ValidationError[]
         documentationLink: '/docs/workflow-step-references'
       });
     }
+
+    // Validate enhanced approval path references
+    const enhancedOutputs: Array<{ key: 'onApproval' | 'onReject' | 'onYes' | 'onNo'; label: string; value?: string }> = [
+      { key: 'onApproval', label: 'approval path', value: step.onApproval },
+      { key: 'onReject', label: 'rejection path', value: step.onReject },
+      { key: 'onYes', label: 'yes path', value: step.onYes },
+      { key: 'onNo', label: 'no path', value: step.onNo }
+    ];
+
+    enhancedOutputs.forEach(({ key, label, value }) => {
+      if (value && !stepIds.has(value)) {
+        errors.push({
+          id: generateErrorId(),
+          severity: 'error',
+          stepId: step.id,
+          fieldPath: key,
+          technicalMessage: `Invalid reference in step ${stepNumber} ("${step.id}"): ${key} points to non-existent step "${value}"`,
+          conversationalExplanation: `In step ${stepNumber} ("${step.id}"), the ${label} references a step "${value}" that doesn't exist in the workflow.`,
+          suggestedFix: `Either create a step with ID "${value}" or change the reference to an existing step ID`,
+          documentationLink: '/docs/workflow-step-references'
+        });
+      }
+    });
   });
 
   return errors;

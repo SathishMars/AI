@@ -14,7 +14,6 @@ import {
   AlertTitle
 } from '@mui/material';
 import {
-  SmartToy as AimeIcon,
   Send as SendIcon
 } from '@mui/icons-material';
 import { WorkflowJSON, WorkflowStep } from '@/app/types/workflow';
@@ -32,6 +31,10 @@ import { SmartAutocomplete } from './SmartAutocomplete';
 import { ConversationHistoryMessage } from '@/app/utils/langchain/langchain-workflow-generator';
 import { WorkflowAutocompleteItem } from '@/app/types/workflow-conversation-autocomplete';
 import { getLLMContext } from '@/app/data/workflow-conversation-autocomplete';
+import {
+  buildFunctionDefinitionLookup,
+  collectMissingRoutingQuestions
+} from '@/app/utils/workflow-routing-helpers';
 // Phase 4: Frontend validation integration
 import { useWorkflowValidation, WorkflowValidationState } from '@/app/hooks/useWorkflowValidation';
 import { WorkflowValidationFeedback } from './WorkflowValidationFeedback';
@@ -89,7 +92,18 @@ const MessageItem = memo(({ message, isStreaming }: { message: ConversationMessa
       }}
     >
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-        {message.sender === 'aime' && <AimeIcon sx={{ mr: 1, fontSize: 16 }} />}
+        {message.sender === 'aime' && (
+          <Box
+            component="img"
+            src="/aime-head-only.png"
+            alt="aime avatar"
+            sx={{
+              mr: 1,
+              height: 20,
+              width: 'auto'
+            }}
+          />
+        )}
         <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
           {message.sender === 'user' ? 'You' : 'aime'}
         </Typography>
@@ -192,6 +206,11 @@ export default function WorkflowCreationPane({
   const [conversationContext, setConversationContext] = useState<CreationContext | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [workflowContext, setWorkflowContext] = useState<WorkflowContext | null>(null); // Used for LangChain conversation context
+  const llmFunctionDefinitions = React.useMemo(() => getLLMContext(), []);
+  const functionDefinitionLookup = React.useMemo(
+    () => buildFunctionDefinitionLookup(llmFunctionDefinitions),
+    [llmFunctionDefinitions]
+  );
   
   // UI state
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -450,8 +469,6 @@ export default function WorkflowCreationPane({
       const conversationHistory = getConversationHistory();
       
       // Get rich function definitions from workflow-conversation-autocomplete
-      const llmFunctionContext = getLLMContext();
-      
       const enhancedContext = {
         ...baseContext,
         // Enhanced conversation features from original system
@@ -479,7 +496,7 @@ export default function WorkflowCreationPane({
           budget: baseContext.mrfData?.budget || 0
         },
         currentDate: new Date().toISOString(),
-        functionDefinitions: llmFunctionContext // Rich function definitions with parameters and examples
+        functionDefinitions: llmFunctionDefinitions // Rich function definitions with parameters and examples
       };
       
       // Use the new LangChain API endpoint with conversation memory
@@ -517,11 +534,12 @@ export default function WorkflowCreationPane({
       const workflowData = result.success ? result.result?.workflow : result.workflow;
       const conversationalResponse = result.success ? result.result?.conversationalResponse : result.conversationalResponse;
       const followUpQuestions = result.success ? result.result?.followUpQuestions : result.followUpQuestions;
-      const parameterCollectionNeeded = result.success ? result.result?.parameterCollectionNeeded : result.parameterCollectionNeeded;
+      let parameterCollectionNeeded = result.success ? result.result?.parameterCollectionNeeded : result.parameterCollectionNeeded;
+      let completeWorkflow: WorkflowJSON | null = null;
       
       // Update workflow in the right pane
       if (workflowData && onWorkflowChange) {
-        const completeWorkflow = createCompleteWorkflow(workflowData);
+        completeWorkflow = createCompleteWorkflow(workflowData);
         if (completeWorkflow) {
           console.log('✅ Updating workflow with:', completeWorkflow);
           onWorkflowChange(completeWorkflow);
@@ -531,35 +549,61 @@ export default function WorkflowCreationPane({
       // Small delay to make the interaction feel natural
       await new Promise(resolve => setTimeout(resolve, 800));
       
+      const sanitizedFollowUps = Array.isArray(followUpQuestions)
+        ? followUpQuestions.filter((question: unknown): question is string => typeof question === 'string' && question.trim().length > 0)
+        : [];
+      const routingFollowUps = completeWorkflow
+        ? collectMissingRoutingQuestions(completeWorkflow.steps as WorkflowStep[], functionDefinitionLookup)
+        : new Set<string>();
+
+      const combinedFollowUps = new Set<string>(sanitizedFollowUps);
+      routingFollowUps.forEach(question => combinedFollowUps.add(question));
+
+      const finalFollowUps = Array.from(combinedFollowUps);
+      const hasFollowUpQuestions = finalFollowUps.length > 0;
+      const trimmedConversationalResponse = typeof conversationalResponse === 'string'
+        ? conversationalResponse.trim()
+        : '';
+
+      if (routingFollowUps.size > 0) {
+        console.log('🔁 Missing routing outputs detected:', Array.from(routingFollowUps));
+        parameterCollectionNeeded = parameterCollectionNeeded || routingFollowUps.size > 0;
+      }
+
       // Handle conversational response and follow-up questions
-      if (conversationalResponse) {
-        console.log('💬 Conversational response detected:', conversationalResponse);
-        
+      if (trimmedConversationalResponse || hasFollowUpQuestions) {
+        if (trimmedConversationalResponse) {
+          console.log('💬 Conversational response detected:', trimmedConversationalResponse);
+        }
+
         // Group conversational response with follow-up questions in a single message
-        let combinedMessage = conversationalResponse;
-        
+        let combinedMessage = trimmedConversationalResponse || `I've updated your workflow based on your latest request.`;
+
         // Add follow-up questions if present
-        if (followUpQuestions && followUpQuestions.length > 0) {
-          console.log('❓ Follow-up questions:', followUpQuestions);
-          
+        if (hasFollowUpQuestions) {
+          console.log('❓ Follow-up questions:', finalFollowUps);
+
           // Add the questions to the same message bubble
-          combinedMessage += `\n\nTo complete your workflow, I need some additional information:\n\n${followUpQuestions.map((question: string, index: number) => `${index + 1}. ${question}`).join('\n')}`;
-          
+          combinedMessage += `\n\nTo complete your workflow, I need some additional information:\n\n${finalFollowUps.map((question: string, index: number) => `${index + 1}. ${question}`).join('\n')}`;
+
           // If parameter collection is needed, add the hint to the same message
           if (parameterCollectionNeeded) {
             console.log('🔧 Parameter collection needed');
             combinedMessage += "\n\nPlease provide the information above so I can complete the workflow configuration with the specific details.";
           }
+        } else {
+          combinedMessage += "\n\nIs there anything else I can help you with?";
         }
-        
+
         // Replace the processing message with the actual LLM response
         replaceLastAimeMessage(combinedMessage);
       } else {
         // Replace with standard success message when no conversational response
         const hasStepsForSuccess = Array.isArray(workflow.steps) && workflow.steps.length > 0;
-        const successMessage = hasStepsForSuccess
+        const successMessage = (hasStepsForSuccess
           ? `Perfect! I've modified your existing workflow to incorporate your request. The updated workflow maintains the existing structure while adding the new requirements. Check the visualization on the right to see the changes.`
-          : `Excellent! I've created your new workflow based on your request. The workflow includes all the logic you described. You can see the complete workflow structure in the visualization on the right.`;
+          : `Excellent! I've created your new workflow based on your request. The workflow includes all the logic you described. You can see the complete workflow structure in the visualization on the right.`)
+          + "\n\nIs there anything else I can help you with?";
         replaceLastAimeMessage(successMessage);
       }
       

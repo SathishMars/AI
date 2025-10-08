@@ -7,6 +7,37 @@ import { SimpleTreeView } from '@mui/x-tree-view/SimpleTreeView';
 import { TreeItem } from '@mui/x-tree-view/TreeItem';
 import EditIcon from '@mui/icons-material/Edit';
 import { WorkflowStep } from '@/app/types/workflow';
+import { findStepById } from '@/app/utils/workflow-navigation';
+import { getLLMContext } from '@/app/data/workflow-conversation-autocomplete';
+import {
+  buildFunctionDefinitionLookup,
+  getRoutingFieldValue,
+  getRoutingKeysForStep,
+  ROUTING_FIELD_CONFIG,
+  RoutingFieldKey
+} from '@/app/utils/workflow-routing-helpers';
+
+const ROUTING_CHIP_PREFIX: Partial<Record<RoutingFieldKey, string>> = {
+  onSuccessGoTo: '✓ Success → ',
+  onFailureGoTo: '✗ Failure → ',
+  onApproval: 'Approval → ',
+  onReject: 'Reject → ',
+  onYes: 'Yes → ',
+  onNo: 'No → ',
+  nextSteps: 'Next → '
+};
+
+const ROUTING_CHIP_COLOR: Partial<
+  Record<RoutingFieldKey, 'default' | 'primary' | 'secondary' | 'success' | 'error' | 'info' | 'warning'>
+> = {
+  onSuccessGoTo: 'success',
+  onFailureGoTo: 'error',
+  onApproval: 'success',
+  onYes: 'success',
+  onReject: 'warning',
+  onNo: 'warning',
+  nextSteps: 'info'
+};
 
 interface WorkflowStepTreeProps {
   steps: WorkflowStep[];
@@ -24,9 +55,21 @@ interface WorkflowStepTreeProps {
  * - Clean hierarchical visualization
  */
 export default function WorkflowStepTree({ steps, onStepEdit }: WorkflowStepTreeProps) {
+  const llmFunctionDefinitions = React.useMemo(() => getLLMContext(), []);
+  const functionDefinitionLookup = React.useMemo(
+    () => buildFunctionDefinitionLookup(llmFunctionDefinitions),
+    [llmFunctionDefinitions]
+  );
+
   // Generate unique item IDs for tree view
   const generateItemId = (step: WorkflowStep, path: string = ''): string => {
     return path ? `${path}-${step.id}` : step.id;
+  };
+
+  const resolveStepName = (targetId?: string): string | null => {
+    if (!targetId) return null;
+    const result = findStepById(steps, targetId);
+    return result?.step.name || targetId;
   };
 
   // Get step type color
@@ -58,6 +101,20 @@ export default function WorkflowStepTree({ steps, onStepEdit }: WorkflowStepTree
     const itemId = generateItemId(step, path);
     const typeColor = getStepTypeColor(step.type);
     const typeLabel = getStepTypeLabel(step.type);
+    const routingKeys = getRoutingKeysForStep(step, functionDefinitionLookup);
+
+    const resolveRoutingTarget = (target: string | WorkflowStep | undefined): string | null => {
+      if (!target) {
+        return null;
+      }
+      if (typeof target === 'string') {
+        return resolveStepName(target) || target;
+      }
+      if (typeof target === 'object') {
+        return target.name || target.id;
+      }
+      return null;
+    };
 
     // Collect all child nodes (children array + inline onSuccess/onFailure)
     const childNodes: React.ReactNode[] = [];
@@ -171,25 +228,55 @@ export default function WorkflowStepTree({ steps, onStepEdit }: WorkflowStepTree
           </IconButton>
         )}
 
-        {/* Show onSuccessGoTo/onFailureGoTo references if present */}
-        {step.onSuccessGoTo && (
-          <Chip
-            label={`→ ${step.onSuccessGoTo}`}
-            size="small"
-            variant="outlined"
-            color="success"
-            sx={{ height: 20, fontSize: '0.65rem' }}
-          />
-        )}
-        {step.onFailureGoTo && (
-          <Chip
-            label={`→ ${step.onFailureGoTo}`}
-            size="small"
-            variant="outlined"
-            color="error"
-            sx={{ height: 20, fontSize: '0.65rem' }}
-          />
-        )}
+        {/* Show navigation references as chips */}
+        {routingKeys.map((key) => {
+          const config = ROUTING_FIELD_CONFIG[key];
+          if (!config) {
+            return null;
+          }
+
+          const rawValue = getRoutingFieldValue(step, key);
+
+          if (Array.isArray(rawValue)) {
+            const resolvedTargets = rawValue
+              .map((target) => resolveRoutingTarget(target))
+              .filter((value): value is string => Boolean(value));
+
+            if (resolvedTargets.length === 0) {
+              return null;
+            }
+
+            const prefix = ROUTING_CHIP_PREFIX[key] ?? `${config.label} → `;
+            const chipColor = ROUTING_CHIP_COLOR[key] ?? 'default';
+
+            return (
+              <Chip
+                key={key}
+                label={`${prefix}${resolvedTargets.join(', ')}`}
+                size="small"
+                variant="outlined"
+                color={chipColor}
+                sx={{ height: 20, fontSize: '0.65rem' }}
+              />
+            );
+          }
+
+          const resolvedValue = resolveRoutingTarget(rawValue as string | WorkflowStep | undefined);
+          if (!resolvedValue) {
+            return null;
+          }
+
+          return (
+            <Chip
+              key={key}
+              label={`${ROUTING_CHIP_PREFIX[key] ?? `${config.label} → `}${resolvedValue}`}
+              size="small"
+              variant="outlined"
+              color={ROUTING_CHIP_COLOR[key] ?? 'default'}
+              sx={{ height: 20, fontSize: '0.65rem' }}
+            />
+          );
+        })}
       </Box>
     );
 

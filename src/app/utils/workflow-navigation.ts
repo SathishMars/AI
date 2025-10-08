@@ -181,6 +181,18 @@ export function getAllStepReferences(steps: WorkflowStep[]): Set<string> {
     if (step.onFailureGoTo) {
       references.add(step.onFailureGoTo);
     }
+    if (step.onApproval) {
+      references.add(step.onApproval);
+    }
+    if (step.onReject) {
+      references.add(step.onReject);
+    }
+    if (step.onYes) {
+      references.add(step.onYes);
+    }
+    if (step.onNo) {
+      references.add(step.onNo);
+    }
   });
   return references;
 }

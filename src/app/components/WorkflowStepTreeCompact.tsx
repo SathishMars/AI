@@ -1,7 +1,7 @@
 // src/app/components/WorkflowStepTreeCompact.tsx
 'use client';
 
-import React, { useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   Accordion,
   AccordionSummary,
@@ -15,6 +15,43 @@ import {
 } from '@mui/icons-material';
 import { WorkflowStep } from '@/app/types/workflow';
 import { findStepById } from '@/app/utils/workflow-navigation';
+import { getLLMContext } from '@/app/data/workflow-conversation-autocomplete';
+import {
+  buildFunctionDefinitionLookup,
+  getRoutingFieldValue,
+  getRoutingKeysForStep,
+  ROUTING_FIELD_CONFIG,
+  RoutingFieldKey
+} from '@/app/utils/workflow-routing-helpers';
+
+const ROUTING_CHIP_PREFIX: Partial<Record<RoutingFieldKey, string>> = {
+  onSuccessGoTo: '✓ Success → ',
+  onFailureGoTo: '✗ Failure → ',
+  onApproval: 'Approval → ',
+  onReject: 'Reject → ',
+  onYes: 'Yes → ',
+  onNo: 'No → ',
+  nextSteps: 'Next → '
+};
+
+const ROUTING_CHIP_COLOR: Partial<
+  Record<RoutingFieldKey, 'default' | 'primary' | 'secondary' | 'success' | 'error' | 'info' | 'warning'>
+> = {
+  onSuccessGoTo: 'success',
+  onFailureGoTo: 'error',
+  onApproval: 'success',
+  onYes: 'success',
+  onReject: 'warning',
+  onNo: 'warning',
+  nextSteps: 'info'
+};
+
+type RoutingEntry = {
+  key: RoutingFieldKey;
+  label: string;
+  color: 'default' | 'primary' | 'secondary' | 'success' | 'error' | 'info' | 'warning';
+  count: number;
+};
 
 interface WorkflowStepTreeCompactProps {
   steps: WorkflowStep[];
@@ -26,6 +63,7 @@ interface CompactStepNodeProps {
   path: number[];
   allSteps: WorkflowStep[];
   onStepClick?: (step: WorkflowStep, path: number[]) => void;
+  definitionLookup: ReturnType<typeof buildFunctionDefinitionLookup>;
 }
 
 /**
@@ -35,7 +73,7 @@ interface CompactStepNodeProps {
  * - Shows next step names (not IDs)
  * - Professional accordion format
  */
-function CompactStepNode({ step, path, allSteps, onStepClick }: CompactStepNodeProps) {
+function CompactStepNode({ step, path, allSteps, onStepClick, definitionLookup }: CompactStepNodeProps) {
   // Check if step has inline branches (to determine default expand state)
   const hasInlineSuccess = step.onSuccess !== undefined;
   const hasInlineFailure = step.onFailure !== undefined;
@@ -49,30 +87,79 @@ function CompactStepNode({ step, path, allSteps, onStepClick }: CompactStepNodeP
   // Calculate indentation based on nesting level (20px per level)
   const indent = (path.length - 1) * 20;
   
-  // Find next step names from IDs (not showing IDs, only names)
-  const getNextStepName = (stepId: string | undefined): string | null => {
-    if (!stepId) return null;
-    const searchResult = findStepById(allSteps, stepId);
-    return searchResult?.step.name || null;
-  };
-  
-  const onSuccessStepName = getNextStepName(step.onSuccessGoTo);
-  const onFailureStepName = getNextStepName(step.onFailureGoTo);
-  
+  const resolveTarget = useCallback(
+    (target: string | WorkflowStep | undefined): string | null => {
+      if (!target) {
+        return null;
+      }
+
+      if (typeof target === 'string') {
+        const searchResult = findStepById(allSteps, target);
+        return searchResult?.step.name || target;
+      }
+
+      if (typeof target === 'object') {
+        return target.name || target.id;
+      }
+
+      return null;
+    },
+    [allSteps]
+  );
+
+  const routingEntries = useMemo<RoutingEntry[]>(() => {
+    const keys = getRoutingKeysForStep(step, definitionLookup);
+
+    return keys.reduce<RoutingEntry[]>((acc, key) => {
+      const config = ROUTING_FIELD_CONFIG[key];
+      if (!config) {
+        return acc;
+      }
+
+      const rawValue = getRoutingFieldValue(step, key);
+      const color = ROUTING_CHIP_COLOR[key] ?? 'default';
+      const prefix = ROUTING_CHIP_PREFIX[key] ?? `${config.label} → `;
+
+      if (Array.isArray(rawValue)) {
+        const resolvedTargets = rawValue
+          .map((value) => resolveTarget(value))
+          .filter((value): value is string => Boolean(value));
+
+        if (resolvedTargets.length === 0) {
+          return acc;
+        }
+
+        acc.push({
+          key,
+          label: `${prefix}${resolvedTargets.join(', ')}`,
+          color,
+          count: resolvedTargets.length
+        });
+        return acc;
+      }
+
+      const resolvedTarget = resolveTarget(rawValue as string | WorkflowStep | undefined);
+      if (!resolvedTarget) {
+        return acc;
+      }
+
+      acc.push({
+        key,
+        label: `${prefix}${resolvedTarget}`,
+        color,
+        count: 1
+      });
+
+      return acc;
+    }, []);
+  }, [definitionLookup, resolveTarget, step]);
+
+  const routingEntryCount = routingEntries.reduce((total, entry) => total + entry.count, 0);
+
   // Check if step has any children or next steps
   const hasChildren = step.children && step.children.length > 0;
-  const hasNextSteps = onSuccessStepName || onFailureStepName || hasChildren || hasInlineSuccess || hasInlineFailure;
-  
-  // Count nested steps for badge display when collapsed
-  const countNestedSteps = () => {
-    let count = 0;
-    if (hasInlineSuccess) count++;
-    if (hasInlineFailure) count++;
-    if (hasChildren) count += step.children!.length;
-    return count;
-  };
-  
-  const nestedStepCount = countNestedSteps();
+  const hasNextSteps = routingEntries.length > 0 || hasChildren || hasInlineSuccess || hasInlineFailure;
+  const nestedStepCount = routingEntryCount + (hasChildren ? step.children!.length : 0) + (hasInlineSuccess ? 1 : 0) + (hasInlineFailure ? 1 : 0);
   
   const handleAccordionChange = (event: React.SyntheticEvent, isExpanded: boolean) => {
     setExpanded(isExpanded);
@@ -156,37 +243,21 @@ function CompactStepNode({ step, path, allSteps, onStepClick }: CompactStepNodeP
         {hasNextSteps && (
           <AccordionDetails sx={{ pl: `${indent + 60}px`, pt: 0, pb: 1 }}>
             {/* Show next steps by NAME (not ID) */}
-            {onSuccessStepName && (
-              <Box sx={{ mb: 0.5 }}>
+            {routingEntries.map((entry) => (
+              <Box key={entry.key} sx={{ mb: 0.5 }}>
                 <Chip
-                  label={`✓ Success → ${onSuccessStepName}`}
+                  label={entry.label}
                   size="small"
                   variant="outlined"
-                  color="success"
-                  sx={{ 
-                    height: 24, 
+                  color={entry.color ?? 'default'}
+                  sx={{
+                    height: 24,
                     fontSize: '0.75rem',
-                    borderRadius: 1,
+                    borderRadius: 1
                   }}
                 />
               </Box>
-            )}
-            
-            {onFailureStepName && (
-              <Box sx={{ mb: 0.5 }}>
-                <Chip
-                  label={`✗ Failure → ${onFailureStepName}`}
-                  size="small"
-                  variant="outlined"
-                  color="error"
-                  sx={{ 
-                    height: 24, 
-                    fontSize: '0.75rem',
-                    borderRadius: 1,
-                  }}
-                />
-              </Box>
-            )}
+            ))}
             
             {/* Render inline success step */}
             {hasInlineSuccess && step.onSuccess && (
@@ -196,6 +267,7 @@ function CompactStepNode({ step, path, allSteps, onStepClick }: CompactStepNodeP
                   path={[...path, 0]} // First inline child
                   allSteps={allSteps}
                   onStepClick={onStepClick}
+                  definitionLookup={definitionLookup}
                 />
               </Box>
             )}
@@ -208,6 +280,7 @@ function CompactStepNode({ step, path, allSteps, onStepClick }: CompactStepNodeP
                   path={[...path, hasInlineSuccess ? 1 : 0]} // Second inline child if success exists
                   allSteps={allSteps}
                   onStepClick={onStepClick}
+                  definitionLookup={definitionLookup}
                 />
               </Box>
             )}
@@ -223,6 +296,7 @@ function CompactStepNode({ step, path, allSteps, onStepClick }: CompactStepNodeP
                     path={[...path, childIndex]}
                     allSteps={allSteps}
                     onStepClick={onStepClick}
+                    definitionLookup={definitionLookup}
                   />
                 </Box>
               );
@@ -251,6 +325,12 @@ export default function WorkflowStepTreeCompact({
   steps, 
   onStepClick 
 }: WorkflowStepTreeCompactProps) {
+  const llmFunctionDefinitions = useMemo(() => getLLMContext(), []);
+  const definitionLookup = useMemo(
+    () => buildFunctionDefinitionLookup(llmFunctionDefinitions),
+    [llmFunctionDefinitions]
+  );
+
   // Flatten all steps for lookup (to find names from IDs)
   const flattenSteps = (stepArray: WorkflowStep[]): WorkflowStep[] => {
     const result: WorkflowStep[] = [];
@@ -272,7 +352,7 @@ export default function WorkflowStepTreeCompact({
     return result;
   };
   
-  const allSteps = flattenSteps(steps);
+  const allSteps = useMemo(() => flattenSteps(steps), [steps]);
   
   if (!steps || steps.length === 0) {
     return (
@@ -293,6 +373,7 @@ export default function WorkflowStepTreeCompact({
           path={[index]}
           allSteps={allSteps}
           onStepClick={onStepClick}
+          definitionLookup={definitionLookup}
         />
       ))}
     </Box>

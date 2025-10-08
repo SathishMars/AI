@@ -28,6 +28,14 @@ import { useMermaidGeneration } from '@/app/hooks/useMermaidGeneration';
 import MermaidChart from '@/app/components/MermaidChart';
 import WorkflowStepTree from '@/app/components/WorkflowStepTree';
 import { ensureNestedArrayFormat } from '@/app/utils/workflow-format-adapter';
+import { getLLMContext } from '@/app/data/workflow-conversation-autocomplete';
+import {
+  buildFunctionDefinitionLookup,
+  getRoutingKeysForStep,
+  ROUTING_FIELD_CONFIG,
+  RoutingFieldKey,
+  getRoutingFieldValue
+} from '@/app/utils/workflow-routing-helpers';
 
 
 
@@ -76,6 +84,11 @@ export default function VisualizationPane({
   const [tabValue, setTabValue] = useState(0);
   const [editingStep, setEditingStep] = useState<WorkflowStep | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const llmFunctionDefinitions = React.useMemo(() => getLLMContext(), []);
+  const functionDefinitionLookup = React.useMemo(
+    () => buildFunctionDefinitionLookup(llmFunctionDefinitions),
+    [llmFunctionDefinitions]
+  );
   
   // Initialize Mermaid generation hook
   const mermaidGeneration = useMermaidGeneration(workflow, onWorkflowChange, {
@@ -455,26 +468,90 @@ export default function VisualizationPane({
                 />
               )}
               
-              {(editingStep.onSuccessGoTo || editingStep.onFailureGoTo) && (
-                <Box sx={{ display: 'flex', gap: 2 }}>
-                  {editingStep.onSuccessGoTo && (
-                    <TextField
-                      label="On Success Go To"
-                      value={editingStep.onSuccessGoTo}
-                      onChange={(e) => setEditingStep({ ...editingStep, onSuccessGoTo: e.target.value })}
-                      fullWidth
-                    />
-                  )}
-                  {editingStep.onFailureGoTo && (
-                    <TextField
-                      label="On Failure Go To"
-                      value={editingStep.onFailureGoTo}
-                      onChange={(e) => setEditingStep({ ...editingStep, onFailureGoTo: e.target.value })}
-                      fullWidth
-                    />
-                  )}
-                </Box>
-              )}
+              {(() => {
+                if (!editingStep) return null;
+                const routingKeys = getRoutingKeysForStep(editingStep, functionDefinitionLookup);
+                const orderedKeys = routingKeys.filter((key) => Boolean(ROUTING_FIELD_CONFIG[key]));
+
+                if (orderedKeys.length === 0) {
+                  return null;
+                }
+
+                const handleRoutingChange = (key: RoutingFieldKey, rawValue: string) => {
+                  setEditingStep((prev) => {
+                    if (!prev) return prev;
+                    const trimmed = rawValue.trim();
+
+                    if (key === 'nextSteps') {
+                      const steps = trimmed
+                        .split(',')
+                        .map((item) => item.trim())
+                        .filter(Boolean);
+                      const nextValue = steps.length > 0 ? steps : undefined;
+                      return {
+                        ...prev,
+                        nextSteps: nextValue
+                      };
+                    }
+
+                    return {
+                      ...prev,
+                      [key]: trimmed.length > 0 ? trimmed : undefined
+                    } as WorkflowStep;
+                  });
+                };
+
+                return (
+                  <Box
+                    sx={{
+                      display: 'grid',
+                      gap: 2,
+                      gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' }
+                    }}
+                  >
+                    {orderedKeys.map((key) => {
+                      const config = ROUTING_FIELD_CONFIG[key];
+                      const value = getRoutingFieldValue(editingStep, key);
+
+                      if (!config) {
+                        return null;
+                      }
+
+                      if (config.valueType === 'array') {
+                        const displayValue = Array.isArray(value)
+                          ? value.join(', ')
+                          : typeof value === 'string'
+                            ? value
+                            : '';
+
+                        return (
+                          <TextField
+                            key={key}
+                            label={config.label}
+                            value={displayValue}
+                            onChange={(e) => handleRoutingChange(key, e.target.value)}
+                            helperText={config.helperText}
+                            fullWidth
+                          />
+                        );
+                      }
+
+                      const displayValue = typeof value === 'string' ? value : '';
+
+                      return (
+                        <TextField
+                          key={key}
+                          label={config.label}
+                          value={displayValue}
+                          onChange={(e) => handleRoutingChange(key, e.target.value)}
+                          helperText={config.helperText}
+                          fullWidth
+                        />
+                      );
+                    })}
+                  </Box>
+                );
+              })()}
             </Box>
           )}
         </DialogContent>

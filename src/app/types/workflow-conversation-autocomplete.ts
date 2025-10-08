@@ -43,6 +43,20 @@ export interface WorkflowAutocompleteItem {
   displayName: string;
   description: string;
   examples: string[];
+  workflowStepType?: 'trigger' | 'action' | 'condition' | 'workflow' | 'end';
+  llmUsageInstructions?: string;
+  llmJsonExample?: Record<string, unknown>;
+  outputs?: Partial<{
+    nextSteps: unknown;
+    onApproval: unknown;
+    onReject: unknown;
+    onSuccess: unknown;
+    onFailure: unknown;
+    onSuccessGoTo: unknown;
+    onFailureGoTo: unknown;
+    onYes: unknown;
+    onNo: unknown;
+  }>;
   
   // For functions that require parameters
   parameters?: ParameterDefinition[];
@@ -53,7 +67,7 @@ export interface WorkflowAutocompleteItem {
   // LLM instructions
   llmInstructions: {
     usage: string; // How to use this in workflow JSON
-    jsonExample: object; // Example JSON structure
+    jsonExample: Record<string, unknown>; // Example JSON structure
     contextDescription: string; // What this provides to the workflow
   };
   

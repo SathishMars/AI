@@ -66,6 +66,11 @@ export const WorkflowStepSchema: z.ZodSchema = z.lazy(() =>
     // Conditional paths - references to other steps (by human-readable ID)
     onSuccessGoTo: z.string().optional(),
     onFailureGoTo: z.string().optional(),
+    onApproval: z.string().optional(),
+    onReject: z.string().optional(),
+    onYes: z.string().optional(),
+    onNo: z.string().optional(),
+    nextSteps: z.union([z.array(z.string()), z.string()]).optional(),
     
     // For end steps
     result: z.enum(['success', 'failure', 'cancelled', 'timeout']).optional(),
@@ -104,7 +109,8 @@ export const WorkflowDefinitionSchema = z.object({
 // Internal workflow format (simple - just steps array)
 // Used throughout the application for workflow editing and manipulation
 export const WorkflowJSONSchema = z.object({
-  steps: z.array(WorkflowStepSchema) // Nested array of workflow steps
+  steps: z.array(WorkflowStepSchema), // Nested array of workflow steps
+  mermaidDiagram: z.string().optional()
 });
 
 // LLM-generated workflow format (includes full context)
@@ -131,6 +137,11 @@ export interface WorkflowStep {
   onFailure?: WorkflowStep;
   onSuccessGoTo?: string;
   onFailureGoTo?: string;
+  onApproval?: string;
+  onReject?: string;
+  onYes?: string;
+  onNo?: string;
+  nextSteps?: string[] | string;
   result?: 'success' | 'failure' | 'cancelled' | 'timeout';
   workflowId?: string;
   workflowParams?: Record<string, unknown>;

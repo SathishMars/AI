@@ -202,12 +202,8 @@ export const workflowConversationAutocomplete: WorkflowConversationAutocomplete 
           reason: 'Budget exceeds department threshold',
           urgency: 'normal'
         },
-        onSuccess: '#createEvent',
-        onFailure: '#updateForm',
         onApproval: '#createEvent',
-        onYes: '#createEvent',
         onReject: '#notifyRejection',
-        onNo: '#notifyRejection'
       },
       contextDescription: 'Initiates approval workflow with designated approvers and tracks approval status. Supports multiple output paths: onSuccess/onFailure (standard), onApproval/onYes (approved), onReject/onNo (rejected)'
     },
@@ -255,14 +251,12 @@ export const workflowConversationAutocomplete: WorkflowConversationAutocomplete 
       usage: 'Use to create parallel execution paths in workflows. Can branch to multiple steps simultaneously',
       jsonExample: {
         type: 'action',
-        action: 'fnBranchWorkflow',
+        action: 'branchWorkflow',
         params: {
-          branches: ['approvalStep', 'notificationStep', 'auditStep'],
           waitForAll: true,
           mergeStep: 'consolidateResults'
         },
-        onSuccess: 'mergeResults',
-        onFailure: 'handleBranchFailure'
+        nextSteps: ['approvalStep', 'notificationStep', 'auditStep']
       },
       contextDescription: 'Splits workflow execution into parallel branches. Use when multiple independent processes need to run simultaneously'
     },
@@ -311,14 +305,13 @@ export const workflowConversationAutocomplete: WorkflowConversationAutocomplete 
       usage: 'Use to synchronize multiple parallel workflow branches. Waits for specified steps to complete before proceeding',
       jsonExample: {
         type: 'action', 
-        action: 'fnMergeWorkflow',
+        action: 'mergeWorkflow',
         params: {
           waitForSteps: ['managerApproval', 'budgetValidation', 'securityReview'],
           requireAllSuccess: true,
           timeout: 120
         },
-        onSuccess: 'proceedWithProcess',
-        onFailure: 'handleMergeFailure'
+        nextSteps: ['proceedWithProcess']
       },
       contextDescription: 'Merges parallel workflow branches by waiting for multiple steps to complete. Essential for synchronization in complex workflows'
     },
@@ -335,63 +328,14 @@ export const workflowConversationAutocomplete: WorkflowConversationAutocomplete 
     displayName: 'Create Event',
     description: 'Create a calendar event or meeting',
     examples: ['@createEvent for team meeting', '@createEvent reminder for deadline'],
-    parameters: [
-      {
-        name: 'title',
-        type: 'text',
-        description: 'Event title',
-        required: true,
-        placeholder: 'Team Meeting',
-        validation: { maxLength: 200 }
-      },
-      {
-        name: 'attendees',
-        type: 'api',
-        description: 'Select event attendees',
-        required: false,
-        apiEndpoint: '/api/users/directory',
-        apiValueField: 'email',
-        apiLabelField: 'displayName'
-      },
-      {
-        name: 'duration',
-        type: 'select',
-        description: 'Event duration',
-        required: true,
-        defaultValue: 60,
-        options: [
-          { value: 15, label: '15 minutes' },
-          { value: 30, label: '30 minutes' },
-          { value: 60, label: '1 hour' },
-          { value: 90, label: '1.5 hours' },
-          { value: 120, label: '2 hours' }
-        ]
-      },
-      {
-        name: 'location',
-        type: 'select',
-        description: 'Meeting location',
-        required: false,
-        options: [
-          { value: 'virtual', label: 'Virtual/Online' },
-          { value: 'conference_room_a', label: 'Conference Room A' },
-          { value: 'conference_room_b', label: 'Conference Room B' },
-          { value: 'boardroom', label: 'Boardroom' },
-          { value: 'external', label: 'External Location' }
-        ]
-      }
-    ],
+    parameters: [],
     llmInstructions: {
       usage: 'Use in workflow action steps to create calendar events and schedule meetings',
       jsonExample: {
         type: 'action',
         action: 'fnCreateEvent',
-        params: {
-          title: 'Project Review Meeting',
-          attendees: ['team@company.com'],
-          duration: 60,
-          location: 'conference_room_a'
-        }
+        params: {},
+        nextSteps: ['sendInvites']
       },
       contextDescription: 'Creates calendar events and sends meeting invitations to specified attendees'
     },
@@ -644,7 +588,7 @@ export const workflowConversationAutocomplete: WorkflowConversationAutocomplete 
         type: 'text',
         description: 'Multiple output paths as JSON (onSuccess, onFailure, onApproval, onYes, onReject, onNo)',
         required: true,
-        placeholder: '{ "onSuccess": "approveStep", "onFailure": "rejectStep", "onApproval": "approveStep", "onReject": "rejectStep" }'
+        placeholder: '{ "onSuccess": "successStep", "onFailure": "failureStep" }'
       }
     ],
     llmInstructions: {
@@ -653,17 +597,16 @@ export const workflowConversationAutocomplete: WorkflowConversationAutocomplete 
         type: 'condition',
         action: 'fnEnhancedCondition',
         condition: {
-          all: [
-            { fact: 'mrf.budget', operator: 'greaterThan', value: 1000 },
-            { fact: 'user.role', operator: 'notEqual', value: 'manager' }
+          any:[
+            { fact: 'user.age', operator: 'greaterThan', value: 18 },
+            {  all: [
+              { fact: 'mrf.budget', operator: 'greaterThan', value: 1000 },
+              { fact: 'user.role', operator: 'notEqual', value: 'manager' }
+            ]}
           ]
         },
-        onSuccess: 'requireApproval',
-        onFailure: 'autoApprove',
-        onApproval: 'createEvent',
-        onYes: 'createEvent',
-        onReject: 'notifyUser',
-        onNo: 'notifyUser'
+        onSuccess: 'createEvent',
+        onFailure: 'notifyUser',
       },
       contextDescription: 'Advanced condition step supporting multiple output paths for nuanced workflow control. Use when simple success/failure is not sufficient'
     },
@@ -671,33 +614,55 @@ export const workflowConversationAutocomplete: WorkflowConversationAutocomplete 
     color: '#ff5722',
     tags: ['condition', 'decision', 'advanced', 'routing']
   },
-
-  // STEP REFERENCES
-  {
-    id: 'step_reference',
-    category: 'stepReference',
-    trigger: '#',
-    name: 'stepReference',
-    displayName: 'Workflow Step',
-    description: 'Reference to workflow steps for navigation',
-    examples: ['#approvalStep for routing', '#notificationStep'],
-    llmInstructions: {
-      usage: 'Reference workflow steps for conditional navigation. these steps should already exist in the workflow or should be created new if not existing. Supports enhanced outputs: onApproval/onYes, onReject/onNo in addition to onSuccess/onFailure',
-      jsonExample: {
-        onSuccess: 'approvalStep',
-        onFailure: 'rejectionStep',
-        onApproval: 'approvalStep',
-        onYes: 'approvalStep',
-        onReject: 'rejectionStep',
-        onNo: 'rejectionStep'
-      },
-      contextDescription: 'Workflow step identifiers for conditional branching and navigation. Enhanced to support multiple output paths for complex routing'
-    },
-    icon: '🔗',
-    color: '#607d8b',
-    tags: ['workflow', 'navigation', 'steps']
-  }
 ];
+
+const OUTPUT_KEYS = [
+  'nextSteps',
+  'onApproval',
+  'onReject',
+  'onSuccess',
+  'onFailure',
+  'onSuccessGoTo',
+  'onFailureGoTo',
+  'onYes',
+  'onNo'
+] as const;
+
+workflowConversationAutocomplete.forEach((item) => {
+  if (!item.workflowStepType) {
+    const exampleType = (item.llmInstructions.jsonExample as Record<string, unknown> | undefined)?.['type'];
+    if (
+      typeof exampleType === 'string' &&
+      ['trigger', 'action', 'condition', 'workflow', 'end'].includes(exampleType)
+    ) {
+      item.workflowStepType = exampleType as 'trigger' | 'action' | 'condition' | 'workflow' | 'end';
+    }
+  }
+
+  if (!item.llmUsageInstructions) {
+    item.llmUsageInstructions = item.llmInstructions.usage;
+  }
+
+  if (!item.llmJsonExample) {
+    item.llmJsonExample = item.llmInstructions.jsonExample;
+  }
+
+  if (!item.outputs) {
+    const example = item.llmInstructions.jsonExample as Record<string, unknown> | undefined;
+    if (example) {
+      const derivedOutputs = OUTPUT_KEYS.reduce<Record<string, unknown>>((acc, key) => {
+        if (key in example) {
+          acc[key] = example[key];
+        }
+        return acc;
+      }, {});
+
+      if (Object.keys(derivedOutputs).length > 0) {
+        item.outputs = derivedOutputs;
+      }
+    }
+  }
+});
 
 // Helper functions for categorized access
 export const getFunctionAutocomplete = () => 
@@ -731,18 +696,37 @@ export const getAutocompleteByTrigger = (trigger: string) =>
 
 // Get all available for LLM context
 export const getLLMContext = () => 
-  workflowConversationAutocomplete.map(item => ({
-    name: item.name,
-    category: item.category,
-    description: item.description,
-    usage: item.llmInstructions.usage,
-    example: item.llmInstructions.jsonExample,
-    parameters: item.parameters?.map(p => ({
-      name: p.name,
-      type: p.type,
-      required: p.required,
-      description: p.description,
-      options: p.options,
-      validation: p.validation
-    }))
-  }));
+  workflowConversationAutocomplete.map(item => {
+    const jsonExample = item.llmInstructions.jsonExample as Record<string, unknown>;
+    const rawStepType = typeof jsonExample?.['type'] === 'string' ? jsonExample['type'] : undefined;
+
+  const supportedOutputKeys = ['onSuccess', 'onFailure', 'onSuccessGoTo', 'onFailureGoTo', 'onApproval', 'onYes', 'onReject', 'onNo', 'nextSteps'];
+    const supportedOutputs = supportedOutputKeys.filter(key => key in jsonExample);
+
+    const outputs = supportedOutputs.reduce<Record<string, unknown>>((acc, key) => {
+      if (key in jsonExample) {
+        acc[key] = jsonExample[key];
+      }
+      return acc;
+    }, {});
+
+    return {
+      name: item.name,
+      category: item.category,
+      description: item.description,
+      usage: item.llmInstructions.usage,
+      stepType: rawStepType as ('trigger' | 'action' | 'condition' | 'end') | undefined,
+      supportedOutputs: supportedOutputs.length > 0 ? supportedOutputs : undefined,
+      contextDescription: item.llmInstructions.contextDescription,
+      example: item.llmInstructions.jsonExample,
+      outputs: Object.keys(outputs).length > 0 ? outputs : undefined,
+      parameters: item.parameters?.map(p => ({
+        name: p.name,
+        type: p.type,
+        required: p.required,
+        description: p.description,
+        options: p.options,
+        validation: p.validation
+      }))
+    };
+  });

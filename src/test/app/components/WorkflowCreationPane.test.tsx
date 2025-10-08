@@ -217,6 +217,7 @@ const renderWithTheme = (component: React.ReactElement) =>
 describe('WorkflowCreationPane', () => {
   let fetchMock: jest.Mock;
   let mockOnWorkflowChange: jest.Mock;
+  let workflowResponseOverride: Partial<{ conversationalResponse: string; followUpQuestions: string[]; parameterCollectionNeeded?: boolean; workflow: { steps: unknown[] } }> | null;
 
   const renderComponent = (props?: Partial<React.ComponentProps<typeof WorkflowCreationPane>>) =>
     renderWithTheme(
@@ -239,6 +240,7 @@ describe('WorkflowCreationPane', () => {
     initiateCreationMock.mockClear();
     handleStreamingGenerationMock.mockClear();
     processUserRefinementMock.mockClear();
+    workflowResponseOverride = null;
 
     fetchMock = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input.toString();
@@ -265,18 +267,20 @@ describe('WorkflowCreationPane', () => {
       }
 
       if (url === '/api/langchain/generate-workflow' && init?.method === 'POST') {
+        const overridePayload = workflowResponseOverride;
         return Promise.resolve({
           ok: true,
           json: async () => ({
             success: true,
             result: {
-              workflow: {
+              workflow: overridePayload?.workflow ?? {
                 steps: [
                   { id: 'start', name: 'Start: On submission', type: 'trigger' }
                 ]
               },
-              conversationalResponse: 'Workflow generated successfully.',
-              followUpQuestions: []
+              conversationalResponse: overridePayload?.conversationalResponse ?? 'Workflow generated successfully.',
+              followUpQuestions: overridePayload?.followUpQuestions ?? [],
+              parameterCollectionNeeded: overridePayload?.parameterCollectionNeeded ?? false
             }
           })
         });
@@ -357,6 +361,44 @@ describe('WorkflowCreationPane', () => {
       expect.objectContaining({ content: expect.stringContaining('Workflow generated successfully.') })
     ));
 
-    expect(await screen.findByText(/Workflow generated successfully/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Is there anything else I can help you with/i)).toBeInTheDocument();
+  });
+
+  it('prompts follow-up questions when provided by the workflow generator', async () => {
+    workflowResponseOverride = {
+      conversationalResponse: 'I have your workflow ready.',
+      followUpQuestions: [
+        'Who should approve the event request?',
+        'Do you need any budget thresholds configured?'
+      ],
+      parameterCollectionNeeded: true
+    };
+
+    renderComponent();
+    await waitForInitialization();
+
+    const input = await screen.findByTestId('smart-autocomplete');
+    fireEvent.change(input, { target: { value: 'Collect details' } });
+    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
+
+    expect(await screen.findByText(/To complete your workflow, I need some additional information/i)).toBeInTheDocument();
+    expect(await screen.findByText(/1\. Who should approve the event request\?/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Please provide the information above so I can complete the workflow configuration/i)).toBeInTheDocument();
+  });
+
+  it('offers additional assistance when no follow-up questions are returned', async () => {
+    workflowResponseOverride = {
+      conversationalResponse: 'Here is the workflow you asked for.',
+      followUpQuestions: []
+    };
+
+    renderComponent();
+    await waitForInitialization();
+
+    const input = await screen.findByTestId('smart-autocomplete');
+    fireEvent.change(input, { target: { value: 'Finalize workflow' } });
+    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
+
+    expect(await screen.findByText(/Is there anything else I can help you with/i)).toBeInTheDocument();
   });
 });
