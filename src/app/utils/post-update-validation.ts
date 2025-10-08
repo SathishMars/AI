@@ -60,7 +60,9 @@ export class PostUpdateValidationSystem {
       };
 
       // Cache results for future use
-      await this.cacheValidationResults(workflow.metadata.id, postUpdateResult);
+      if (workflow.metadata?.id) {
+        await this.cacheValidationResults(workflow.metadata.id, postUpdateResult);
+      }
 
       // Trigger conversational recovery if needed
       if (!postUpdateResult.isValid && postUpdateResult.conversationalRecovery) {
@@ -241,12 +243,17 @@ export class PostUpdateValidationSystem {
     workflow: WorkflowJSON,
     _updateContext: UpdateContext // eslint-disable-line @typescript-eslint/no-unused-vars
   ): Promise<ValidationResult | null> {
+    const metadataId = workflow.metadata?.id;
+    if (!metadataId) {
+      return null;
+    }
+
     const workflowHash = this.generateWorkflowHash(workflow);
     
     for (const [key, cached] of this.validationCache.entries()) {
       if (cached.workflowHash === workflowHash && 
           cached.expiresAt > new Date() &&
-          key.includes(workflow.metadata.id)) {
+          key.includes(metadataId)) {
         return cached.results;
       }
     }
@@ -351,7 +358,7 @@ export class PostUpdateValidationSystem {
   }
 
   private isValidatableWorkflow(workflow: Partial<WorkflowJSON>): boolean {
-    return !!(workflow.metadata?.id && Array.isArray(workflow.steps) && workflow.steps.length > 0);
+  return !!(workflow.metadata?.id && Array.isArray(workflow.steps) && workflow.steps.length > 0);
   }
 
   private ensureCompleteWorkflow(partialWorkflow: Partial<WorkflowJSON>): WorkflowJSON {
@@ -365,7 +372,7 @@ export class PostUpdateValidationSystem {
         tags: partialWorkflow.metadata?.tags || [],
         ...partialWorkflow.metadata
       },
-      steps: partialWorkflow.steps || {},
+  steps: Array.isArray(partialWorkflow.steps) ? partialWorkflow.steps : [],
       ...partialWorkflow
     } as WorkflowJSON;
   }

@@ -4,7 +4,8 @@ import {
   updateWorkflowTemplate,
   deleteWorkflowTemplate
 } from '@/app/utils/workflow-template-database';
-import { TemplateError } from '@/app/types/workflow-template';
+import { TemplateError, WorkflowTemplate, TemplateResolutionResult } from '@/app/types/workflow-template';
+import { WorkflowStep } from '@/app/types/workflow';
 
 // Mock the database utilities
 jest.mock('@/app/utils/workflow-template-database');
@@ -18,64 +19,63 @@ describe('Workflow Template Detail API Logic', () => {
     jest.clearAllMocks();
   });
 
-  const mockTemplate = {
-    _id: 'template-123',
-    account: 'test-account',
-    name: 'test-workflow',
-    status: 'draft' as const,
-    version: '1.0.0',
-    workflowDefinition: {
-      schemaVersion: '1.0',
-      metadata: {
-        id: 'test-workflow-001',
-        name: 'Test Workflow',
-        version: '1.0.0',
-        status: 'draft' as const,
-        tags: ['test']
-      },
-      steps: {
-        start: {
-          name: 'Start',
-          type: 'trigger' as const,
-          action: 'onMRFSubmit',
-          nextSteps: ['end']
-        },
-        end: {
-          name: 'End',
-          type: 'end' as const,
+  const mockSteps: WorkflowStep[] = [
+    {
+      id: 'start',
+      name: 'Start: On MRF Submit',
+      type: 'trigger',
+      action: 'onMRFSubmit',
+      params: {},
+      children: [
+        {
+          id: 'end',
+          name: 'End: Workflow Complete',
+          type: 'end',
           result: 'success'
         }
-      }
+      ]
+    }
+  ];
+
+  const mockTemplate: WorkflowTemplate = {
+    _id: 'template-123',
+    id: 'template-123',
+    account: 'test-account',
+  organization: undefined,
+    version: '1.0.0',
+    workflowDefinition: {
+      steps: mockSteps as unknown[]
     },
-    description: 'Test workflow description',
-    category: 'test',
-    tags: ['test'],
-    author: 'test-user',
     metadata: {
+      name: 'Test Workflow',
+      status: 'draft',
+      author: 'test-user',
       createdAt: new Date(),
       updatedAt: new Date(),
-      author: 'test-user'
+      tags: ['test'],
+      description: 'Test workflow description',
+      category: 'test'
     }
   };
 
   describe('getWorkflowTemplate functionality', () => {
     it('should retrieve a template successfully', async () => {
-      const mockResult = {
+      const mockResult: TemplateResolutionResult = {
         template: mockTemplate,
-        conversations: [],
-        templateState: 'draft_available' as const,
-        suggestCreateDraft: false
+          conversations: [],
+          templateState: 'draft_available' as const,
+          suggestCreateDraft: false
       };
 
-      mockGetWorkflowTemplate.mockResolvedValue(mockResult);
+        mockGetWorkflowTemplate.mockResolvedValue(mockResult);
 
-      const result = await getWorkflowTemplate('test-account', 'test-workflow');
+  const result = await getWorkflowTemplate('test-account', null, 'test-workflow');
       
       expect(result).toBeDefined();
-      expect(result.template?.name).toBe('test-workflow');
-      expect(result.template?.status).toBe('draft');
+  expect(result.template?.metadata.name).toBe('Test Workflow');
+  expect(result.template?.metadata.status).toBe('draft');
       expect(result.templateState).toBe('draft_available');
-      expect(mockGetWorkflowTemplate).toHaveBeenCalledWith('test-account', 'test-workflow');
+  expect(mockGetWorkflowTemplate).toHaveBeenCalledWith('test-account', null, 'test-workflow');
     });
 
     it('should handle template not found', async () => {
@@ -83,10 +83,10 @@ describe('Workflow Template Detail API Logic', () => {
         new TemplateError('Template not found', 'NOT_FOUND')
       );
 
-      await expect(getWorkflowTemplate('test-account', 'nonexistent'))
+      await expect(getWorkflowTemplate('test-account', null, 'nonexistent'))
         .rejects.toThrow(TemplateError);
       
-      await expect(getWorkflowTemplate('test-account', 'nonexistent'))
+      await expect(getWorkflowTemplate('test-account', null, 'nonexistent'))
         .rejects.toThrow('Template not found');
     });
 
@@ -95,7 +95,7 @@ describe('Workflow Template Detail API Logic', () => {
         new TemplateError('Database connection failed', 'DB_ERROR')
       );
 
-      await expect(getWorkflowTemplate('test-account', 'test-workflow'))
+      await expect(getWorkflowTemplate('test-account', null, 'test-workflow'))
         .rejects.toThrow(TemplateError);
     });
   });
@@ -105,7 +105,7 @@ describe('Workflow Template Detail API Logic', () => {
       description: 'Updated description',
       tags: ['test', 'updated'],
       workflowDefinition: {
-        schemaVersion: '1.0',
+        schemaVersion: '1.0.0',
         metadata: {
           id: 'test-workflow-001',
           name: 'Updated Test Workflow',
@@ -113,51 +113,63 @@ describe('Workflow Template Detail API Logic', () => {
           status: 'draft' as const,
           tags: ['test', 'updated']
         },
-        steps: {
-          start: {
-            name: 'Start',
+        steps: [
+          {
+            id: 'start',
+            name: 'Start: On MRF Submit',
             type: 'trigger' as const,
             action: 'onMRFSubmit',
-            nextSteps: ['validate']
-          },
-          validate: {
-            name: 'Validate',
-            type: 'condition' as const,
-            condition: {
-              all: [
-                { fact: 'form.complete', operator: 'equal', value: true }
-              ]
-            },
-            onSuccess: 'end',
-            onFailure: 'end'
-          },
-          end: {
-            name: 'End',
-            type: 'end' as const,
-            result: 'success'
+            params: {},
+            children: [
+              {
+                id: 'validate',
+                name: 'Check: Validate Form Completion',
+                type: 'condition' as const,
+                condition: {
+                  all: [
+                    { fact: 'form.complete', operator: 'equal', value: true }
+                  ]
+                },
+                onSuccess: {
+                  id: 'end',
+                  name: 'End: Workflow Success',
+                  type: 'end' as const,
+                  result: 'success'
+                },
+                onFailure: {
+                  id: 'endFailure',
+                  name: 'End: Workflow Failure',
+                  type: 'end' as const,
+                  result: 'failure'
+                }
+              }
+            ]
           }
-        }
+        ]
       }
     };
 
     it('should update a template successfully', async () => {
-      const updatedTemplate = {
+      const updatedTemplate: WorkflowTemplate = {
         ...mockTemplate,
-        ...updateData,
-        version: '1.0.1',
+        workflowDefinition: updateData.workflowDefinition as { steps: unknown[] },
         metadata: {
           ...mockTemplate.metadata,
+          name: mockTemplate.metadata.name,
+          description: updateData.description,
+          tags: updateData.tags,
           updatedAt: new Date()
-        }
+        },
+        version: '1.0.1'
       };
 
-      mockUpdateWorkflowTemplate.mockResolvedValue(updatedTemplate);
+        mockUpdateWorkflowTemplate.mockResolvedValue(updatedTemplate);
 
-      const result = await updateWorkflowTemplate('test-account', 'test-workflow', '1.0.0', updateData);
+  const result = await updateWorkflowTemplate('test-account', 'test-workflow', '1.0.0', updateData);
       
-      expect(result.name).toBe('test-workflow');
+  expect(result.metadata.name).toBe('Test Workflow');
       expect(result.version).toBe('1.0.1');
-      expect(mockUpdateWorkflowTemplate).toHaveBeenCalledWith('test-workflow', '1.0.0', updateData);
+  expect(mockUpdateWorkflowTemplate).toHaveBeenCalledWith('test-account', 'test-workflow', '1.0.0', updateData);
     });
 
     it('should handle update validation errors', async () => {
@@ -195,10 +207,10 @@ describe('Workflow Template Detail API Logic', () => {
     it('should delete a template successfully', async () => {
       mockDeleteWorkflowTemplate.mockResolvedValue(true);
 
-      const result = await deleteWorkflowTemplate('test-account', 'test-workflow', '1.0.0');
+  const result = await deleteWorkflowTemplate('test-account', 'test-workflow', '1.0.0');
       
       expect(result).toBe(true);
-      expect(mockDeleteWorkflowTemplate).toHaveBeenCalledWith('test-workflow', '1.0.0');
+  expect(mockDeleteWorkflowTemplate).toHaveBeenCalledWith('test-account', 'test-workflow', '1.0.0');
     });
 
     it('should handle template not found during deletion', async () => {

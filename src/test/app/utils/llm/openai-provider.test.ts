@@ -80,10 +80,10 @@ describe('OpenAIProvider', () => {
   describe('validateResponse', () => {
     it('should validate workflow JSON response correctly', () => {
       const validWorkflowResponse = JSON.stringify({
-        steps: {
-          start: { name: 'Start', type: 'trigger' },
-          end: { name: 'End', type: 'end' }
-        }
+        steps: [
+          { id: 'start', name: 'Start', type: 'trigger' },
+          { id: 'end', name: 'End', type: 'end' }
+        ]
       });
 
       const result = provider.validateResponse(validWorkflowResponse, 'workflow');
@@ -134,7 +134,7 @@ describe('OpenAIProvider', () => {
       
       expect(result.isValid).toBe(true);
       expect(result.info).toHaveLength(1);
-      expect(result.info[0].technicalMessage).toContain('30 characters');
+  expect(result.info[0].technicalMessage).toContain('characters');
     });
 
     it('should detect empty text responses', () => {

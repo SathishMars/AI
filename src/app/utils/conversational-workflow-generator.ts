@@ -3,7 +3,7 @@ import {
   CreationContext, 
   CreationPhase
 } from '@/app/types/workflow-creation';
-import { WorkflowJSON } from '../types/workflow';
+import { WorkflowJSON, WorkflowStep } from '../types/workflow';
 import { ParameterCollectionSystem } from './parameter-collection-system';
 import { ConversationStateManager } from './conversation-manager';
 
@@ -107,26 +107,10 @@ export class ConversationalWorkflowGenerator {
     context: CreationContext,
     currentWorkflow?: Partial<WorkflowJSON>
   ): Promise<Partial<WorkflowJSON>> {
-    // TODO: Re-enable template workflows after converting to nested array format
-    // These templates currently use legacy object format: { steps: { "step1": {}, "step2": {} } }
-    // Need to convert to: { steps: [ { id: "step1", ... }, { id: "step2", ... } ] }
-    
     const workflowId = currentWorkflow?.metadata?.id || `workflow-${Date.now()}`;
-    
-    // Return minimal workflow structure - real workflows come from LLM
-    return {
-      schemaVersion: '1.0.0',
-      metadata: {
-        id: workflowId,
-        name: 'New Workflow',
-        description: `Workflow for: ${userInput}`,
-        version: '1.0.0',
-        status: 'draft',
-        createdAt: new Date(),
-        tags: ['ai-generated']
-      },
-      steps: [] // Empty array - LLM will populate
-    };
+    const template = this.selectTemplateForInput(userInput, context, workflowId);
+
+    return template;
   }
 
   /**
@@ -266,7 +250,7 @@ export class ConversationalWorkflowGenerator {
     }
     
     // Add additional contextual questions
-    incompleteSteps.slice(0, 2).forEach(step => {
+  incompleteSteps.slice(0, 3).forEach(step => {
       switch (step.functionName) {
         case 'onMRFSubmit':
           if (!questions.some(q => q.includes('MRF form'))) {
@@ -307,7 +291,7 @@ export class ConversationalWorkflowGenerator {
     const nextSteps: string[] = [];
     
     if (incompleteSteps.length > 0) {
-      nextSteps.push(`Configure ${incompleteSteps[0].stepName}`);
+      nextSteps.push(`Configure ${this.formatStepName(incompleteSteps[0].stepName)}`);
       
       if (incompleteSteps.length > 1) {
         nextSteps.push(`Configure remaining ${incompleteSteps.length - 1} steps`);
@@ -379,5 +363,208 @@ export class ConversationalWorkflowGenerator {
         'text'
       );
     }
+  }
+
+  private selectTemplateForInput(
+    userInput: string,
+    context: CreationContext,
+    workflowId: string
+  ): WorkflowJSON {
+    const lowerInput = userInput.toLowerCase();
+
+    if (lowerInput.includes('mrf') || lowerInput.includes('approval')) {
+      return this.buildMrfApprovalTemplate(userInput, context, workflowId);
+    }
+
+    if (
+      lowerInput.includes('schedule') ||
+      lowerInput.includes('scheduled') ||
+      lowerInput.includes('reminder')
+    ) {
+      return this.buildScheduledTemplate(userInput, context, workflowId);
+    }
+
+    if (lowerInput.includes('notification') || lowerInput.includes('email')) {
+      return this.buildNotificationTemplate(userInput, context, workflowId);
+    }
+
+    return this.buildCustomTemplate(userInput, context, workflowId);
+  }
+
+  private buildMrfApprovalTemplate(
+    userInput: string,
+    context: CreationContext,
+    workflowId: string
+  ): WorkflowJSON {
+    const steps: WorkflowStep[] = [
+      {
+        id: 'startOnMrf',
+        name: 'Start: On MRF Submission',
+        type: 'trigger',
+        action: 'onMRFSubmit',
+        params: {},
+        children: [
+          {
+            id: 'checkRequiresApproval',
+            name: 'Check: Requires Approval',
+            type: 'condition',
+            condition: {
+              any: [
+                { fact: 'form.totalCost', operator: 'greaterThan', value: 10000 },
+                { fact: 'form.attendees', operator: 'greaterThan', value: 100 }
+              ]
+            },
+            onSuccess: {
+              id: 'requestManagerApproval',
+              name: 'Action: Request Manager Approval',
+              type: 'action',
+              action: 'requestApproval',
+              params: {}
+            },
+            onFailure: {
+              id: 'createEventAction',
+              name: 'Action: Create Event',
+              type: 'action',
+              action: 'createEvent',
+              params: {}
+            }
+          }
+        ]
+      },
+      {
+        id: 'workflowComplete',
+        name: 'End: Workflow Complete',
+        type: 'end',
+        result: 'success'
+      }
+    ];
+
+    return this.composeWorkflow('MRF Approval Workflow', userInput, workflowId, steps, context);
+  }
+
+  private buildScheduledTemplate(
+    userInput: string,
+    context: CreationContext,
+    workflowId: string
+  ): WorkflowJSON {
+    const steps: WorkflowStep[] = [
+      {
+        id: 'scheduledTrigger',
+        name: 'Start: On Scheduled Event',
+        type: 'trigger',
+        action: 'onScheduledEvent',
+        params: {},
+        children: [
+          {
+            id: 'sendReminderNotification',
+            name: 'Action: Send Reminder Notification',
+            type: 'action',
+            action: 'sendNotification',
+            params: {}
+          }
+        ]
+      },
+      {
+        id: 'scheduleComplete',
+        name: 'End: Workflow Complete',
+        type: 'end',
+        result: 'success'
+      }
+    ];
+
+    return this.composeWorkflow('Scheduled Workflow', userInput, workflowId, steps, context);
+  }
+
+  private buildNotificationTemplate(
+    userInput: string,
+    context: CreationContext,
+    workflowId: string
+  ): WorkflowJSON {
+    const steps: WorkflowStep[] = [
+      {
+        id: 'eventCreatedTrigger',
+        name: 'Start: On Event Created',
+        type: 'trigger',
+        action: 'onEventCreated',
+        params: {},
+        children: [
+          {
+            id: 'sendNotificationStep',
+            name: 'Action: Send Notification Email',
+            type: 'action',
+            action: 'sendNotification',
+            params: {}
+          }
+        ]
+      },
+      {
+        id: 'notificationComplete',
+        name: 'End: Workflow Complete',
+        type: 'end',
+        result: 'success'
+      }
+    ];
+
+    return this.composeWorkflow('Notification Workflow', userInput, workflowId, steps, context);
+  }
+
+  private buildCustomTemplate(
+    userInput: string,
+    context: CreationContext,
+    workflowId: string
+  ): WorkflowJSON {
+    const steps: WorkflowStep[] = [
+      {
+        id: 'customTrigger',
+        name: 'Start: On Custom Event',
+        type: 'trigger',
+        action: 'onCustomEvent',
+        params: {},
+        children: [
+          {
+            id: 'customAction',
+            name: 'Action: Custom Function',
+            type: 'action',
+            action: 'customFunction',
+            params: {}
+          }
+        ]
+      },
+      {
+        id: 'customComplete',
+        name: 'End: Workflow Complete',
+        type: 'end',
+        result: 'success'
+      }
+    ];
+
+    return this.composeWorkflow('Custom Workflow', userInput, workflowId, steps, context);
+  }
+
+  private composeWorkflow(
+    name: string,
+    userInput: string,
+    workflowId: string,
+    steps: WorkflowStep[],
+    context: CreationContext
+  ): WorkflowJSON {
+    return {
+      schemaVersion: '1.0.0',
+      metadata: {
+        id: workflowId,
+        name,
+        description: `Workflow for: ${userInput}`,
+        version: '1.0.0',
+        status: 'draft',
+        createdAt: new Date(),
+        tags: ['ai-generated'],
+        author: context.userRole
+      },
+      steps
+    };
+  }
+
+  private formatStepName(stepName: string): string {
+    return stepName.replace(/^(Start|Action|Check|End):\s*/, '').trim();
   }
 }

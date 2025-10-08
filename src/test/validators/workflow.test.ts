@@ -13,7 +13,8 @@ describe('Workflow Validation', () => {
       description: 'A test workflow',
       version: '1.0.0',
       status: 'draft',
-      tags: []
+      tags: [],
+      author: 'Test Author'
     },
     steps: [
       {
@@ -27,7 +28,7 @@ describe('Workflow Validation', () => {
             id: 'end',
             name: 'End: Workflow Complete',
             type: 'end',
-            params: { result: 'success' }
+            result: 'success'
           }
         ]
       }
@@ -66,7 +67,7 @@ describe('Workflow Validation', () => {
                     id: 'end',
                     name: 'End: Workflow Complete',
                     type: 'end',
-                    params: { result: 'success' }
+                    result: 'success'
                   }
                 ]
               }
@@ -102,7 +103,7 @@ describe('Workflow Validation', () => {
                     id: 'end',
                     name: 'End: Workflow Complete',
                     type: 'end',
-                    params: { result: 'success' }
+                    result: 'success'
                   }
                 ]
               }
@@ -139,7 +140,7 @@ describe('Workflow Validation', () => {
                     id: 'end',
                     name: 'End: Workflow Complete',
                     type: 'end',
-                    params: { result: 'success' }
+                    result: 'success'
                   }
                 ]
               }
@@ -238,7 +239,7 @@ describe('Workflow Validation', () => {
                 id: 'end',
                 name: 'End: Workflow Complete',
                 type: 'end',
-                params: { result: 'success' }
+                result: 'success'
               }
             ]
           }

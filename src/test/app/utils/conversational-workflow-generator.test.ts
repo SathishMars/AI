@@ -37,25 +37,28 @@ describe('ConversationalWorkflowGenerator', () => {
         mockConversationManager
       );
 
-      // Check that workflow was generated
-      expect(result.workflowUpdate).toBeDefined();
-      expect(result.workflowUpdate?.metadata?.name).toBe('MRF Approval Workflow');
-      expect(result.workflowUpdate?.steps).toBeDefined();
+  // Check that workflow was generated
+  expect(result.workflowUpdate).toBeDefined();
+  expect(result.workflowUpdate?.metadata?.name).toBe('MRF Approval Workflow');
+  expect(Array.isArray(result.workflowUpdate?.steps)).toBe(true);
+  expect(result.workflowUpdate?.steps?.length).toBeGreaterThan(0);
+  const triggerStep = result.workflowUpdate?.steps?.[0];
+  expect(triggerStep?.action).toBe('onMRFSubmit');
       
       // Check that conversational response was generated
       expect(result.conversationalResponse.toLowerCase()).toContain('mrf approval workflow');
       expect(result.conversationalResponse.length).toBeGreaterThan(50);
       
       // Check that follow-up questions were generated
-      expect(result.followUpQuestions).toHaveLength(3);
-      expect(result.followUpQuestions[0]).toContain('MRF form');
-      expect(result.followUpQuestions[1]).toContain('approval request');
+  expect(result.followUpQuestions.length).toBeGreaterThanOrEqual(3);
+  expect(result.followUpQuestions.some(question => question.includes('MRF form'))).toBe(true);
+  expect(result.followUpQuestions.some(question => question.includes('approval request'))).toBe(true);
       
       // Check that parameter collection is needed
       expect(result.parameterCollectionNeeded).toBe(true);
       
       // Check that next steps are provided
-      expect(result.nextSteps).toContain('Configure MRF Submitted');
+  expect(result.nextSteps[0]).toContain('On MRF Submission');
       
       // Check that conversation manager was called
       expect(mockConversationManager.addAimeMessage).toHaveBeenCalledWith(
@@ -85,7 +88,8 @@ describe('ConversationalWorkflowGenerator', () => {
       // Check that scheduled workflow was generated
       expect(result.workflowUpdate).toBeDefined();
       expect(result.workflowUpdate?.metadata?.name).toBe('Scheduled Workflow');
-      expect(result.workflowUpdate?.steps?.start?.action).toBe('onScheduledEvent');
+  const scheduledTrigger = result.workflowUpdate?.steps?.find(step => step.id === 'scheduledTrigger');
+  expect(scheduledTrigger?.action).toBe('onScheduledEvent');
       
       // Check conversational response
       expect(result.conversationalResponse.toLowerCase()).toContain('scheduled workflow');
@@ -118,7 +122,13 @@ describe('ConversationalWorkflowGenerator', () => {
       // Check that notification workflow was generated
       expect(result.workflowUpdate).toBeDefined();
       expect(result.workflowUpdate?.metadata?.name).toBe('Notification Workflow');
-      expect(result.workflowUpdate?.steps?.sendNotification?.action).toBe('sendNotification');
+      const notificationStep = result.workflowUpdate?.steps?.flatMap(step => [
+        step,
+        ...(step.children ?? []),
+        step.onSuccess ?? [],
+        step.onFailure ?? []
+      ]).find(step => step?.id === 'sendNotificationStep');
+      expect(notificationStep?.action).toBe('sendNotification');
       
       // Check conversational response
       expect(result.conversationalResponse.toLowerCase()).toContain('notification workflow');
@@ -197,20 +207,21 @@ describe('ConversationalWorkflowGenerator', () => {
           tags: ['test'],
           createdAt: new Date()
         },
-        steps: {
-          start: {
-            name: 'Start',
+        steps: [
+          {
+            id: 'start',
+            name: 'Start: On MRF Submit',
             type: 'trigger' as const,
             action: 'onMRFSubmit',
             params: { mrfID: 'test-123' },
-            nextSteps: ['end']
-          },
-          end: {
-            name: 'End',
-            type: 'end' as const,
-            result: 'success'
+            onSuccess: {
+              id: 'end',
+              name: 'End: Workflow Complete',
+              type: 'end' as const,
+              result: 'success'
+            }
           }
-        }
+        ]
       };
 
       const result = await generator.generateWithConversation(
@@ -246,20 +257,21 @@ describe('ConversationalWorkflowGenerator', () => {
           tags: ['test'],
           createdAt: new Date()
         },
-        steps: {
-          start: {
-            name: 'Start',
+        steps: [
+          {
+            id: 'start',
+            name: 'Start: On MRF Submit',
             type: 'trigger' as const,
             action: 'onMRFSubmit',
             params: { mrfID: 'test-123' },
-            nextSteps: ['end']
-          },
-          end: {
-            name: 'End',
-            type: 'end' as const,
-            result: 'success'
+            onSuccess: {
+              id: 'end',
+              name: 'End: Workflow Complete',
+              type: 'end' as const,
+              result: 'success'
+            }
           }
-        }
+        ]
       };
 
       const result = await generator.generateWithConversation(

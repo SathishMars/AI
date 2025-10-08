@@ -19,21 +19,28 @@ describe('PostUpdateValidationSystem', () => {
         name: 'Test Workflow',
         version: '1.0.0',
         status: 'draft',
-        tags: ['test']
+        tags: ['test'],
+        author: 'Test Author',
+        createdAt: new Date('2025-01-01'),
+        updatedAt: new Date('2025-01-01')
       },
-      steps: {
-        start: {
-          name: 'Start Step',
+      steps: [
+        {
+          id: 'start',
+          name: 'Start: On MRF Submit',
           type: 'trigger',
           action: 'onMRFSubmit',
-          nextSteps: ['end']
-        },
-        end: {
-          name: 'End Step',
-          type: 'end',
-          result: 'success'
+          params: { mrfTemplateName: 'all' },
+          children: [
+            {
+              id: 'end',
+              name: 'End: Workflow Complete',
+              type: 'end',
+              result: 'success'
+            }
+          ]
         }
-      }
+      ]
     };
 
     mockUpdateContext = {
@@ -55,12 +62,12 @@ describe('PostUpdateValidationSystem', () => {
     });
 
     it('should detect missing workflow ID', async () => {
-      const invalidWorkflow = { 
-        ...mockWorkflow, 
-        metadata: { 
-          ...mockWorkflow.metadata, 
+      const invalidWorkflow: WorkflowJSON = {
+        ...mockWorkflow,
+        metadata: {
+          ...mockWorkflow.metadata!,
           id: '' // Set to empty string instead of undefined
-        } 
+        }
       };
       
       const result = await validationSystem.validateAfterUpdate(invalidWorkflow, mockUpdateContext);
@@ -72,7 +79,7 @@ describe('PostUpdateValidationSystem', () => {
     });
 
     it('should detect missing workflow steps', async () => {
-      const invalidWorkflow = { ...mockWorkflow, steps: {} };
+      const invalidWorkflow: WorkflowJSON = { ...mockWorkflow, steps: [] };
       
       const result = await validationSystem.validateAfterUpdate(invalidWorkflow, mockUpdateContext);
       
@@ -82,7 +89,7 @@ describe('PostUpdateValidationSystem', () => {
     });
 
     it('should generate conversational recovery for errors', async () => {
-      const invalidWorkflow = { ...mockWorkflow, steps: {} };
+      const invalidWorkflow: WorkflowJSON = { ...mockWorkflow, steps: [] };
       
       const result = await validationSystem.validateAfterUpdate(invalidWorkflow, mockUpdateContext);
       

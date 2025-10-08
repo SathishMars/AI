@@ -96,6 +96,21 @@ export const WorkflowMetadataSchema = z.object({
   tags: z.array(z.string()).default(['ai-generated'])
 });
 
+// Internal metadata structure used throughout the application (includes identifiers)
+const WorkflowMetadataInternalSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+  version: z.string().optional(),
+  status: z.enum(['draft', 'published', 'deprecated', 'archived']).optional(),
+  author: z.string().optional(),
+  updatedBy: z.string().optional(),
+  createdAt: z.union([z.string(), z.date()]).optional(),
+  updatedAt: z.union([z.string(), z.date()]).optional(),
+  category: z.string().optional(),
+  tags: z.array(z.string()).optional()
+}).passthrough();
+
 // Workflow definition interface (ONLY steps array - no metadata duplication)
 export interface WorkflowDefinition {
   steps: WorkflowStep[];
@@ -109,6 +124,8 @@ export const WorkflowDefinitionSchema = z.object({
 // Internal workflow format (simple - just steps array)
 // Used throughout the application for workflow editing and manipulation
 export const WorkflowJSONSchema = z.object({
+  schemaVersion: z.string().default(CURRENT_SCHEMA_VERSION),
+  metadata: WorkflowMetadataInternalSchema.optional(),
   steps: z.array(WorkflowStepSchema), // Nested array of workflow steps
   mermaidDiagram: z.string().optional()
 });
