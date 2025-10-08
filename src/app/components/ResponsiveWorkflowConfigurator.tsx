@@ -159,8 +159,8 @@ export default function ResponsiveWorkflowConfigurator({
   const dividerRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
-  const MIN_CONVERSATION_WIDTH = 300;
-  const MAX_CONVERSATION_WIDTH_PERCENT = 0.6; // 60% of container width
+  const MIN_CONVERSATION_WIDTH = 500;
+  const MAX_CONVERSATION_WIDTH_PERCENT = 0.5; // 50% of container width
   
   // Handle conversation state preservation during layout transitions
   const preserveConversationState = useCallback(() => {

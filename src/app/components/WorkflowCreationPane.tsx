@@ -289,10 +289,10 @@ export default function WorkflowCreationPane({
         
         // Add welcome message for new conversation
         const welcomeMessage = mrfData 
-          ? `Hi! I'm aime, your AI workflow assistant powered by LangChain. I see you want to create a workflow for "${mrfData.title}". Let's build this together step by step! Just describe what you want the workflow to do.`
+          ? `Hey there! I’m Aime — your AI sidekick for building smart workflows. I see you want to create a workflow for "${mrfData.title}". Let's build this together step by step! Just describe what you want the workflow to do.`
           : isNewWorkflow
-            ? `Hi! I'm aime, your AI workflow assistant powered by LangChain. I'm here to help you create a new workflow from scratch. What would you like to build?\n\nTo get started, you can describe your workflow in natural language. For example: 'When an MRF is submitted, check if it needs approval based on budget or location, then either send for approval or proceed directly.'`
-            : `Hi! I'm aime, your AI workflow assistant powered by LangChain. I'm here to help you edit your existing workflow. What would you like to modify?`;          
+            ? `Hey there! I’m Aime — your AI sidekick for building smart workflows.\nTell me what you’d like to create, and I’ll help you build it step by step.\n\nYou can just describe it in plain language — for example:\n-\t\"When an MRF is submitted, check if it needs approval based on budget or location, then either send it for approval or move it forward.\"`
+            : `Hey there! I’m Aime — your AI sidekick for building smart workflows. I'm here to help you modify your existing workflow. What would you like to change?`;
         manager.addAimeMessage(welcomeMessage, 'text');
         console.log('✅ Created fresh conversation session');
         
@@ -363,8 +363,8 @@ export default function WorkflowCreationPane({
     
     // Take last 20 messages (up to 10 pairs), but skip the welcome message
     const recentMessages = messages
-      .filter(msg => msg.content !== 'Hello! I\'m Aime, your AI workflow assistant. I\'m here to help you create and customize workflows for your team.') // Skip welcome message
-      .slice(-20); // Last 20 messages
+      .filter(msg => !msg.content.startsWith('Hey there! I’m Aime — your AI sidekick for building smart workflows.')) // Skip welcome message
+      .slice(-10); // Last 10 messages
     
     recentMessages.forEach(msg => {
       history.push({

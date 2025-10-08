@@ -219,6 +219,7 @@ export const SmartAutocomplete: React.FC<SmartAutocompleteProps> = ({
         onKeyDown={handleKeyDown}
         onSelect={handleSelect}
         disabled={disabled}
+        autoFocus
         inputRef={(el) => {
           textAreaRef.current = el;
           if (inputRef) {

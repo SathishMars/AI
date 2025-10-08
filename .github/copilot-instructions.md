@@ -189,6 +189,10 @@ import "@fontsource/roboto/700.css";
 
 ## Development Workflow
 
+### Manual Change Awareness
+- Assume files may contain manual adjustments that differ from cached or previously seen versions.
+- Always read the current code before applying updates and reconcile differences instead of overwriting custom logic.
+
 ### Build Commands
 - Development: `npm run dev` (uses Turbopack for fast builds)
 - Production: `npm run build` (uses Turbopack)
