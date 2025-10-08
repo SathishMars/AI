@@ -7,8 +7,9 @@
  */
 
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import WorkflowCreationPane from '@/app/components/WorkflowCreationPane';
+import { UnifiedUserProvider } from '@/app/contexts/UnifiedUserContext';
 import { WorkflowJSON } from '@/app/types/workflow';
 
 // Mock the API calls
@@ -28,8 +29,143 @@ describe('WorkflowCreationPane - Phase 5 Validation Integration', () => {
     jest.clearAllMocks();
     localStorageMock.getItem.mockReturnValue(null);
     
+    const userSessionResponse = {
+      success: true,
+      data: {
+        user: {
+          id: 'user-123',
+          profile: {
+            firstName: 'Test',
+            lastName: 'User',
+            email: 'test.user@example.com',
+            timezone: 'UTC',
+            locale: 'en-US'
+          },
+          preferences: {
+            theme: 'light',
+            language: 'en-US',
+            notifications: {
+              email: true,
+              push: false,
+              workflowUpdates: true,
+              systemAlerts: true
+            },
+            workflowDefaults: {
+              autoSave: true,
+              defaultView: 'visual',
+              showAdvancedOptions: false
+            }
+          },
+          roles: [
+            {
+              id: 'role-1',
+              name: 'Administrator',
+              permissions: ['workflows:create'],
+              level: 'admin',
+              scope: 'organization'
+            }
+          ],
+          status: 'active',
+          metadata: {
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            lastLoginAt: new Date().toISOString(),
+            loginCount: 1
+          }
+        },
+        account: {
+          id: 'account-123',
+          name: 'Test Account',
+          type: 'demo',
+          permissions: ['workflows:create'],
+          features: {
+            workflowBuilder: true,
+            aiGeneration: true,
+            templateSharing: true
+          },
+          subscription: {
+            plan: 'demo',
+            status: 'active',
+            expiresAt: new Date(Date.now() + 86400000).toISOString()
+          },
+          organizations: []
+        },
+        currentOrganization: {
+          id: 'org-123',
+          name: 'Primary Org',
+          type: 'department',
+          settings: {
+            workflowDefaults: {},
+            permissions: {
+              canCreateWorkflows: true,
+              canEditSharedWorkflows: true,
+              canPublishWorkflows: true,
+              canManageUsers: false,
+              canViewAnalytics: false,
+              canExportData: false
+            },
+            features: {
+              aiGeneration: true,
+              advancedRules: true,
+              customIntegrations: false,
+              analyticsReporting: false,
+              ssoIntegration: false,
+              auditLogging: false
+            }
+          },
+          metadata: {
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            createdBy: 'user-123'
+          }
+        },
+        availableOrganizations: [
+          {
+            id: 'org-123',
+            name: 'Primary Org',
+            type: 'department',
+            settings: {
+              workflowDefaults: {},
+              permissions: {
+                canCreateWorkflows: true,
+                canEditSharedWorkflows: true,
+                canPublishWorkflows: true,
+                canManageUsers: false,
+                canViewAnalytics: false,
+                canExportData: false
+              },
+              features: {
+                aiGeneration: true,
+                advancedRules: true,
+                customIntegrations: false,
+                analyticsReporting: false,
+                ssoIntegration: false,
+                auditLogging: false
+              }
+            },
+            metadata: {
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              createdBy: 'user-123'
+            }
+          }
+        ],
+        session: {
+          sessionId: 'session-123',
+          token: 'token-123',
+          expiresAt: new Date(Date.now() + 86400000).toISOString()
+        }
+      }
+    };
+
     // Mock successful API responses
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes('/api/user-session')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(userSessionResponse)
+        });
+      }
       if (url.includes('/api/workflow-autocomplete')) {
         return Promise.resolve({
           ok: true,
@@ -56,9 +192,19 @@ describe('WorkflowCreationPane - Phase 5 Validation Integration', () => {
     });
   });
 
+  const flushPromises = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+  const renderWithProviders = async (ui: React.ReactElement) => {
+    const result = render(<UnifiedUserProvider>{ui}</UnifiedUserProvider>);
+    await act(async () => {
+      await flushPromises();
+    });
+    return result;
+  };
+
   describe('Validation Integration', () => {
     it('should render WorkflowCreationPane without validation errors for empty workflow', async () => {
-      const emptyWorkflow: WorkflowJSON = {
+      const emptyWorkflow = {
         schemaVersion: '1.0',
         metadata: {
           id: 'test-workflow',
@@ -68,9 +214,9 @@ describe('WorkflowCreationPane - Phase 5 Validation Integration', () => {
           tags: []
         },
         steps: []
-      };
+      } as WorkflowJSON;
 
-      render(
+      await renderWithProviders(
         <WorkflowCreationPane
           workflow={emptyWorkflow}
           onWorkflowChange={jest.fn()}
@@ -78,8 +224,10 @@ describe('WorkflowCreationPane - Phase 5 Validation Integration', () => {
         />
       );
 
-      // Should render the component
-      expect(screen.getByText(/aime workflow creator/i)).toBeInTheDocument();
+      // Should render the welcome assistant message
+      expect(
+        await screen.findByText(/i'm aime, your ai workflow assistant/i)
+      ).toBeInTheDocument();
       
       // Should not show validation feedback for empty workflow
       await waitFor(() => {
@@ -88,7 +236,7 @@ describe('WorkflowCreationPane - Phase 5 Validation Integration', () => {
     });
 
     it('should show validation errors when workflow has invalid steps', async () => {
-      const invalidWorkflow: WorkflowJSON = {
+      const invalidWorkflow = {
         schemaVersion: '1.0',
         metadata: {
           id: 'test-workflow',
@@ -106,9 +254,9 @@ describe('WorkflowCreationPane - Phase 5 Validation Integration', () => {
             params: {}
           }
         ]
-      };
+      } as WorkflowJSON;
 
-      render(
+      await renderWithProviders(
         <WorkflowCreationPane
           workflow={invalidWorkflow}
           onWorkflowChange={jest.fn()}
@@ -127,7 +275,7 @@ describe('WorkflowCreationPane - Phase 5 Validation Integration', () => {
     });
 
     it('should show validation errors for duplicate step IDs', async () => {
-      const duplicateIdWorkflow: WorkflowJSON = {
+      const duplicateIdWorkflow = {
         schemaVersion: '1.0',
         metadata: {
           id: 'test-workflow',
@@ -161,9 +309,9 @@ describe('WorkflowCreationPane - Phase 5 Validation Integration', () => {
             ]
           }
         ]
-      };
+      } as WorkflowJSON;
 
-      render(
+      await renderWithProviders(
         <WorkflowCreationPane
           workflow={duplicateIdWorkflow}
           onWorkflowChange={jest.fn()}
@@ -182,7 +330,7 @@ describe('WorkflowCreationPane - Phase 5 Validation Integration', () => {
     });
 
     it('should show validation errors for broken references', async () => {
-      const brokenRefWorkflow: WorkflowJSON = {
+      const brokenRefWorkflow = {
         schemaVersion: '1.0',
         metadata: {
           id: 'test-workflow',
@@ -213,9 +361,9 @@ describe('WorkflowCreationPane - Phase 5 Validation Integration', () => {
             ]
           }
         ]
-      };
+      } as WorkflowJSON;
 
-      render(
+      await renderWithProviders(
         <WorkflowCreationPane
           workflow={brokenRefWorkflow}
           onWorkflowChange={jest.fn()}
@@ -234,7 +382,7 @@ describe('WorkflowCreationPane - Phase 5 Validation Integration', () => {
     });
 
     it('should update validation when workflow changes', async () => {
-      const validWorkflow: WorkflowJSON = {
+      const validWorkflow = {
         schemaVersion: '1.0',
         metadata: {
           id: 'test-workflow',
@@ -252,9 +400,9 @@ describe('WorkflowCreationPane - Phase 5 Validation Integration', () => {
             params: {}
           }
         ]
-      };
+      } as WorkflowJSON;
 
-      const { rerender } = render(
+      const { rerender } = await renderWithProviders(
         <WorkflowCreationPane
           workflow={validWorkflow}
           onWorkflowChange={jest.fn()}
@@ -268,7 +416,7 @@ describe('WorkflowCreationPane - Phase 5 Validation Integration', () => {
       }, { timeout: 1000 });
 
       // Update with invalid workflow
-      const invalidWorkflow: WorkflowJSON = {
+      const invalidWorkflow = {
         ...validWorkflow,
         steps: [
           {
@@ -279,15 +427,21 @@ describe('WorkflowCreationPane - Phase 5 Validation Integration', () => {
             params: {}
           }
         ]
-      };
+      } as WorkflowJSON;
 
       rerender(
-        <WorkflowCreationPane
-          workflow={invalidWorkflow}
-          onWorkflowChange={jest.fn()}
-          isNewWorkflow={true}
-        />
+        <UnifiedUserProvider>
+          <WorkflowCreationPane
+            workflow={invalidWorkflow}
+            onWorkflowChange={jest.fn()}
+            isNewWorkflow={true}
+          />
+        </UnifiedUserProvider>
       );
+
+      await act(async () => {
+        await flushPromises();
+      });
 
       // Should now show validation errors
       await waitFor(() => {
@@ -296,7 +450,7 @@ describe('WorkflowCreationPane - Phase 5 Validation Integration', () => {
     });
 
     it('should not show validation feedback when workflow is valid', async () => {
-      const validWorkflow: WorkflowJSON = {
+      const validWorkflow = {
         schemaVersion: '1.0',
         metadata: {
           id: 'test-workflow',
@@ -333,9 +487,9 @@ describe('WorkflowCreationPane - Phase 5 Validation Integration', () => {
             ]
           }
         ]
-      };
+      } as WorkflowJSON;
 
-      render(
+      await renderWithProviders(
         <WorkflowCreationPane
           workflow={validWorkflow}
           onWorkflowChange={jest.fn()}
@@ -352,8 +506,8 @@ describe('WorkflowCreationPane - Phase 5 Validation Integration', () => {
   });
 
   describe('Props Validation', () => {
-    it('should not require validationResult prop (removed in Phase 5)', () => {
-      const validWorkflow: WorkflowJSON = {
+    it('should not require validationResult prop (removed in Phase 5)', async () => {
+      const validWorkflow = {
         schemaVersion: '1.0',
         metadata: {
           id: 'test-workflow',
@@ -363,24 +517,22 @@ describe('WorkflowCreationPane - Phase 5 Validation Integration', () => {
           tags: []
         },
         steps: []
-      };
+      } as WorkflowJSON;
 
       // Should render without validationResult prop
-      expect(() => {
-        render(
-          <WorkflowCreationPane
-            workflow={validWorkflow}
-            onWorkflowChange={jest.fn()}
-            isNewWorkflow={true}
-          />
-        );
-      }).not.toThrow();
+      await renderWithProviders(
+        <WorkflowCreationPane
+          workflow={validWorkflow}
+          onWorkflowChange={jest.fn()}
+          isNewWorkflow={true}
+        />
+      );
     });
   });
 
   describe('UI Integration', () => {
     it('should render validation feedback in separate section below messages', async () => {
-      const invalidWorkflow: WorkflowJSON = {
+      const invalidWorkflow = {
         schemaVersion: '1.0',
         metadata: {
           id: 'test-workflow',
@@ -398,9 +550,9 @@ describe('WorkflowCreationPane - Phase 5 Validation Integration', () => {
             params: {}
           }
         ]
-      };
+      } as WorkflowJSON;
 
-      render(
+      await renderWithProviders(
         <WorkflowCreationPane
           workflow={invalidWorkflow}
           onWorkflowChange={jest.fn()}
@@ -419,7 +571,7 @@ describe('WorkflowCreationPane - Phase 5 Validation Integration', () => {
     });
 
     it('should limit validation feedback height with scrolling', async () => {
-      const workflowWithManyErrors: WorkflowJSON = {
+      const workflowWithManyErrors = {
         schemaVersion: '1.0',
         metadata: {
           id: 'test-workflow',
@@ -435,9 +587,9 @@ describe('WorkflowCreationPane - Phase 5 Validation Integration', () => {
           action: 'onMRFSubmit',
           params: {}
         }))
-      };
+      } as WorkflowJSON;
 
-      render(
+      await renderWithProviders(
         <WorkflowCreationPane
           workflow={workflowWithManyErrors}
           onWorkflowChange={jest.fn()}
