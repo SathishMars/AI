@@ -29,7 +29,7 @@ const createConversationManager = (): MockConversationManager => {
     {
       id: 'msg-1',
       sender: 'aime',
-      content: "Hi! I'm aime, your AI workflow assistant. Let's create a workflow together!",
+      content: 'Hey there! I\u2019m Aime — your AI sidekick for building smart workflows.',
       timestamp: new Date(),
       status: 'complete',
       type: 'text'
@@ -187,6 +187,14 @@ jest.mock('@/app/contexts/UnifiedUserContext', () => ({
 const theme = createTheme();
 
 const mockWorkflow: WorkflowJSON = {
+  schemaVersion: '1.0',
+  metadata: {
+    id: 'test-workflow',
+    name: 'Test Workflow',
+    version: '1.0.0',
+    status: 'draft',
+    tags: []
+  },
   steps: []
 };
 
@@ -300,7 +308,8 @@ describe('WorkflowCreationPane', () => {
     renderComponent();
     await waitForInitialization();
 
-    expect(await screen.findByText(/AI workflow assistant powered by LangChain/i)).toBeInTheDocument();
+  const welcomeMessages = await screen.findAllByText(/AI sidekick for building smart workflows/i);
+  expect(welcomeMessages.length).toBeGreaterThan(0);
     expect(mockConversationManagers[0].setCurrentWorkflow).toHaveBeenCalledWith({ steps: mockWorkflow.steps });
   });
 

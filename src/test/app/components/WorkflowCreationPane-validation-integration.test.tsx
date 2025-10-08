@@ -225,9 +225,8 @@ describe('WorkflowCreationPane - Phase 5 Validation Integration', () => {
       );
 
       // Should render the welcome assistant message
-      expect(
-        await screen.findByText(/i'm aime, your ai workflow assistant/i)
-      ).toBeInTheDocument();
+      const welcomeMessages = await screen.findAllByText(/AI sidekick for building smart workflows/i);
+      expect(welcomeMessages.length).toBeGreaterThan(0);
       
       // Should not show validation feedback for empty workflow
       await waitFor(() => {
