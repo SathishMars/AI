@@ -57,6 +57,7 @@ export interface CreateWorkflowTemplateInput {
   organization?: string; // Composite key (nullable for account-wide templates)
   name: string; // Descriptive name
   workflowDefinition: WorkflowJSON | { steps: unknown[] }; // Accept either full WorkflowJSON or simple { steps: [] }
+  mermaidDiagram?: string;
   description?: string;
   category?: string;
   tags?: string[];

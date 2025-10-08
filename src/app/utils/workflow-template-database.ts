@@ -200,12 +200,15 @@ export async function createWorkflowTemplate(
       metadata.category = input.category;
     }
 
+    const trimmedMermaid = typeof input.mermaidDiagram === 'string' ? input.mermaidDiagram.trim() : '';
+
     const templateDoc = {
       id: templateId,
       account: input.account,
       organization,
       version,
       workflowDefinition,
+      ...(trimmedMermaid ? { mermaidDiagram: trimmedMermaid } : {}),
       metadata,
       ...(parentVersion ? { parentVersion } : {}),
       usageStats: {

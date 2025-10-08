@@ -86,6 +86,8 @@ export default function WorkflowConfigurePage({ params }: PageProps) {
       // Convert WorkflowJSON to WorkflowDefinition (just extract steps)
       await updateWorkflowDefinition({
         steps: updatedWorkflow.steps as WorkflowStep[]
+      }, {
+        mermaidDiagram: updatedWorkflow.mermaidDiagram
       });
     } catch (err) {
       console.error('Failed to save workflow:', err);
@@ -164,7 +166,7 @@ export default function WorkflowConfigurePage({ params }: PageProps) {
       
       {!canAutoSave && template && (
         <Alert severity="warning" sx={{ mb: 2 }}>
-          Auto-save disabled: Please add at least one workflow step and provide a valid template name.
+          Auto-save disabled: Please add at least one workflow step, provide a valid template name, and wait for the workflow diagram to finish generating.
         </Alert>
       )}
       

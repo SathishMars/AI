@@ -44,6 +44,7 @@ describe('useWorkflowTemplateV2', () => {
         }
       ]
     },
+    mermaidDiagram: 'graph TD; step1[Start] --> step2[End];',
     metadata: {
       name: 'Test Workflow',
       status: 'draft',
@@ -352,6 +353,7 @@ describe('useWorkflowTemplateV2', () => {
       });
       
       expect(result.current.workflow).toEqual(newDefinition);
+      expect(result.current.template?.mermaidDiagram).toBeUndefined();
     });
     
     it('should auto-save when criteria met', async () => {
@@ -378,25 +380,7 @@ describe('useWorkflowTemplateV2', () => {
       await act(async () => {
         await result.current.loadTemplate('a1b2c3d4e5');
       });
-      
-      // Mock save response
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          ...validTemplate,
-          workflowDefinition: {
-            steps: [
-              {
-                id: 'step1',
-                name: 'Start: Updated Step',
-                type: 'trigger',
-                action: 'onMRFSubmit',
-                params: {}
-              }
-            ]
-          }
-        })
-      });
+      (global.fetch as jest.Mock).mockClear();
       
       const newDefinition: WorkflowDefinition = {
         steps: [
@@ -413,12 +397,32 @@ describe('useWorkflowTemplateV2', () => {
       await act(async () => {
         await result.current.updateWorkflowDefinition(newDefinition);
       });
+      expect(global.fetch).not.toHaveBeenCalled();
+
+      const updatedMermaid = 'graph TD; step1[Start] --> step2[End];';
+
+      // Mock save response for mermaid-ready auto-save
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          ...validTemplate,
+          workflowDefinition: newDefinition,
+          mermaidDiagram: updatedMermaid
+        })
+      });
+
+      await act(async () => {
+        await result.current.updateWorkflowDefinition(newDefinition, {
+          mermaidDiagram: updatedMermaid
+        });
+      });
       
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledWith(
           `/api/workflow-templates/${validTemplate.id}`,
           expect.objectContaining({
-            method: 'PUT'
+            method: 'PUT',
+            body: expect.stringContaining(updatedMermaid)
           })
         );
       });
@@ -495,7 +499,9 @@ describe('useWorkflowTemplateV2', () => {
       };
       
       await act(async () => {
-        await result.current.updateWorkflowDefinition(newDefinition);
+        await result.current.updateWorkflowDefinition(newDefinition, {
+          mermaidDiagram: 'graph TD; A-->B;'
+        });
       });
       
       // Should NOT have called save API
@@ -580,7 +586,8 @@ describe('useWorkflowTemplateV2', () => {
       expect(global.fetch).toHaveBeenCalledWith(
         `/api/workflow-templates/${mockTemplate.id}`,
         expect.objectContaining({
-          method: 'PUT'
+          method: 'PUT',
+          body: expect.stringContaining('mermaidDiagram')
         })
       );
     });

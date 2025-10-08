@@ -159,14 +159,16 @@ export function createInputToTemplate(input: CreateWorkflowTemplateInput): Workf
     name: input.name,
     status: 'draft',                          // New templates always start as draft
     
-    // Workflow definition
-    workflowDefinition: input.workflowDefinition,
+  // Workflow definition
+  workflowDefinition: input.workflowDefinition,
     
     // Metadata
     metadata: {
+      name: input.name,
+      status: 'draft',
       createdAt: now,
       updatedAt: now,
-      author: input.author,
+      author: input.author || 'system',
       description: input.description,
       category: input.category,
       tags: input.tags || []

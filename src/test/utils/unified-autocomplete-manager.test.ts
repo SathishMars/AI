@@ -77,35 +77,12 @@ describe('UnifiedAutocompleteManager', () => {
   });
 
   describe('Autocomplete Suggestions', () => {
-    test('should fetch function suggestions from API', async () => {
-      const mockResponse = {
-        ok: true,
-        json: async () => ({
-          data: {
-            autocompleteItems: [
-              { name: 'requestApproval', description: 'Request approval from manager' },
-              { name: 'createEvent', description: 'Create a new event' }
-            ]
-          }
-        })
-      };
-      
-      (global.fetch as jest.Mock).mockResolvedValueOnce(mockResponse);
-      
+    test('should return function suggestions from local catalog', async () => {
       const suggestions = await autocompleteManager.getSuggestions('Hello @req', 10, mockContext);
-      
-      expect(fetch).toHaveBeenCalledWith('/api/workflow-autocomplete?category=function&includeMetadata=true');
-      expect(suggestions).toHaveLength(1);
-      expect(suggestions[0].value).toBe('requestApproval');
-    });
 
-    test('should handle API errors gracefully for functions', async () => {
-      (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('API Error'));
-      
-      const suggestions = await autocompleteManager.getSuggestions('Hello @req', 10, mockContext);
-      
-      // Should return fallback suggestions on API error (from static data)
-      expect(suggestions.length).toBeGreaterThan(0);
+      expect(fetch).not.toHaveBeenCalled();
+      expect(suggestions.some(s => s.value === 'requestApproval')).toBe(true);
+      expect(suggestions.every(s => s.category === 'function')).toBe(true);
     });
 
     test('should provide user context suggestions without API', async () => {
@@ -118,8 +95,19 @@ describe('UnifiedAutocompleteManager', () => {
 
     test('should provide workflow step suggestions without API', async () => {
       const suggestions = await autocompleteManager.getSuggestions('go to #check', 13, mockContext);
-      
+
       expect(suggestions.some(s => s.value === 'checkApproval')).toBe(true);
+    });
+
+    test('should fall back to static form fields when MRF API fails', async () => {
+      (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('API Error'));
+
+      const inputText = 'needs mrf.att';
+      const cursorPosition = inputText.length;
+      const suggestions = await autocompleteManager.getSuggestions(inputText, cursorPosition, mockContext);
+
+      expect(fetch).toHaveBeenCalledWith('/api/mrf-template?includeValues=false');
+      expect(suggestions.some(s => s.value === 'attendees')).toBe(true);
     });
   });
 });

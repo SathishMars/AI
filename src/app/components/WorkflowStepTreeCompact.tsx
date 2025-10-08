@@ -122,18 +122,23 @@ function CompactStepNode({ step, path, allSteps, onStepClick, definitionLookup }
 
       if (Array.isArray(rawValue)) {
         const resolvedTargets = rawValue
-          .map((value) => resolveTarget(value))
-          .filter((value): value is string => Boolean(value));
+          .map((value) => ({
+            resolved: resolveTarget(value),
+            isInline: typeof value === 'object' && value !== null
+          }))
+          .filter(({ resolved }) => Boolean(resolved)) as Array<{ resolved: string; isInline: boolean }>;
 
         if (resolvedTargets.length === 0) {
           return acc;
         }
 
+        const referenceCount = resolvedTargets.filter(({ isInline }) => !isInline).length;
+
         acc.push({
           key,
-          label: `${prefix}${resolvedTargets.join(', ')}`,
+          label: `${prefix}${resolvedTargets.map(({ resolved }) => resolved).join(', ')}`,
           color,
-          count: resolvedTargets.length
+          count: referenceCount
         });
         return acc;
       }
@@ -143,11 +148,13 @@ function CompactStepNode({ step, path, allSteps, onStepClick, definitionLookup }
         return acc;
       }
 
+      const isInlineValue = typeof rawValue === 'object' && rawValue !== null;
+
       acc.push({
         key,
         label: `${prefix}${resolvedTarget}`,
         color,
-        count: 1
+        count: isInlineValue ? 0 : 1
       });
 
       return acc;

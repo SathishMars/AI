@@ -40,6 +40,11 @@ export const SmartAutocomplete: React.FC<SmartAutocompleteProps> = ({
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [autocompleteManager] = useState(() => new UnifiedAutocompleteManager());
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
+  const latestValueRef = useRef(value);
+
+  useEffect(() => {
+    latestValueRef.current = value;
+  }, [value]);
 
   // Auto-resize textarea based on content (max 5 lines)
   const adjustTextareaHeight = useCallback(() => {
@@ -64,8 +69,9 @@ export const SmartAutocomplete: React.FC<SmartAutocompleteProps> = ({
     const textarea = textAreaRef.current;
     if (!textarea) return;
     
-    const cursorPosition = textarea.selectionStart || value.length;
-    const textBeforeCursor = value.substring(0, cursorPosition);
+    const currentValue = latestValueRef.current;
+    const cursorPosition = textarea.selectionStart ?? currentValue.length;
+    const textBeforeCursor = currentValue.substring(0, cursorPosition);
     
     console.log('🔍 Checking triggers at cursor position:', cursorPosition, 'Text before cursor:', textBeforeCursor);
     
@@ -77,7 +83,7 @@ export const SmartAutocomplete: React.FC<SmartAutocompleteProps> = ({
     if (triggerMatch || endsWithAt || endsWithHash) {
       console.log('🎯 Autocomplete triggered for:', textBeforeCursor);
       try {
-        const newSuggestions = await autocompleteManager.getSuggestions(value, cursorPosition, context);
+  const newSuggestions = await autocompleteManager.getSuggestions(currentValue, cursorPosition, context);
         console.log('✅ Got', newSuggestions.length, 'suggestions');
         setSuggestions(newSuggestions);
         setShowSuggestions(newSuggestions.length > 0);
@@ -90,7 +96,7 @@ export const SmartAutocomplete: React.FC<SmartAutocompleteProps> = ({
     } else {
       setShowSuggestions(false);
     }
-  }, [context, value, autocompleteManager]);
+  }, [context, autocompleteManager]);
 
   // Apply selected suggestion
   const applySuggestion = (suggestion: AutocompleteSuggestion) => {
@@ -149,7 +155,8 @@ export const SmartAutocomplete: React.FC<SmartAutocompleteProps> = ({
   // Handle input changes
   const handleInputChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newValue = event.target.value;
-    onChange(newValue);
+  latestValueRef.current = newValue;
+  onChange(newValue);
     
     // Trigger autocomplete check after a small delay
     setTimeout(() => {

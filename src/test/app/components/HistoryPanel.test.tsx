@@ -15,7 +15,7 @@ const mockConversationManager = {
     totalCount: 0
   }),
   searchConversationHistory: jest.fn().mockResolvedValue([]),
-  getStats: jest.fn().mockResolvedValue({
+  getConversationStats: jest.fn().mockResolvedValue({
     totalMessages: 0,
     totalVersions: 0,
     lastActivity: null
@@ -58,19 +58,19 @@ describe('HistoryPanel', () => {
   });
 
   describe('Rendering', () => {
-    it('renders history panel when open', () => {
+    it('renders history panel when open', async () => {
       renderWithTheme(<HistoryPanel {...defaultProps} />);
       
-      expect(screen.getByText('History & Versions')).toBeInTheDocument();
+      expect(await screen.findByText('History & Versions')).toBeInTheDocument();
     });
 
-    it('renders collapsed state when closed', () => {
+    it('renders collapsed state when closed', async () => {
       renderWithTheme(
         <HistoryPanel {...defaultProps} isOpen={false} />
       );
       
       // Should render collapsed version
-      expect(screen.getByLabelText('Open History Panel')).toBeInTheDocument();
+      expect(await screen.findByLabelText('Open History Panel')).toBeInTheDocument();
     });
   });
 });

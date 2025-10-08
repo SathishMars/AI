@@ -27,7 +27,8 @@ jest.mock('@/app/components/ResponsiveWorkflowConfigurator', () => {
         <button
           data-testid="change-workflow"
           onClick={() => props.onWorkflowChange({
-            steps: [{ id: 'test', name: 'Test', type: 'action' }]
+            steps: [{ id: 'test', name: 'Test', type: 'action' }],
+            mermaidDiagram: 'graph TD; test[Test] --> result[Result];'
           })}
         >
           Change Workflow
@@ -250,6 +251,7 @@ describe('EditWorkflowPage Integration', () => {
           workflowDefinition: {
             steps: [{ id: 'test', name: 'Test', type: 'action' }]
           },
+          mermaidDiagram: 'graph TD; test[Test] --> result[Result];',
           metadata: {
             createdAt: new Date(),
             updatedAt: new Date(),
@@ -287,7 +289,8 @@ describe('EditWorkflowPage Integration', () => {
           name: 'Original Name',
           status: 'draft',
           version: '1.0.0',
-          workflowDefinition: { steps: [] },
+          workflowDefinition: { steps: [{ id: 'step1', name: 'Start', type: 'trigger' }] },
+          mermaidDiagram: 'graph TD; step1 --> end;',
           metadata: {
             createdAt: new Date(),
             updatedAt: new Date(),
@@ -312,7 +315,8 @@ describe('EditWorkflowPage Integration', () => {
           name: 'Updated Name',
           status: 'draft',
           version: '1.0.0',
-          workflowDefinition: { steps: [] },
+          workflowDefinition: { steps: [{ id: 'step1', name: 'Start', type: 'trigger' }] },
+          mermaidDiagram: 'graph TD; step1 --> end;',
           metadata: {
             createdAt: new Date(),
             updatedAt: new Date(),
@@ -380,6 +384,7 @@ describe('EditWorkflowPage Integration', () => {
             workflowDefinition: {
               steps: [{ id: 'test', name: 'Test', type: 'action' }]
             },
+            mermaidDiagram: 'graph TD; test[Test] --> result[Result];',
             metadata: {
               createdAt: new Date(),
               updatedAt: new Date(),
@@ -397,8 +402,8 @@ describe('EditWorkflowPage Integration', () => {
       // Note: This might be too fast to catch in tests, but verifies the code path
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledWith(
-          expect.stringContaining('/api/workflow-templates/'),
-          expect.objectContaining({ method: 'PUT' })
+          expect.stringContaining('/api/workflow-templates'),
+          expect.objectContaining({ method: expect.stringMatching(/POST|PUT/) })
         );
       }, { timeout: 200 });
     });

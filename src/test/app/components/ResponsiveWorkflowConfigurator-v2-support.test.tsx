@@ -1,6 +1,6 @@
 // src/test/app/components/ResponsiveWorkflowConfigurator-v2-support.test.tsx
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import ResponsiveWorkflowConfigurator from '@/app/components/ResponsiveWorkflowConfigurator';
 import { WorkflowJSON } from '@/app/types/workflow';
@@ -60,16 +60,15 @@ jest.mock('@/app/components/WorkflowTemplateNameDialog', () => ({
   default: ({ open }: { open: boolean }) => open ? <div data-testid="name-dialog">Name Dialog</div> : null
 }));
 
+jest.mock('@/app/components/WorkflowTemplateSelector', () => ({
+  __esModule: true,
+  default: ({ currentTemplateName }: { currentTemplateName?: string }) => (
+    <div data-testid="template-selector">Template: {currentTemplateName ?? 'unnamed'}</div>
+  )
+}));
+
 describe('ResponsiveWorkflowConfigurator V2 Support', () => {
   const mockWorkflowJSON: WorkflowJSON = {
-    schemaVersion: '1.0.0',
-    metadata: {
-      id: 'test-workflow',
-      name: 'Test Workflow',
-      version: '1.0.0',
-      status: 'draft',
-      tags: []
-    },
     steps: [
       { id: 'step1', name: 'Step 1', type: 'trigger', action: 'start' }
     ]
@@ -82,15 +81,24 @@ describe('ResponsiveWorkflowConfigurator V2 Support', () => {
     ]
   };
 
+  beforeAll(() => {
+    // Ensure useMediaQuery treats environment as desktop so primary layout renders
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: jest.fn().mockImplementation((query: string) => ({
+        matches: query.includes('min-width: 1200px'),
+        media: query,
+        onchange: null,
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+        addListener: jest.fn(),
+        removeListener: jest.fn(),
+        dispatchEvent: jest.fn()
+      }))
+    });
+  });
   const mockValidationResult = { isValid: true, errors: [], warnings: [], info: [] };
   const mockOnWorkflowChange = jest.fn();
-
-  // Helper to check if component rendered successfully
-  const componentRendered = (container: HTMLElement) => {
-    // Check for any key UI elements that should be present
-    return container.querySelector('[data-testid="workflow-creation-pane"]') !== null ||
-           container.textContent?.includes('Steps:') === true;
-  };
 
   beforeEach(() => {
     jest.clearAllMocks();

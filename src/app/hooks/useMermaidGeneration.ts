@@ -31,13 +31,29 @@ export function useMermaidGeneration(
   const lastWorkflowRef = useRef<string>('');
   
   const generateDiagram = useCallback(async (force = false) => {
-    // Check if workflow actually changed
-    const currentWorkflowString = JSON.stringify(workflow.steps);
+    const steps = Array.isArray(workflow.steps) ? workflow.steps : [];
+    const currentWorkflowString = JSON.stringify(steps);
     if (!force && currentWorkflowString === lastWorkflowRef.current) {
       return;
     }
     
     lastWorkflowRef.current = currentWorkflowString;
+    
+    if (steps.length === 0) {
+      setState(prev => ({
+        ...prev,
+        isGenerating: false,
+        lastGenerated: null
+      }));
+
+      if (workflow.mermaidDiagram) {
+        onWorkflowChange({
+          ...workflow,
+          mermaidDiagram: undefined
+        });
+      }
+      return;
+    }
     
     setState(prev => ({ ...prev, isGenerating: true, error: null }));
     

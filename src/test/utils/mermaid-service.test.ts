@@ -17,43 +17,53 @@ describe('Mermaid Service', () => {
       status: 'draft',
       tags: ['test', 'mermaid']
     },
-    steps: {
-      start: {
+    steps: [
+      {
+        id: 'start',
         name: 'Start Process',
         type: 'trigger',
         action: 'onEventSubmit',
-        nextSteps: ['checkCondition']
+        children: [
+          {
+            id: 'checkCondition',
+            name: 'Check Requirements',
+            type: 'condition',
+            condition: {
+              all: [
+                {
+                  fact: 'event.attendees',
+                  operator: 'greater than',
+                  value: 50
+                }
+              ]
+            },
+            onSuccess: {
+              id: 'requireApproval',
+              name: 'Require Approval',
+              type: 'action',
+              action: 'functions.requestApproval',
+              params: { approver: 'manager@example.com' },
+              onSuccessGoTo: 'end'
+            },
+            onFailure: {
+              id: 'autoApprove',
+              name: 'Auto Approve',
+              type: 'action',
+              action: 'functions.autoApprove',
+              params: { reason: 'Threshold not met' },
+              onSuccessGoTo: 'end'
+            }
+          }
+        ]
       },
-      checkCondition: {
-        name: 'Check Requirements',
-        type: 'condition',
-        condition: {
-          fact: 'event.attendees',
-          operator: 'greaterThan',
-          value: 50
-        },
-        onSuccess: 'requireApproval',
-        onFailure: 'autoApprove'
-      },
-      requireApproval: {
-        name: 'Require Approval',
-        type: 'action',
-        action: 'functions.requestApproval',
-        nextSteps: ['end']
-      },
-      autoApprove: {
-        name: 'Auto Approve',
-        type: 'action',
-        action: 'functions.autoApprove',
-        nextSteps: ['end']
-      },
-      end: {
+      {
+        id: 'end',
         name: 'Process Complete',
         type: 'end',
         result: 'success'
       }
-    }
-  };
+    ]
+  } as unknown as WorkflowJSON;
 
   beforeEach(() => {
     clearMermaidCache();
@@ -130,10 +140,10 @@ describe('Mermaid Service', () => {
       expect(fallbackDiagram).toContain('flowchart TD');
       expect(fallbackDiagram).toContain('start(["Start Process"])');
       expect(fallbackDiagram).toContain('checkCondition{"Check Requirements');
-      expect(fallbackDiagram).toContain('requireApproval["Require Approval<br/>functions.requestApproval"]');
-      expect(fallbackDiagram).toContain('autoApprove["Auto Approve<br/>functions.autoApprove"]');
+      expect(fallbackDiagram).toContain('requireApproval["Require Approval<br/>functions.requestApproval');
+      expect(fallbackDiagram).toContain('autoApprove["Auto Approve<br/>functions.autoApprove');
       expect(fallbackDiagram).toContain('end(("Process Complete<br/>Result: success"))');
-      expect(fallbackDiagram).toContain('checkCondition{"Check Requirements<br/>event.attendees greaterThan 50"}');
+      expect(fallbackDiagram).toContain('Check Requirements<br/>event.attendees greater than 50');
       expect(fallbackDiagram).toContain('checkCondition -->|Success| requireApproval');
       expect(fallbackDiagram).toContain('checkCondition -->|Failure| autoApprove');
       expect(fallbackDiagram).toContain('classDef triggerClass fill:#E8F5E8,stroke:#2E7D32');
@@ -152,69 +162,95 @@ describe('Mermaid Service', () => {
           status: 'draft',
           tags: []
         },
-        steps: {
-          step1: {
+        steps: [
+          {
+            id: 'step1',
             name: 'First Step',
             type: 'action',
             action: 'doSomething',
-            nextSteps: ['step2']
+            children: [
+              {
+                id: 'step2',
+                name: 'Second Step',
+                type: 'action',
+                action: 'doSomethingElse',
+                onSuccessGoTo: 'end'
+              }
+            ]
           },
-          step2: {
-            name: 'Second Step',
-            type: 'action',
-            action: 'doSomethingElse',
-            nextSteps: ['end']
-          },
-          end: {
+          {
+            id: 'end',
             name: 'End',
             type: 'end',
             result: 'success'
           }
-        }
-      };
+        ]
+      } as unknown as WorkflowJSON;
 
       const fallbackDiagram = createFallbackDiagram(simpleWorkflow);
 
       expect(fallbackDiagram).toContain('step1 --> step2');
-      expect(fallbackDiagram).toContain('step2 --> end');
+      expect(fallbackDiagram).toContain('step2 -->|Success| end');
     });
 
-    it('should sanitize step IDs with special characters', () => {
-      const workflowWithSpecialChars: WorkflowJSON = {
+    it('should include reference-based transitions from inline branches', () => {
+      const workflowWithReferences: WorkflowJSON = {
         schemaVersion: '1.0.0',
         metadata: {
-          id: 'special-chars-workflow',
-          name: 'Special Characters Workflow',
+          id: 'reference-workflow',
+          name: 'Reference Workflow',
           version: '1.0.0',
           status: 'draft',
           tags: []
         },
-        steps: {
-          'step-with-dashes': {
-            name: 'Step With Dashes',
-            type: 'action',
-            action: 'doSomething',
-            nextSteps: ['step.with.dots']
+        steps: [
+          {
+            id: 'start',
+            name: 'Start',
+            type: 'trigger',
+            action: 'onEventSubmit',
+            children: [
+              {
+                id: 'checkBudget',
+                name: 'Check Budget',
+                type: 'condition',
+                condition: {
+                  all: [
+                    { fact: 'budget.amount', operator: 'greater than', value: 1000 }
+                  ]
+                },
+                onSuccessGoTo: 'approveStep',
+                onFailure: {
+                  id: 'requestDetails',
+                  name: 'Request Details',
+                  type: 'action',
+                  action: 'functions.requestMoreInfo',
+                  onSuccessGoTo: 'end'
+                }
+              }
+            ]
           },
-          'step.with.dots': {
-            name: 'Step With Dots',
+          {
+            id: 'approveStep',
+            name: 'Approve Request',
             type: 'action',
-            action: 'doSomethingElse',
-            nextSteps: ['end']
+            action: 'functions.requestApproval',
+            onSuccessGoTo: 'end'
           },
-          'end': {
+          {
+            id: 'end',
             name: 'End',
             type: 'end',
             result: 'success'
           }
-        }
-      };
+        ]
+      } as unknown as WorkflowJSON;
 
-      const fallbackDiagram = createFallbackDiagram(workflowWithSpecialChars);
+      const fallbackDiagram = createFallbackDiagram(workflowWithReferences);
 
-      expect(fallbackDiagram).toContain('step_with_dashes');
-      expect(fallbackDiagram).toContain('step_with_dots');
-      expect(fallbackDiagram).toContain('step_with_dashes --> step_with_dots');
+      expect(fallbackDiagram).toContain('checkBudget -->|Success| approveStep');
+      expect(fallbackDiagram).toContain('checkBudget -->|Failure| requestDetails');
+      expect(fallbackDiagram).toContain('requestDetails -->|Success| end');
     });
   });
 

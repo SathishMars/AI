@@ -1,6 +1,6 @@
 // src/app/utils/unified-autocomplete-providers.ts
 
-import { AutocompleteProvider, AutocompleteSuggestion } from '@/app/types/conversation';
+import { AutocompleteProvider, AutocompleteSuggestion, ConversationContext } from '@/app/types/conversation';
 import { 
   getFunctionAutocomplete,
   getUserContextAutocomplete,
@@ -10,6 +10,102 @@ import {
   getLLMContext
 } from '@/app/data/workflow-conversation-autocomplete';
 import { WorkflowAutocompleteItem, ParameterDefinition } from '@/app/types/workflow-conversation-autocomplete';
+
+function computeRelevanceScore(term: string, input: string): number {
+  if (!input) {
+    return 30;
+  }
+
+  const normalizedTerm = term.toLowerCase();
+  const query = input.toLowerCase();
+
+  if (normalizedTerm === query) {
+    return 100;
+  }
+
+  if (normalizedTerm.startsWith(query)) {
+    return 75;
+  }
+
+  if (normalizedTerm.includes(query)) {
+    return 50;
+  }
+
+  return 20;
+}
+
+function dedupeSuggestionsByValue(suggestions: AutocompleteSuggestion[]): AutocompleteSuggestion[] {
+  const byValue = new Map<string, AutocompleteSuggestion>();
+
+  suggestions.forEach((suggestion) => {
+    const existing = byValue.get(suggestion.value);
+    if (!existing) {
+      byValue.set(suggestion.value, suggestion);
+      return;
+    }
+
+    const existingScore = (existing.metadata?.relevanceScore as number) ?? 0;
+    const suggestionScore = (suggestion.metadata?.relevanceScore as number) ?? 0;
+
+    if (suggestionScore > existingScore) {
+      byValue.set(suggestion.value, suggestion);
+    }
+  });
+
+  return Array.from(byValue.values());
+}
+
+function sortSuggestions(suggestions: AutocompleteSuggestion[], limit = 10): AutocompleteSuggestion[] {
+  return dedupeSuggestionsByValue(suggestions)
+    .sort((a, b) => {
+      const aScore = (a.metadata?.relevanceScore as number) ?? 0;
+      const bScore = (b.metadata?.relevanceScore as number) ?? 0;
+
+      if (aScore !== bScore) {
+        return bScore - aScore;
+      }
+
+      return a.display.localeCompare(b.display);
+    })
+    .slice(0, limit);
+}
+
+function buildContextSuggestions(
+  entries: Array<[string, unknown]>,
+  input: string,
+  {
+    category,
+    icon,
+    idPrefix,
+    descriptionBuilder
+  }: {
+    category: AutocompleteSuggestion['category'];
+    icon: string;
+    idPrefix: string;
+    descriptionBuilder?: (key: string, value: unknown) => string;
+  }
+): AutocompleteSuggestion[] {
+  const query = input.toLowerCase();
+
+  return entries
+    .filter(([key]) => !input || key.toLowerCase().includes(query))
+    .map(([key, value], index) => {
+      const relevanceScore = computeRelevanceScore(key, input);
+      return {
+        id: `${idPrefix}_${key}_${index}`,
+        display: key,
+        value: key,
+        description: descriptionBuilder ? descriptionBuilder(key, value) : undefined,
+        category,
+        icon,
+        metadata: {
+          source: 'context',
+          contextValue: value,
+          relevanceScore
+        }
+      };
+    });
+}
 
 // Helper to format parameter display
 function formatParameters(parameters?: ParameterDefinition[]): string {
@@ -76,7 +172,7 @@ function calculateRelevance(item: WorkflowAutocompleteItem, input: string): numb
 function createProvider(trigger: string, getItems: () => WorkflowAutocompleteItem[]): AutocompleteProvider {
   return {
     trigger,
-    getSuggestions: async (input: string): Promise<AutocompleteSuggestion[]> => {
+  getSuggestions: async (input: string): Promise<AutocompleteSuggestion[]> => {
       try {
         const items = getItems();
         
@@ -95,12 +191,10 @@ function createProvider(trigger: string, getItems: () => WorkflowAutocompleteIte
 
         // Convert to suggestions and sort by relevance
         const suggestions = filteredItems
-          .map(item => createSuggestion(item, input))
-          .sort((a, b) => (b.metadata?.relevanceScore as number || 0) - (a.metadata?.relevanceScore as number || 0))
-          .slice(0, 10); // Limit to top 10 results
+          .map(item => createSuggestion(item, input));
 
         console.log(`🔍 ${trigger} provider found ${suggestions.length} suggestions for "${input}"`);
-        return suggestions;
+        return sortSuggestions(suggestions);
 
       } catch (error) {
         console.error(`Error in ${trigger} provider:`, error);
@@ -117,7 +211,33 @@ function createProvider(trigger: string, getItems: () => WorkflowAutocompleteIte
 export const functionsProvider = createProvider('@', getFunctionAutocomplete);
 
 // User context provider (user.)
-export const userContextProvider = createProvider('user.', getUserContextAutocomplete);
+export const userContextProvider: AutocompleteProvider = {
+  trigger: 'user.',
+  getSuggestions: async (input: string, context: ConversationContext): Promise<AutocompleteSuggestion[]> => {
+    try {
+      const baseItems = getUserContextAutocomplete();
+      const baseSuggestions = baseItems.map(item => createSuggestion(item, input));
+
+      const contextEntries = Object.entries(context.userContext ?? {});
+      const contextSuggestions = buildContextSuggestions(contextEntries, input, {
+        category: 'userContext',
+        icon: '👤',
+        idPrefix: 'user_context_dynamic',
+        descriptionBuilder: (key, value) => `Current user context value for ${key}${value !== undefined ? `: ${String(value)}` : ''}`
+      });
+
+      const suggestions = [...baseSuggestions, ...contextSuggestions];
+
+      return sortSuggestions(suggestions);
+    } catch (error) {
+      console.error('Error in user. provider:', error);
+      return [];
+    }
+  },
+  formatSuggestion: (suggestion: AutocompleteSuggestion): string => {
+    return suggestion.value;
+  }
+};
 
 // Date functions provider (date.)
 export const dateFunctionsProvider = createProvider('date.', getDateFunctionAutocomplete);
@@ -125,11 +245,12 @@ export const dateFunctionsProvider = createProvider('date.', getDateFunctionAuto
 // Form fields provider (mrf.)
 export const formFieldsProvider: AutocompleteProvider = {
   trigger: 'mrf.',
-  getSuggestions: async (input: string): Promise<AutocompleteSuggestion[]> => {
+  getSuggestions: async (input: string, context: ConversationContext): Promise<AutocompleteSuggestion[]> => {
     try {
       // Get base form field suggestions
       const baseItems = getFormFieldAutocomplete();
-      let suggestions = baseItems.map(item => createSuggestion(item, input));
+      const baseSuggestions = baseItems.map(item => createSuggestion(item, input));
+      const suggestions: AutocompleteSuggestion[] = [...baseSuggestions];
 
       // Try to get actual form fields from MRF template API
       try {
@@ -154,20 +275,30 @@ export const formFieldsProvider: AutocompleteProvider = {
                 metadata: {
                   examples: [`mrf.${fieldName} for conditions`, `use mrf.${fieldName} in workflow`],
                   fieldType: field.type,
-                  relevanceScore: input ? (fieldName.toLowerCase().includes(input.toLowerCase()) ? 50 : 0) : 0
+                  relevanceScore: computeRelevanceScore(fieldName, input)
                 }
               };
             });
 
-          suggestions = [...suggestions, ...formFieldSuggestions];
+          suggestions.push(...formFieldSuggestions);
         }
       } catch (apiError) {
         console.warn('Could not fetch MRF template for form fields:', apiError);
       }
 
-      return suggestions
-        .sort((a, b) => (b.metadata?.relevanceScore as number || 0) - (a.metadata?.relevanceScore as number || 0))
-        .slice(0, 10);
+      if (context?.mrfContext) {
+        const contextEntries = Object.entries(context.mrfContext);
+        const contextSuggestions = buildContextSuggestions(contextEntries, input, {
+          category: 'formField',
+          icon: '📝',
+          idPrefix: 'mrf_context',
+          descriptionBuilder: (key, value) => `MRF context value for ${key}${value !== undefined ? `: ${String(value)}` : ''}`
+        });
+
+        suggestions.push(...contextSuggestions);
+      }
+
+      return sortSuggestions(suggestions);
 
     } catch (error) {
       console.error('Error in mrf. provider:', error);
@@ -182,19 +313,36 @@ export const formFieldsProvider: AutocompleteProvider = {
 // Step references provider (#)
 export const stepReferencesProvider: AutocompleteProvider = {
   trigger: '#',
-  getSuggestions: async (input: string): Promise<AutocompleteSuggestion[]> => {
+  getSuggestions: async (input: string, context: ConversationContext): Promise<AutocompleteSuggestion[]> => {
     try {
       // Get base step reference suggestions
       const baseItems = getStepReferenceAutocomplete();
       const suggestions = baseItems.map(item => createSuggestion(item, input));
 
+      if (context?.currentWorkflowSteps && context.currentWorkflowSteps.length > 0) {
+        const stepSuggestions = context.currentWorkflowSteps
+          .filter(step => !input || step.toLowerCase().includes(input.toLowerCase()))
+          .map((step, index) => ({
+            id: `workflow_step_${index}_${step}`,
+            display: step,
+            value: step,
+            description: 'Reference a workflow step by ID',
+            category: 'stepReference',
+            icon: '#️⃣',
+            metadata: {
+              source: 'context',
+              relevanceScore: computeRelevanceScore(step, input)
+            }
+          }));
+
+        suggestions.push(...stepSuggestions);
+      }
+
       // Add steps from current workflow if available in context
       // Note: This would need to be extended based on your context structure
       // For now, we'll use the base suggestions
 
-      return suggestions
-        .sort((a, b) => (b.metadata?.relevanceScore as number || 0) - (a.metadata?.relevanceScore as number || 0))
-        .slice(0, 10);
+      return sortSuggestions(suggestions);
 
     } catch (error) {
       console.error('Error in # provider:', error);
@@ -202,7 +350,7 @@ export const stepReferencesProvider: AutocompleteProvider = {
     }
   },
   formatSuggestion: (suggestion: AutocompleteSuggestion): string => {
-    return suggestion.display;
+    return suggestion.value;
   }
 };
 

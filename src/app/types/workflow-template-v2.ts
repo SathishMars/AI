@@ -135,6 +135,7 @@ export interface CreateWorkflowTemplateInput {
   
   // Workflow Content
   workflowDefinition: WorkflowDefinition;
+  mermaidDiagram?: string;
   
   // Optional Metadata
   description?: string;
@@ -306,6 +307,7 @@ export const CreateWorkflowTemplateInputSchema = z.object({
   organization: z.string().nullable().optional(),
   name: z.string().min(1).max(200),
   workflowDefinition: WorkflowDefinitionSchema,
+  mermaidDiagram: z.string().optional(),
   description: z.string().max(1000).optional(),
   category: z.string().max(50).optional(),
   tags: z.array(z.string().max(30)).max(20).optional(),
@@ -409,5 +411,6 @@ export function isValidTemplateName(name: string | undefined): boolean {
  * UPDATED: Name is now in metadata.name (not top level)
  */
 export function shouldAutoSave(template: WorkflowTemplate): boolean {
-  return hasSteps(template.workflowDefinition) && isValidTemplateName(template.metadata?.name);
+  const hasDiagram = typeof template.mermaidDiagram === 'string' && template.mermaidDiagram.trim().length > 0;
+  return hasSteps(template.workflowDefinition) && isValidTemplateName(template.metadata?.name) && hasDiagram;
 }

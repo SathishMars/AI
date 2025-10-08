@@ -163,6 +163,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       workflowDefinition: {
         steps: templateInput.workflowDefinition?.steps || []
       },
+      mermaidDiagram: templateInput.mermaidDiagram,
       description: templateInput.description,
       category: templateInput.category,
       tags: templateInput.tags || ['ai-generated'],

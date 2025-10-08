@@ -83,6 +83,11 @@ interface UseWorkflowTemplateV2Options {
   onTemplateSaved?: (template: WorkflowTemplate) => void; // Callback after successful save
 }
 
+interface UpdateWorkflowDefinitionOptions {
+  mermaidDiagram?: string | null;
+  skipAutoSave?: boolean;
+}
+
 interface UseWorkflowTemplateV2Return {
   // Current template data
   template: WorkflowTemplate | null;
@@ -104,7 +109,8 @@ interface UseWorkflowTemplateV2Return {
   loadTemplate: (id: string) => Promise<void>;
   createTemplate: (name: string, description?: string) => Promise<WorkflowTemplate>;
   initializeNewTemplate: (name: string, description?: string) => void;  // In-memory only, no API call
-  updateWorkflowDefinition: (definition: WorkflowDefinition) => Promise<void>;
+  updateWorkflowDefinition: (definition: WorkflowDefinition, options?: UpdateWorkflowDefinitionOptions) => Promise<void>;
+  updateWorkflowDefinition: (definition: WorkflowDefinition, options?: UpdateWorkflowDefinitionOptions) => Promise<void>;
   updateTemplateName: (name: string) => Promise<void>;
   saveTemplate: () => Promise<void>;
   
@@ -308,17 +314,25 @@ export function useWorkflowTemplateV2(
    * Saves immediately if auto-save enabled and criteria met.
    */
   const updateWorkflowDefinition = useCallback(async (
-    definition: WorkflowDefinition
+    definition: WorkflowDefinition,
+    options: UpdateWorkflowDefinitionOptions = {}
   ) => {
+    const { mermaidDiagram, skipAutoSave = false } = options;
     const currentTemplate = templateRef.current;
     if (!currentTemplate) {
       throw new Error('No template loaded');
     }
+    const hasMermaidUpdate = Object.prototype.hasOwnProperty.call(options, 'mermaidDiagram');
+    const trimmedMermaid = typeof mermaidDiagram === 'string' ? mermaidDiagram.trim() : undefined;
+    const mermaidDiagramValue = hasMermaidUpdate
+      ? (trimmedMermaid && trimmedMermaid.length > 0 ? trimmedMermaid : undefined)
+      : undefined;
     
     // Update local state immediately
     const updatedTemplate: WorkflowTemplate = {
       ...currentTemplate,
       workflowDefinition: definition,
+      mermaidDiagram: mermaidDiagramValue,
       metadata: {
         ...currentTemplate.metadata,
         updatedAt: new Date()
@@ -330,12 +344,13 @@ export function useWorkflowTemplateV2(
     setTemplate(normalizedUpdatedTemplate);
     
     // Auto-save if enabled and criteria met
-    if (autoSave && shouldAutoSave(normalizedUpdatedTemplate)) {
+    if (autoSave && !skipAutoSave && shouldAutoSave(normalizedUpdatedTemplate)) {
       console.log('💾 [Frontend] Auto-save triggered');
       console.log('  - Template has _id:', !!currentTemplate._id);
       console.log('  - Template has version:', currentTemplate.version);
       console.log('  - Account:', accountId);
       console.log('  - Organization:', organizationId);
+      console.log('  - Mermaid available:', typeof normalizedUpdatedTemplate.mermaidDiagram === 'string');
       
       try {
         setIsSaving(true);
@@ -352,7 +367,8 @@ export function useWorkflowTemplateV2(
             name: normalizedUpdatedTemplate.metadata.name || 'New Workflow',
             description: normalizedUpdatedTemplate.metadata.description,
             workflowDefinition: definition,
-            author: 'system',
+            mermaidDiagram: normalizedUpdatedTemplate.mermaidDiagram,
+            author: normalizedUpdatedTemplate.metadata.author || 'system',
             tags: normalizedUpdatedTemplate.metadata.tags || []
           };
           
@@ -412,7 +428,8 @@ export function useWorkflowTemplateV2(
               version: currentTemplate.version || '1.0.0',
               action: 'update',
               updates: {
-                workflowDefinition: definition
+                workflowDefinition: definition,
+                mermaidDiagram: normalizedUpdatedTemplate.mermaidDiagram
               }
             })
           });
@@ -538,6 +555,7 @@ export function useWorkflowTemplateV2(
         },
         body: JSON.stringify({
           workflowDefinition: currentTemplate.workflowDefinition,
+          mermaidDiagram: currentTemplate.mermaidDiagram,
           name: currentTemplate.metadata.name
         })
       });

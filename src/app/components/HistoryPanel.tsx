@@ -283,9 +283,10 @@ export default function HistoryPanel({
   if (!isOpen) {
     return (
       <Box className={className}>
-        <Tooltip title="View History">
+        <Tooltip title="Open History Panel">
           <IconButton
             onClick={onToggle}
+            aria-label="Open History Panel"
             sx={{
               position: 'fixed',
               right: 16,
@@ -326,7 +327,7 @@ export default function HistoryPanel({
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
           <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <HistoryIcon color="primary" />
-            History
+            History & Versions
           </Typography>
           <IconButton onClick={onToggle} size="small">
             <ClearIcon />
