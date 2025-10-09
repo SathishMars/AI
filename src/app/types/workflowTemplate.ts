@@ -1,4 +1,6 @@
 
+import { z } from 'zod';
+
 /**
  * Template lifecycle status
  * 
@@ -79,4 +81,85 @@ export interface WorkflowTemplateHistory {
     changedAt: string;                                   // ISO timestamp of when the change occurred
     changedBy: string;                                   // User ID of who made the change
 } 
+
+// -------------------------
+// Zod schema validators
+// -------------------------
+
+export const TemplateStatusSchema = z.enum(['draft', 'published', 'deprecated', 'archived']);
+
+const isoString = () => z.string().refine((s) => !isNaN(Date.parse(s)), { message: 'Invalid ISO timestamp' });
+
+export const WorkflowTemplateMetadataSchema = z.object({
+    label: z.string(),
+    description: z.string().optional(),
+    status: TemplateStatusSchema,
+    createdAt: isoString(),
+    updatedAt: isoString(),
+    createdBy: z.string(),
+    updatedBy: z.string(),
+    tags: z.array(z.string()).optional(),
+    lastUsedAt: isoString().optional(),
+    parentVersion: z.number().int().optional(),
+    copiedFromTemplateId: z.string().optional(),
+    copiedFromVersion: z.number().int().optional(),
+});
+
+export const WorkflowStepMetadataSchema = z.object({
+    isNew: z.boolean().optional(),
+    isModified: z.boolean().optional(),
+    isDeleted: z.boolean().optional(),
+    workflowVersion: z.number().int().optional(),
+    createdAt: isoString().optional(),
+    updatedAt: isoString().optional(),
+    createdBy: z.string().optional(),
+    updatedBy: z.string().optional(),
+});
+
+// Recursive step schema - use z.lazy for self-reference
+export const WorkflowStepSchema: z.ZodType<WorkflowStep> = z.lazy(() =>
+    z.object({
+        id: z.string(),
+        label: z.string(),
+        type: z.string(),
+        stepFunction: z.string().optional(),
+        functionParams: z.record(z.unknown()).optional(),
+        next: z.array(z.union([z.string(), WorkflowStepSchema])).optional(),
+        onConditionPass: z.array(z.union([z.string(), WorkflowStepSchema])).optional(),
+        onConditionFail: z.array(z.union([z.string(), WorkflowStepSchema])).optional(),
+        onError: z.array(z.union([z.string(), WorkflowStepSchema])).optional(),
+        onTimeout: z.array(z.union([z.string(), WorkflowStepSchema])).optional(),
+        timeout: z.number().optional(),
+        retryCount: z.number().int().optional(),
+        retryDelay: z.number().optional(),
+    })
+);
+
+export const WorkflowDefinitionSchema = z.object({
+    steps: z.array(WorkflowStepSchema),
+});
+
+export const WorkflowTemplateSchema = z.object({
+    id: z.string(),
+    account: z.string(),
+    organization: z.string().nullable().optional(),
+    version: z.string(),
+    metadata: WorkflowTemplateMetadataSchema,
+    workflowDefinition: WorkflowDefinitionSchema,
+    mermaidDiagram: z.string().optional(),
+});
+
+export const WorkflowTemplateHistorySchema = z.object({
+    id: z.string(),
+    account: z.string(),
+    organization: z.string().nullable().optional(),
+    version: z.string(),
+    label: z.string(),
+    status: TemplateStatusSchema,
+    changedAt: isoString(),
+    changedBy: z.string(),
+});
+
+export type WorkflowTemplateFromSchema = z.infer<typeof WorkflowTemplateSchema>;
+
 
