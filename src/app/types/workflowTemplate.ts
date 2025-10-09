@@ -40,8 +40,8 @@ export interface WorkflowStep {
     id: string;                                           // Unique step ID (10-char short-id)
     label: string;                                        // human readable step name
     type: string;                                         // Step type (e.g., task, decision, condition, etc.)
-    tool?: string;                                        // Optional tool or service associated with the step
-    toolParams?: Record<string, unknown>;                 // Optional parameters for the tool
+    stepFunction?: string;                                        // Optional tool or service associated with the step
+    functionParams?: Record<string, unknown>;                 // Optional parameters for the tool
     next?: Array<string | WorkflowStep>;                  // Optional next steps (for branching)
     onConditionPass?: Array<string | WorkflowStep>;       // Optional steps if condition passes
     onConditionFail?: Array<string | WorkflowStep>;       // Optional steps if condition fails

@@ -1,7 +1,7 @@
-import { WorkflowTool } from "@/app/types/workflowTool";
+import { WorkflowStepFunction } from "@/app/types/workflowStepFunction";
 import { tr } from "zod/v4/locales";
 
-export const workflowToolDefinition: Array<WorkflowTool> = [
+export const workflowFunctionDefinitions: Array<WorkflowStepFunction> = [
     // TRIGGER FUNCTIONS
     {
         id: 'trigger_on_request',
@@ -32,10 +32,10 @@ export const workflowToolDefinition: Array<WorkflowTool> = [
       \`\`\` json
         {
             id: 'ght223nmop',  // replace with a generated unique step ID used as refernce in other steps where needed to chain the steps
-            label: 'On receiving the request', // human readable name for the step based on context of what the tool does
+            label: 'On receiving the request', // human readable name for the step based on context of what the step does
             type: 'trigger',
-            tool: 'onRequest',
-            toolParams: {
+            stepFunction: 'onRequest',
+            functionParams: {
                 requestType: 'all' // if provided by the user in their description, match to the available request types from the api or use 'all' for any request. 
             },
             next: ['7hhs67klm9'] // next step ID to execute after this step
@@ -73,10 +73,10 @@ export const workflowToolDefinition: Array<WorkflowTool> = [
       \`\`\` json
         {
             id: 'ght223nmop',  // replace with a generated unique step ID used as refernce in other steps where needed to chain the steps
-            label: 'On receiving the MRF', // human readable name for the step based on context of what the tool does
+            label: 'On receiving the MRF', // human readable name for the step based on context of what the step does
             type: 'trigger',
-            tool: 'onMRF',
-            toolParams: {
+            stepFunction: 'onMRF',
+            functionParams: {
                 mrfTemplateName: 'all' // if provided by the user in their description, match to the available MRF types from the api or use 'all' for any MRF. 
             },
             next: ['7hhs67klm9'] // next step ID to execute after this step
@@ -130,10 +130,10 @@ export const workflowToolDefinition: Array<WorkflowTool> = [
       \`\`\` json
         {
             id: '7hhs67klm9',  // replace with a generated unique step ID used as refernce in other steps where needed to chain the steps
-            label: 'Notify the manager', // human readable name for the step based on context of what the tool does
+            label: 'Notify the manager', // human readable name for the step based on context of what the step does
             type: 'task',
-            tool: 'notify',
-            toolParams: {
+            stepFunction: 'notify',
+            functionParams: {
                 to: '\${userId: "jdoe@company.com", name: "John Doe"}', // use the userId as per the org format
                 cc: '\${userId: "finance-team@company.com", name: "Finance Team"}', // use the userId as per the org format
                 subject: 'A new meeting request from John Doe was submitted',
@@ -159,10 +159,10 @@ export const workflowToolDefinition: Array<WorkflowTool> = [
       \`\`\` json
         {
             id: '3klmop4567',  // replace with a generated unique step ID used as refernce in other steps where needed to chain the steps   
-            label: 'Create calendar event', // human readable name for the step based on context of what the tool does
+            label: 'Create calendar event', // human readable name for the step based on context of what the step does
             type: 'task',
-            tool: 'createEvent',
-            toolParams: { },
+            stepFunction: 'createEvent',
+            functionParams: { },
             next: ['87snjhsw76'] // next step ID to execute after this step. could be the terminate step or another task step. 
         }
       \`\`\`      
@@ -207,10 +207,10 @@ export const workflowToolDefinition: Array<WorkflowTool> = [
       \`\`\` json
         {
             id: '3klmop4567',  // replace with a generated unique step ID used as refernce in other steps where needed to chain the steps
-            label: 'Request approval from manager', // human readable name for the step based on context of what the tool does
+            label: 'Request approval from manager', // human readable name for the step based on context of what the step does
             type: 'decision',
-            tool: 'requestApproval',
-            toolParams: {
+            stepFunction: 'requestApproval',
+            functionParams: {
                 approver: '\${manager}', // use the userId as per the org format or use workflow variables like \${manager} to dynamically set the approver based on the request context
                 reason: 'Budget exceeds department threshold' // optional reason for the approval request
             },
@@ -255,10 +255,10 @@ export const workflowToolDefinition: Array<WorkflowTool> = [
       \`\`\` json
         {
             id: '3klmop4567',  // replace with a generated unique step ID used as refernce in other steps where needed to chain the steps   
-            label: 'Check if age > 18 and budget > 1000', // human readable name for the step based on context of what the tool does
+            label: 'Check if age > 18 and budget > 1000', // human readable name for the step based on context of what the step does
             type: 'decision',
-            tool: 'checkCondition',
-            toolParams: {
+            stepFunction: 'checkCondition',
+            functionParams: {
                 condition: {. //json-rules-engine compatible condition object
                     any: [
                         { fact: '\${age}', operator: 'greaterThan', value: 18 },
@@ -296,10 +296,10 @@ export const workflowToolDefinition: Array<WorkflowTool> = [
       \`\`\` json
         {
             id: 'branch12345',  // replace with a generated unique step ID used as refernce in other steps where needed to chain the steps  
-            label: 'Branch the workflow into parallel paths', // human readable name for the step based on context of what the tool does
+            label: 'Branch the workflow into parallel paths', // human readable name for the step based on context of what the step does
             type: 'branch',
-            tool: 'branch',
-            toolParams: {
+            stepFunction: 'branch',
+            functionParams: {
                 // no parameters for branch step
             },
             next: ['889gfhhy65', '7hhs67klm9', 'vvs6ojhwtF'] // array of next step IDs to execute in parallel
@@ -352,10 +352,10 @@ export const workflowToolDefinition: Array<WorkflowTool> = [
       \`\`\` json
         {
             id: '3klmop4567',  // replace with a generated unique step ID used as refernce in other steps where needed to chain the steps   
-            label: 'Merge parallel workflow branches', // human readable name for the step based on context of what the tool does
+            label: 'Merge parallel workflow branches', // human readable name for the step based on context of what the step does
             type: 'merge',
-            tool: 'merge',
-            toolParams: {
+            stepFunction: 'merge',
+            functionParams: {
                 waitForSteps: ['889gfhhy65', '7hhs67klm9'], // array of step IDs to wait for completion
                 waitForAll: true, // set to true if all steps must succeed, false if partial success is acceptable
                 timeout: 120 // maximum wait time in seconds before proceeding (e.g., 120 seconds = 2 minutes)

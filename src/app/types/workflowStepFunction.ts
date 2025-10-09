@@ -1,6 +1,3 @@
-import { IntegrationInstructions } from "@mui/icons-material";
-
-
 
 export type ToolType = 'task' | 'decision' | 'trigger' | 'branch' | 'merge' | 'workflow';
 
@@ -16,7 +13,7 @@ export interface api {
     responseMapping?: Record<string, string>;                   // Optional response mapping
 }
 
-export interface ToolParam {
+export interface FunctionParam {
     name: string;                                               // Parameter name to be passed to the tool
     label: string;                                              // Human-readable parameter label
     required: boolean;                                          // Is the parameter required
@@ -27,21 +24,21 @@ export interface ToolParam {
     defaultValue?: string|number|boolean|object|api;                // Optional default value
 }
 
-export interface ToolOutput {
+export interface FunctionOutput {
     type: 'result' | 'pass' | 'fail' | 'error' | 'timeout';     // Output type
     label: string;                                              // Human-readable output label
     required: boolean;                                          // Is the output required
 }
 
 
-export interface WorkflowTool {
+export interface WorkflowStepFunction {
     id: string;                                                 // Unique tool ID
     label: string;                                              // Human-readable tool name
     name: string;                                               // Tool name (to be used in the workflow)
     type: ToolType;                                             // Tool type (e.g., task, decision)
     description?: string;                                       // Optional tool description
-    params?: Array<ToolParam>;                                  // Optional parameters for the tool
-    outputs: Array<ToolOutput>;                                 // Possible outputs from the tool
+    params?: Array<FunctionParam>;                                  // Optional parameters for the tool
+    outputs: Array<FunctionOutput>;                                 // Possible outputs from the tool
     llmInstructions: LLMInstructions;                           // Instructions for LLM on how to use the tool
 }
 
