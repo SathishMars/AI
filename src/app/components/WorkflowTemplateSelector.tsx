@@ -77,7 +77,14 @@ export default function WorkflowTemplateSelector({
           status: t.metadata.status
         }));
         console.log('📄 Template details:', templatesList);
-        setTemplates(prev => [...prev, ...templatesList]);
+        //check if the selected template is in the list, if not add it
+        if (currentTemplateMenuItem && !templatesList.find(t => t.id === currentTemplateMenuItem.id)) {
+          templatesList.push(currentTemplateMenuItem);
+          console.log('➕ Added current template to list:', currentTemplateMenuItem.id, currentTemplateMenuItem.label);
+        }
+        // Sort templates alphabetically by label
+        templatesList.sort((a, b) => a.label.localeCompare(b.label));
+        setTemplates([...templatesList]);
         currentTemplatesListRef.current = templatesList;
       } catch (err) {
         console.error('❌ Error fetching templates:', err);
