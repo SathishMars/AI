@@ -141,16 +141,33 @@ export default function AimeWorkflowPane({
 }: AimeWorkflowPaneProps) {
     const [userInput, setUserInput] = useState<string>('');
     const autocompleteRef = useRef<HTMLTextAreaElement | null>(null);
+    const messagesContainerRef = useRef<HTMLDivElement | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         // Focus the input on mount
-        if (!workflowTemplateId) {
-            autocompleteRef.current?.focus();
-        }
+        setTimeout(() => {
+            if (workflowTemplateId && workflowTemplateId.length > 0) {
+                autocompleteRef.current?.focus();
+            }
+            scrollToBottom();
+        }, 100);
     }, [workflowTemplateId]);
 
+    useEffect(() => {
+        // Scroll to bottom when messages change
+        scrollToBottom();
+    }, [messages]);
+
+    const scrollToBottom = () => {
+        if (messagesContainerRef.current) {
+            messagesContainerRef.current.scrollTo({
+                top: messagesContainerRef.current.scrollHeight,
+                behavior: 'smooth'
+            });
+        }
+    }
 
     const handleSendToAime = useCallback(async (userMessage: string) => {
         if (!userMessage.trim()) return;
@@ -168,6 +185,7 @@ export default function AimeWorkflowPane({
         }
         setTimeout(() => {
             setIsLoading(false);
+            // Scroll to bottom of messages
             if (autocompleteRef.current) {
                 autocompleteRef.current.focus();
             }
@@ -184,11 +202,12 @@ export default function AimeWorkflowPane({
             )}
 
             {!error && workflowTemplateId && (
-                <Paper sx={{ alignSelf: 'stretch', flex: 1, p: 1, display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}>
+                <Paper sx={{ alignSelf: 'stretch', height: '100%', p: 1, display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}>
                     <Box sx={{ mb: 1, fontWeight: 'bold' }}>
                         Ask aime
                     </Box>
                     <Box
+                        ref={messagesContainerRef}
                         sx={{
                             border: 1,
                             borderColor: 'divider',
@@ -200,11 +219,9 @@ export default function AimeWorkflowPane({
                             position: 'relative',
                             overflowY: 'auto',
                             maxHeight: '100%',
-                            display: 'flex',
-                            flexDirection: 'column'
                         }}
                     >
-                        <List sx={{ flex: 1, minHeight: 0, overflow: 'visible' }}>
+                        <List sx={{ width: '100%', minHeight: 0, overflow: 'visible' }}>
                             {(messages?.length === 0) ? (
                                 <Box sx={{ textAlign: 'center', color: 'text.secondary' }}>
                                     No messages yet. Start the conversation!

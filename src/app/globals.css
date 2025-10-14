@@ -5,10 +5,7 @@ body {
   /* Material-UI will handle background and color via CssBaseline */
   margin: 0;
   padding: 0;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
+  height: 100vh;
 }
 
 /* Performance optimizations for responsive layout */
@@ -35,6 +32,13 @@ body {
   contain: layout;
   will-change: transform;
 }
+
+.smooth-transform {
+  /* Apply GPU acceleration for smooth transforms */
+  will-change: transform;
+  backface-visibility: hidden;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+} 
 
 /* Embedded iframe optimizations */
 iframe body {

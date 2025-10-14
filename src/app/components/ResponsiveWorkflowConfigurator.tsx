@@ -189,7 +189,8 @@ export default function ResponsiveWorkflowConfigurator({
       p: 2,
       borderBottom: 1,
       borderColor: 'divider',
-      bgcolor: 'background.paper'
+      bgcolor: 'background.paper',
+      width: '100%'
     }}>
       <Box sx={{
         display: 'flex',
@@ -368,10 +369,9 @@ export default function ResponsiveWorkflowConfigurator({
   }
 
   return (
-    <Container
-      maxWidth={false}
+    <Box
       className="responsive-workflow-container"
-      sx={{ flex:1, p: 0, display: 'flex', flexDirection: 'column' }}
+      sx={{p: 0, m:0, height: '100%', width: '100%'}}
     >
       {renderToolbar()}
 
@@ -413,12 +413,12 @@ export default function ResponsiveWorkflowConfigurator({
       {(isDesktop || isTablet) && (
         <Box
           ref={containerRef}
+          className="smooth-transform"
           sx={{
-            flex: 1,
             display: 'flex',
-            overflow: 'hidden',
-            position: 'relative',
-            alignItems: 'stretch'
+            width: '100%',
+            height: 'calc(100% - 72px)', // Adjust for toolbar height
+            minHeight: 0, // Ensures flex container respects height
           }}
         >
           {/* Conversation Pane */}
@@ -428,6 +428,8 @@ export default function ResponsiveWorkflowConfigurator({
               minWidth: `${MIN_CONVERSATION_WIDTH}px`,
               borderRight: 1,
               borderColor: 'divider',
+              height: '100%',
+              minHeight: 0, // Ensures flex container respects height
             }}
           >
             <AimeWorkflowPane
@@ -444,10 +446,13 @@ export default function ResponsiveWorkflowConfigurator({
           {/* Visualization Pane */}
           <Box sx={{
             flex: 1,
+            height: '100%',
             minWidth: 0, // Allows flex item to shrink below content size
-            display: 'flex',
+            display: 'inline-flex',
             flexDirection: 'column'
-          }}>
+          }}
+          className="smooth-transform"
+          >
             <VisualizationPane
               workflowTemplate={workflowTemplate}
               onWorkflowDefinitionChange={onWorkflowDefinitionChange}
@@ -463,6 +468,6 @@ export default function ResponsiveWorkflowConfigurator({
         onSubmit={handleTemplateNameSubmit}
         currentName={workflowTemplate?.metadata?.label}
       />
-    </Container>
+    </Box>
   );
 }

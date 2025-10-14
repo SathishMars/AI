@@ -129,22 +129,12 @@ export default function WorkflowConfigurePage({ params }: PageProps) {
 
   // Main workflow configurator
   return (
-    <Container sx={{ m: 0, p: 0, py: 2, flex: 1, display: 'flex', flexDirection: 'column' }}>
+    <Container sx={{ m: 0, p: 0, py: 2, height: 'calc(100% - 64px)', width: '100%' }}>
       {isSaving && (
         <Alert severity="info" sx={{ mb: 2 }}>
           Saving workflow to database...
         </Alert>
       )}
-      
-
-      {/* Debug: Log template state */}
-      {(() => {
-        console.log('📄 Page render - Template state:', {
-          template,
-          isNewTemplate
-        });
-        return null;
-      })()}
       
       <ResponsiveWorkflowConfigurator
         workflowTemplate={template}
