@@ -2,13 +2,22 @@ import { generateMermaidFromWorkflow } from '@/app/utils/langchain/langchain-mer
 
 describe('generateMermaidFromWorkflow', () => {
     it('uses curly braces for decision nodes', () => {
-        const workflow = {
+        type TestStep = {
+            id: string;
+            label: string;
+            type: string;
+            next?: string[];
+            onConditionPass?: string;
+            onConditionFail?: string;
+        };
+
+        const workflow: { steps: TestStep[] } = {
             steps: [
                 { id: 'start', label: 'Start', type: 'start', next: ['decide'] },
                 { id: 'decide', label: 'Is OK?', type: 'decision', onConditionPass: 'end', onConditionFail: 'end' },
                 { id: 'end', label: 'End', type: 'end' },
             ],
-        } as any;
+        };
 
         const diagram = generateMermaidFromWorkflow(workflow);
         // decision node should be emitted with {} around the label
