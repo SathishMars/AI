@@ -1,0 +1,13 @@
+
+
+.aime-message {
+  border-radius: 10px;
+  background-color: rgba(0,200,0,0.5); 
+  margin-bottom: 5px;
+}
+
+.user-message {
+  border-radius: 10px;
+  background-color: rgba(0,0,255,0.1); 
+  margin-bottom: 5px;
+}

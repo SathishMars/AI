@@ -1,0 +1,168 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { WorkflowMessage } from "../types/aimeWorkflowMessages";
+import ShortUniqueId from 'short-unique-id';
+import { WorkflowDefinition } from "../types/workflowTemplate";
+import { text } from "stream/consumers";
+import { useUnifiedUserContext } from "../contexts/UnifiedUserContext";
+
+// 10-char alphanumeric short id generator (reusable instance)
+const uid = new ShortUniqueId({ length: 10, dictionary: 'alphanum' });
+
+// Helper to produce an id string
+function generateShortId(): string {
+    // use rnd() to generate id string with this package version
+    // (instance is not directly callable in typings)
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    return uid.rnd();
+}
+
+interface AImeWorkflowOptions {
+    workflowTemplateId: string;
+    workflowDefinition: WorkflowDefinition;
+    onMessage: (message: string) => void;
+    onWorkflowDefinitionChange?: (workflowDefinition: WorkflowDefinition, mermaidDiagram?: string) => void;
+}
+
+interface UseAimeWorkflowReturn {
+    messages: WorkflowMessage[];
+    sendMessage: (message: string) => Promise<void>;
+}
+
+const seedWelcomeMessage = (): WorkflowMessage => {
+        return {
+            id: generateShortId(),
+            sender: "aime",
+            type: "text",
+            userId: "system",
+            userName: "aime workflows",
+            content: {
+                text: `
+                Hello! I'm aime, your AI assistant. I can help you build and refine your workflow. Just type in what you want to do and when to kick off (trigger) this workflow.
+                Just provide some details about what you want to achieve with this workflow like "On receiving a request, I want to check if the initial budget exceeds $1000.".
+                `
+            },
+            timestamp: new Date().toISOString()
+        };
+    }; 
+
+export function useAimeWorkflow({
+    workflowTemplateId,
+    workflowDefinition,
+    onMessage,
+    onWorkflowDefinitionChange
+}: AImeWorkflowOptions): UseAimeWorkflowReturn {
+    const sessionIDRef = useRef<string>(generateShortId());
+    const sessionId = sessionIDRef.current;
+    const [messages, setMessages] = useState<WorkflowMessage[]>([]);
+    const { user, isLoading: userContextLoading } = useUnifiedUserContext();
+
+    useEffect(() => {
+        if (!workflowTemplateId || workflowTemplateId.trim()==="new") {
+                // this is a new conversation. So seed it with a welcome message from aime
+                setMessages([seedWelcomeMessage()]);
+                // setting some dummy messages for now. Aime will always start the conversation. User will respond.
+                // setMessages([
+                //     { id: 'msg1', sender: 'aime', content: { text: `Hello! I'm aime, your AI assistant for the "${workflowTemplateLabel}" workflow. How can I assist you today?` }, timestamp: '2025-10-11T21:00:23.032Z' },
+                //     { id: 'msg2', sender: 'user', content: { text: 'Hi aime! Can you help me get started with this workflow?' }, timestamp: '2025-10-11T21:00:24.002Z' },
+                //     {
+                //         id: 'msg3',
+                //         sender: 'aime',
+                //         content: {
+                //             text: 'Of course! To get started, please provide some details about what you want to achieve with this workflow.',
+                //             followUpQuestions: ['What is the main goal of this workflow?', 'Are there specific tasks you want to automate?'],
+                //             followUpOptions: { tone: [{ label: 'formal', value: 'formal' }, { label: 'casual', value: 'casual' }, { label: 'humorous', value: 'humorous' }] }
+                //         },
+                //         timestamp: new Date().toISOString()
+                //     }
+                // ]);   
+                return;           
+        }
+        // Reset messages when workflowTemplateId changes
+        fetch('/api/workflow-templates/' + encodeURIComponent(workflowTemplateId) + '/aime-messages', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(async (response) => {
+            if (!response.ok) {
+                throw new Error(`API error: ${response.status} ${response.statusText}`);
+            }
+            const data = await response.json();
+            console.log('Fetched messages for template:', workflowTemplateId, data);
+            if (data && Array.isArray(data) && data.length > 0) {
+                setMessages(data);
+                console.log('Set messages from fetched data:', data);
+            } else {
+                //  new chat. So seed it with a welcome message from aime
+                setMessages([seedWelcomeMessage()]);            
+            }
+        })
+        .catch((error) => {
+            console.error('Error fetching messages:', error);
+            setMessages([]);
+        });
+    }, [workflowTemplateId]);
+
+    const sendMessage = useCallback(async (message: string) => {
+        const newMessage: WorkflowMessage = {
+            id: generateShortId(),
+            sender: 'user',
+            type: 'text',
+            userId: user.id, // Replace with actual user ID if available
+            userName: user.lastName +", "+ user.firstName, // Replace with actual user name if available
+            content: { text: message },
+            timestamp: new Date().toISOString()
+        };
+
+        // Append user message to state
+        setMessages(prev => [...prev, newMessage]);
+        //call the/api/generate-workflow API to get aime response
+        // we need to send only the last few messages to keep the payload small and maintain context
+        const MAX_CONTEXT_MESSAGES = 10; // including the new user message
+        const recentMessages = messages.slice(- (MAX_CONTEXT_MESSAGES - 1)); // get last N-1 messages
+        const messagesHistory = [...recentMessages, newMessage];
+        const payload = {
+            sessionId,
+            templateId: workflowTemplateId,
+            messages: messagesHistory,
+            workflowDefinition: workflowDefinition
+        };
+
+        const response = await fetch('/api/generate-workflow', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            throw new Error(`API error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        console.log('API response data:', data);
+
+        if (data && Array.isArray(data.messages)) {
+            setMessages(prev => [...prev, ...data.messages]);
+        } else {
+            throw new Error('Invalid response format from API');
+        }
+
+        console.log('Received workflowDefinition from API:', data.workflowDefinition);
+
+        if (data.workflowDefinition && onWorkflowDefinitionChange) {
+            onWorkflowDefinitionChange(data.workflowDefinition, data.mermaidDiagram.trim());
+        }
+        if (onMessage) {
+            onMessage(message);
+        }
+    }, [messages, onMessage, onWorkflowDefinitionChange, sessionId, workflowDefinition, workflowTemplateId]);
+
+    return {
+        messages,
+        sendMessage
+    };
+}

@@ -1,284 +1,545 @@
 // src/app/components/SmartAutocomplete.tsx
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   TextField,
   Popper,
   ClickAwayListener,
   MenuList,
   MenuItem,
-  Paper
+  Paper,
+  InputAdornment,
+  IconButton,
+  PopperProps
 } from '@mui/material';
-import { ConversationContext } from '@/app/types/conversation';
-import { AutocompleteSuggestion } from '@/app/types/conversation';
-import { UnifiedAutocompleteManager } from '@/app/utils/unified-autocomplete-manager';
+import SendIcon from '@mui/icons-material/Send';
+import { WorkflowAutocompleteItem } from '@/app/types/workflowAutocomplete';
+import { WorkflowDefinition, WorkflowStep } from '../types/workflowTemplate';
+import { set } from 'zod';
+
 
 interface SmartAutocompleteProps {
-  value: string;
-  onChange: (value: string) => void;
-  onKeyPress: (event: React.KeyboardEvent) => void;
-  placeholder: string;
-  disabled: boolean;
-  inputRef: React.RefObject<HTMLTextAreaElement | null>;
-  context?: ConversationContext;
+  autoFocus?: boolean;
+  value?: string;
+  onChange?: (value: string) => void;
+  onKeyPress?: (event: React.KeyboardEvent) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  inputRef?: React.RefObject<HTMLTextAreaElement | null>;
+  workflowDefinition?: WorkflowDefinition; // Optional workflow definition to filter suggestions
+  handleSendToAime?: (userMessage: string) => void;
 }
 
+// Virtual anchor compatible with Popper's VirtualElement
+interface VirtualAnchor {
+  getBoundingClientRect: () => DOMRect;
+}
+
+const getWorkflowSteps = (workflowDefinition: WorkflowDefinition | undefined): Array<WorkflowAutocompleteItem> => {
+  if (!workflowDefinition || !workflowDefinition.steps) return [];
+  let allSteps: Array<WorkflowAutocompleteItem> = [];
+  // we need to recurseively get the list of steps from the workflow definition based on the workflowDefinition.steps array
+  const getSteps = (steps: Array<WorkflowStep | string>): Array<WorkflowAutocompleteItem> => {
+    let allSteps: Array<WorkflowAutocompleteItem> = [];
+    steps.forEach((step: WorkflowStep | string) => {
+      if (typeof step === 'string') return; // skip string steps (like 'end' or 'start')
+      allSteps.push({
+        id: step.id,
+        label: step.label,
+        name: step.stepFunction || step.label,
+        description: step.stepFunction || '',
+        type: step.type,
+      });
+      //Check in step.next is an array and has length, then recurse 
+      if (step.next && Array.isArray(step.next) && step.next.length) {
+        allSteps = allSteps.concat(getSteps(step.next));
+      }
+      if (step.onConditionPass) {
+        if (typeof step.onConditionPass !== 'string') {
+          allSteps = allSteps.concat(getSteps([step.onConditionPass]));
+        }
+      }
+      if (step.onConditionFail) {
+        if (typeof step.onConditionFail !== 'string') {
+          allSteps = allSteps.concat(getSteps([step.onConditionFail]));
+        }
+      }
+      if (step.onError) {
+        if (typeof step.onError !== 'string') {
+          allSteps = allSteps.concat(getSteps([step.onError]));
+        }
+      }
+      if (step.onTimeout) {
+        if (typeof step.onTimeout !== 'string') {
+          allSteps = allSteps.concat(getSteps([step.onTimeout]));
+        }
+      }
+    });
+    return allSteps;
+  };
+  allSteps = getSteps(workflowDefinition.steps);
+  return allSteps;
+}
+
+const MAX_SUGGESTIONS = 5; // Max number of suggestions to show
+const AUTOCOMPLETE_SUGGESTIONS_TRIGGER = '@'; // Trigger character for autocomplete
+const AUTOCOMPLETE_STEPS_TRIGGER = '#'; // Trigger character for autocomplete
+
 // Enhanced SmartAutocomplete with multi-line support and autocomplete
-export const SmartAutocomplete: React.FC<SmartAutocompleteProps> = ({ 
-  value, 
-  onChange, 
-  onKeyPress, 
-  placeholder, 
-  disabled, 
-  inputRef, 
-  context 
-}) => {
-  const [suggestions, setSuggestions] = useState<AutocompleteSuggestion[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [selectedIndex, setSelectedIndex] = useState(-1);
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [autocompleteManager] = useState(() => new UnifiedAutocompleteManager());
-  const textAreaRef = useRef<HTMLTextAreaElement>(null);
-  const latestValueRef = useRef(value);
+export default function SmartAutocomplete({
+  autoFocus = false,
+  value,
+  onChange,
+  onKeyPress,
+  placeholder,
+  disabled,
+  inputRef,
+  workflowDefinition,
+  handleSendToAime
+}: SmartAutocompleteProps) {
+  // Load and cache the autocomplete items once on mount from the backend api @ /api/workflow-autocomplete
+  const [suggestions, setSuggestions] = useState<WorkflowAutocompleteItem[]>([]);
+  const [workflowSteps, setWorkflowSteps] = useState<WorkflowAutocompleteItem[]>([]);
+  // loading state kept for potential future use
+  const [, setLoading] = useState<boolean>(false);
+  const [open, setOpen] = useState<boolean>(false);
+  // anchorEl may be a real HTMLElement or a virtual element with getBoundingClientRect()
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | VirtualAnchor | null>(null);
+  const [latestRect, setLatestRect] = useState<DOMRect | null>(null);
+  const [triggerChar, setTriggerChar] = useState<string | null>(null);
+  const [searchText, setSearchText] = useState<string>('');
+  const [filtered, setFiltered] = useState<WorkflowAutocompleteItem[]>([]);
+  const [highlightIndex, setHighlightIndex] = useState<number>(0);
+  const menuRef = useRef<HTMLUListElement | null>(null);
 
   useEffect(() => {
-    latestValueRef.current = value;
-  }, [value]);
-
-  // Auto-resize textarea based on content (max 5 lines)
-  const adjustTextareaHeight = useCallback(() => {
-    const textarea = textAreaRef.current;
-    if (textarea) {
-      textarea.style.height = 'auto';
-      const lineHeight = 24; // Approximate line height
-      const maxHeight = lineHeight * 5; // 5 lines max
-      const scrollHeight = Math.min(textarea.scrollHeight, maxHeight);
-      textarea.style.height = `${scrollHeight}px`;
-    }
+    const loadAutocompleteItems = async () => {
+      let isMounted = true;
+      setLoading(true);
+      const response = await fetch('/api/workflow-autocomplete');
+      if (response.ok) {
+        const data = await response.json();
+        if (isMounted && Array.isArray(data)) {
+          setSuggestions(data as WorkflowAutocompleteItem[]);
+        }
+      } else {
+        if (isMounted) setSuggestions([]);
+      }
+      setLoading(false);
+      return () => { isMounted = false; };
+    };
+    loadAutocompleteItems();
   }, []);
 
   useEffect(() => {
-    adjustTextareaHeight();
-  }, [value, adjustTextareaHeight]);
+    setLoading(true);
+    // Filter only workflow steps (functions) for suggestions
+    setWorkflowSteps(getWorkflowSteps(workflowDefinition));
+    // let us add mock steps for testing
+    setWorkflowSteps([
+      {
+        id: 'mock-step-1', label: 'Mock Step 1', name: 'mockStep1',
+        description: 'Don\'t know what this step does',
+        type: 'task'
+      },
+      {
+        id: 'mock-step-2', label: 'Mock Step 2', name: 'mockStep2',
+        description: 'This is a mock step for testing',
+        type: 'decision'
+      },
+    ]);
 
-  // Handle cursor position changes and check for triggers
-  const checkTriggersAtCursor = useCallback(async () => {
-    if (!context) return;
-    
-    const textarea = textAreaRef.current;
-    if (!textarea) return;
-    
-    const currentValue = latestValueRef.current;
-    const cursorPosition = textarea.selectionStart ?? currentValue.length;
-    const textBeforeCursor = currentValue.substring(0, cursorPosition);
-    
-    console.log('🔍 Checking triggers at cursor position:', cursorPosition, 'Text before cursor:', textBeforeCursor);
-    
-    // Check for triggers: @, #, mrf., user.
-    const endsWithAt = textBeforeCursor.endsWith('@');
-    const endsWithHash = textBeforeCursor.endsWith('#');
-    const triggerMatch = textBeforeCursor.match(/[@#]\w*$|\b(mrf|user)\.\w*$/);
-    
-    if (triggerMatch || endsWithAt || endsWithHash) {
-      console.log('🎯 Autocomplete triggered for:', textBeforeCursor);
+    setLoading(false);
+  }, [workflowDefinition]);
+
+  // Filter suggestions when trigger/searchText changes
+  useEffect(() => {
+    if (!triggerChar) {
+      setFiltered([]);
+      setOpen(false);
+      return;
+    }
+    const source = triggerChar === AUTOCOMPLETE_STEPS_TRIGGER ? workflowSteps : suggestions;
+    const q = (searchText || '').trim().toLowerCase();
+    let results = source.filter((s) => {
+      return (
+        s.label?.toLowerCase().includes(q) || s.name?.toLowerCase().includes(q) || s.id?.toLowerCase().includes(q)
+      );
+    }).slice(0, MAX_SUGGESTIONS);
+    // if query is empty, show top few
+    if (!q) results = source.slice(0, MAX_SUGGESTIONS);
+    setFiltered(results);
+    setHighlightIndex(0);
+    setOpen(results.length > 0);
+  }, [triggerChar, searchText, suggestions, workflowSteps]);
+
+  // Helper to find last trigger before caret
+  const findTrigger = (text: string, caretPos: number): { char: string | null; start: number } => {
+    const at = text.lastIndexOf(AUTOCOMPLETE_SUGGESTIONS_TRIGGER, caretPos - 1);
+    const hash = text.lastIndexOf(AUTOCOMPLETE_STEPS_TRIGGER, caretPos - 1);
+    const best = Math.max(at, hash);
+    if (best === -1) return { char: null, start: -1 };
+    const ch = text[best];
+    // ensure char is not preceded by a non-space preventing char (e.g., ensure no space between trigger and caret)
+    return { char: ch, start: best };
+  };
+
+  // Compute caret coordinates (viewport) for a textarea by creating a hidden mirror element.
+  // Returns a DOMRect-like object or null on failure.
+  const getCaretCoordinates = (textarea: HTMLTextAreaElement | HTMLInputElement | null, caretPos: number): DOMRect | null => {
+    if (!textarea) return null;
+    try {
+      const style = window.getComputedStyle(textarea);
       try {
-  const newSuggestions = await autocompleteManager.getSuggestions(currentValue, cursorPosition, context);
-        console.log('✅ Got', newSuggestions.length, 'suggestions');
-        setSuggestions(newSuggestions);
-        setShowSuggestions(newSuggestions.length > 0);
-        setSelectedIndex(-1);
-        setAnchorEl(textarea);
-      } catch (error) {
-        console.error('❌ Error getting autocomplete suggestions:', error);
-        setShowSuggestions(false);
+        // debug: log textarea viewport rect and caret position
+        console.log('[SmartAutocomplete] getCaretCoordinates start', { caretPos, taRect: textarea.getBoundingClientRect() });
+      } catch {
+        // ignore
+      }
+      const div = document.createElement('div');
+      // copy textarea styles that affect text layout
+      const properties: Array<keyof CSSStyleDeclaration> = [
+        'boxSizing', 'width', 'height', 'fontFamily', 'fontSize', 'fontStyle', 'fontWeight', 'lineHeight',
+        'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'borderTopWidth', 'borderRightWidth',
+        'borderBottomWidth', 'borderLeftWidth', 'whiteSpace', 'wordWrap', 'overflowWrap', 'letterSpacing',
+      ];
+      properties.forEach((prop) => {
+        // assign via index signature to avoid `any`
+        (div.style as unknown as Record<string, string>)[prop as string] = (style as unknown as Record<string, string>)[prop as string] || '';
+      });
+      div.style.position = 'absolute';
+      div.style.visibility = 'hidden';
+      div.style.pointerEvents = 'none';
+      div.style.whiteSpace = 'pre-wrap';
+      // match the same width to wrap lines similarly
+      div.style.width = `${textarea.clientWidth}px`;
+
+      // position the mirror at the textarea's viewport coordinates (account for scroll)
+      const taRect = textarea.getBoundingClientRect();
+      div.style.left = `${Math.round(taRect.left + window.scrollX)}px`;
+      div.style.top = `${Math.round(taRect.top + window.scrollY)}px`;
+      div.style.overflow = 'hidden';
+
+      const text = (textarea as HTMLTextAreaElement).value ?? (textarea as HTMLInputElement).value ?? '';
+      const before = text.substring(0, caretPos);
+      const after = text.substring(caretPos);
+
+      const spanBefore = document.createTextNode(before);
+      const spanMark = document.createElement('span');
+      spanMark.textContent = '\u200b'; // ZERO WIDTH SPACE marker
+      const spanAfter = document.createTextNode(after);
+
+      div.appendChild(spanBefore);
+      div.appendChild(spanMark);
+      // append a text node for after to preserve wrapping
+      div.appendChild(spanAfter);
+
+      document.body.appendChild(div);
+      const rect = spanMark.getBoundingClientRect();
+      // debug: log measured marker rect
+      console.log('[SmartAutocomplete] getCaretCoordinates markerRect', rect);
+      document.body.removeChild(div);
+      return rect;
+    } catch {
+      return null;
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) => {
+    const newVal = e.target.value;
+    if (typeof onChange === 'function') {
+      onChange(newVal);
+    } else {
+      console.warn('SmartAutocomplete: onChange prop is not a function');
+    }
+
+    const caret = inputRef?.current?.selectionStart ?? newVal.length;
+    const trg = findTrigger(newVal, caret);
+    if (trg.char) {
+      const q = newVal.substring(trg.start + 1, caret);
+      setTriggerChar(trg.char);
+      setSearchText(q);
+      // compute caret viewport coordinates and create a virtual anchor for Popper
+      const rect = getCaretCoordinates(inputRef?.current ?? null, caret);
+      // debug: log rect used for anchor
+      console.log('[SmartAutocomplete] handleInputChange caretRect', rect, 'caretPos', caret);
+      if (rect) {
+        // anchor slightly below the caret so popper appears beneath the cursor
+        const offsetY = 8; // px
+        const virtualEl: VirtualAnchor = {
+          getBoundingClientRect: () => new DOMRect(rect.left, rect.bottom + offsetY, rect.width, 0)
+        };
+        console.log('[SmartAutocomplete] handleInputChange virtualElRect', virtualEl.getBoundingClientRect());
+        setLatestRect(virtualEl.getBoundingClientRect());
+        setAnchorEl(virtualEl);
+      } else {
+        // fallback to anchoring to the textarea element itself
+        console.log('[SmartAutocomplete] handleInputChange no rect, using textarea element as anchor');
+        setLatestRect(null);
+        setAnchorEl(inputRef?.current ?? null);
       }
     } else {
-      setShowSuggestions(false);
+      setTriggerChar(null);
+      setSearchText('');
     }
-  }, [context, autocompleteManager]);
+  };
 
-  // Apply selected suggestion
-  const applySuggestion = (suggestion: AutocompleteSuggestion) => {
-    const textarea = textAreaRef.current;
+  // Recompute anchor when suggestions open or filtered results change (caret may have moved)
+  useEffect(() => {
+    if (!open) return;
+    const textarea = inputRef?.current as HTMLTextAreaElement | null;
     if (!textarea) return;
+    const caret = textarea.selectionStart ?? (value ?? '').length;
+    const rect = getCaretCoordinates(textarea, caret);
+    // debug
+    console.log('[SmartAutocomplete] recompute anchor effect', { rect, caret });
+    if (rect) {
+      const offsetY = 8;
+      const virtual = { getBoundingClientRect: () => new DOMRect(rect.left, rect.bottom + offsetY, rect.width, 0) } as VirtualAnchor;
+      console.log('[SmartAutocomplete] recompute anchor effect virtualRect', virtual.getBoundingClientRect());
+      setLatestRect(virtual.getBoundingClientRect());
+      setAnchorEl(virtual);
+    }
+  }, [open, filtered, value, inputRef]);
 
-    const cursorPosition = textarea.selectionStart || value.length;
-    const textBeforeCursor = value.substring(0, cursorPosition);
-    const textAfterCursor = value.substring(cursorPosition);
+  // debug: log current anchorEl whenever it changes
+  useEffect(() => {
+    console.log('[SmartAutocomplete] anchorEl changed', anchorEl);
+  }, [anchorEl]);
 
-    // Find the trigger and replace the text after it
-    let newText = value;
-    let newCursorPosition = cursorPosition;
+  const closeSuggestions = () => {
+    setOpen(false);
+    setTriggerChar(null);
+    setSearchText('');
+  };
 
-    if (textBeforeCursor.endsWith('@') || textBeforeCursor.endsWith('#')) {
-      // Just triggered, append suggestion
-      newText = textBeforeCursor + suggestion.value + textAfterCursor;
-      newCursorPosition = cursorPosition + suggestion.value.length;
+  const insertSuggestion = (item: WorkflowAutocompleteItem) => {
+    const textarea = inputRef?.current;
+    if (!textarea) return;
+    const safeValue = value ?? '';
+    const caret = textarea.selectionStart ?? safeValue.length;
+    const trg = findTrigger(safeValue, caret);
+    const before = safeValue.substring(0, trg.start);
+    const after = safeValue.substring(caret);
+    // Insert the item.name at the trigger location
+    const insertion = trg.char + "(" + (item.label || item.name || item.id) + ")";
+    const newText = `${before}${insertion}${after}`;
+    if (typeof onChange === 'function') {
+      onChange(newText);
     } else {
-      // Find the start of the current word/trigger
-      const triggers = ['@', '#', 'user.', 'mrf.', 'date.'];
-      let triggerStart = -1;
-      
-      for (const trigger of triggers) {
-        const lastIndex = textBeforeCursor.lastIndexOf(trigger);
-        if (lastIndex > triggerStart) {
-          triggerStart = lastIndex;
-        }
-      }
-      
-      if (triggerStart >= 0) {
-        const beforeTrigger = value.substring(0, triggerStart);
-        const triggerPart = textBeforeCursor.substring(triggerStart);
-        const triggerMatch = triggerPart.match(/^(@|#|user\.|mrf\.|date\.)/);
-        
-        if (triggerMatch) {
-          const trigger = triggerMatch[1];
-          newText = beforeTrigger + trigger + suggestion.value + textAfterCursor;
-          newCursorPosition = beforeTrigger.length + trigger.length + suggestion.value.length;
-        }
-      }
+      console.warn('SmartAutocomplete: onChange prop is not a function');
     }
-
-    onChange(newText);
-    setShowSuggestions(false);
-    
-    // Set cursor position after state update
-    setTimeout(() => {
-      if (textarea) {
-        textarea.setSelectionRange(newCursorPosition, newCursorPosition);
-        textarea.focus();
-      }
+    // move caret after inserted text
+    window.setTimeout(() => {
+      const pos = before.length + insertion.length;
+      textarea.focus();
+      textarea.setSelectionRange(pos, pos);
     }, 0);
+    closeSuggestions();
   };
 
-  // Handle input changes
-  const handleInputChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newValue = event.target.value;
-  latestValueRef.current = newValue;
-  onChange(newValue);
-    
-    // Trigger autocomplete check after a small delay
-    setTimeout(() => {
-      checkTriggersAtCursor();
-    }, 50);
-  };
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>) => {
+    // If user presses Backspace or Delete and the caret/target is inside an encapsulated suggestion
+    // (format: "@(label)"), remove the entire encapsulation instead of a single char.
+    const tryRemoveEncapsulation = () => {
+      const textarea = inputRef?.current as HTMLTextAreaElement | null;
+      const currentValue = value ?? '';
+      if (!textarea || !currentValue) return false;
+      const selStart = textarea.selectionStart ?? 0;
+      const selEnd = textarea.selectionEnd ?? selStart;
 
-  // Handle key navigation in suggestions
-  const handleKeyDown = (event: React.KeyboardEvent) => {
-    if (showSuggestions && suggestions.length > 0) {
-      switch (event.key) {
-        case 'ArrowDown':
-          event.preventDefault();
-          setSelectedIndex(prev => (prev + 1) % suggestions.length);
-          break;
-        case 'ArrowUp':
-          event.preventDefault();
-          setSelectedIndex(prev => prev <= 0 ? suggestions.length - 1 : prev - 1);
-          break;
-        case 'Enter':
-          if (selectedIndex >= 0 && selectedIndex < suggestions.length) {
-            event.preventDefault();
-            applySuggestion(suggestions[selectedIndex]);
-            return;
-          }
-          break;
-        case 'Escape':
-          event.preventDefault();
-          setShowSuggestions(false);
-          setSelectedIndex(-1);
-          break;
+      const findBlockContaining = (str: string, idx: number) => {
+        if (idx < 0 || idx >= str.length) return null;
+        const start = str.lastIndexOf('@(', idx);
+        if (start === -1) return null;
+        const end = str.indexOf(')', start + 2);
+        if (end === -1) return null;
+        if (idx >= start && idx <= end) return { start, end };
+        return null;
+      };
+
+      // If there is a selection, check if selection overlaps a block
+      if (selStart !== selEnd) {
+        // check for any block that intersects selection by finding block that contains selStart or selEnd-1
+        const blockA = findBlockContaining(currentValue, selStart);
+        const blockB = findBlockContaining(currentValue, Math.max(0, selEnd - 1));
+        const block = blockA ?? blockB;
+        if (block) {
+          const before = currentValue.substring(0, block.start);
+          const after = currentValue.substring(block.end + 1);
+          const newText = before + after;
+          if (typeof onChange === 'function') onChange(newText);
+          window.setTimeout(() => {
+            const pos = before.length;
+            textarea.focus();
+            textarea.setSelectionRange(pos, pos);
+          }, 0);
+          return true;
+        }
+        return false;
+      }
+
+      // No selection: determine target index of deletion
+      let targetIndex = selStart;
+      if ((e.key === 'Backspace')) {
+        targetIndex = selStart - 1;
+      } else if (e.key === 'Delete') {
+        targetIndex = selStart;
+      } else {
+        return false;
+      }
+      const block = findBlockContaining(currentValue, targetIndex);
+      if (block) {
+        const before = currentValue.substring(0, block.start);
+        const after = currentValue.substring(block.end + 1);
+        const newText = before + after;
+        if (typeof onChange === 'function') onChange(newText);
+        // position caret at start of removed block
+        window.setTimeout(() => {
+          const pos = before.length;
+          textarea.focus();
+          textarea.setSelectionRange(pos, pos);
+        }, 0);
+        return true;
+      }
+      return false;
+    };
+
+    if ((e.key === 'Backspace' || e.key === 'Delete')) {
+      const handled = tryRemoveEncapsulation();
+      if (handled) {
+        e.preventDefault();
+        return;
       }
     }
-    
-    onKeyPress(event);
+    // Navigation in suggestion list
+    if (open && (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === 'Escape')) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setHighlightIndex((i) => Math.min(i + 1, filtered.length - 1));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setHighlightIndex((i) => Math.max(i - 1, 0));
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeSuggestions();
+        return;
+      }
+      if (e.key === 'Enter' && !e.shiftKey) {
+        // If popup open and an item is highlighted, choose it
+        if (open && filtered.length > 0) {
+          e.preventDefault();
+          insertSuggestion(filtered[highlightIndex]);
+          return;
+        }
+      }
+    }
+
+    // Send on Enter (without Shift) when popup closed
+    if (e.key === 'Enter' && !e.shiftKey && !open) {
+      e.preventDefault();
+      if (typeof handleSendToAime === 'function') handleSendToAime(value ?? '');
+      return;
+    }
+
+    // allow Shift+Enter for newline
+    if (e.key === 'Enter' && e.shiftKey) {
+      // don't intercept
+      return;
+    }
+
+    // pass through to parent key handler if provided
+    if (onKeyPress) onKeyPress(e as unknown as React.KeyboardEvent);
   };
 
-  // Handle click outside to close suggestions
-  const handleClickAway = () => {
-    setShowSuggestions(false);
-    setSelectedIndex(-1);
-  };
 
-  // Handle cursor position changes for autocomplete
-  const handleSelect = () => {
-    setTimeout(() => {
-      checkTriggersAtCursor();
-    }, 10);
-  };
-
+  // debug: show some key state on render
+  console.log('[SmartAutocomplete] render', { open, triggerChar, searchText, filteredCount: filtered.length, anchorEl });
   return (
-    <>
-      <TextField
-        multiline
-        fullWidth
-        variant="outlined"
-        placeholder={placeholder}
-        value={value}
-        onChange={handleInputChange}
-        onKeyDown={handleKeyDown}
-        onSelect={handleSelect}
-        disabled={disabled}
-        autoFocus
-        inputRef={(el) => {
-          textAreaRef.current = el;
-          if (inputRef) {
-            (inputRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = el;
-          }
-        }}
-        sx={{
-          '& .MuiOutlinedInput-root': {
-            minHeight: 'auto',
-            alignItems: 'flex-start',
-            padding: '12px',
-            '& textarea': {
-              resize: 'none',
-              overflow: 'auto',
-              lineHeight: '24px',
-              fontFamily: 'inherit'
-            }
-          }
-        }}
-      />
-      
-      {showSuggestions && (
-        <Popper
-          open={showSuggestions}
-          anchorEl={anchorEl}
-          placement="bottom-start"
-          style={{ zIndex: 1300 }}
-        >
-          <ClickAwayListener onClickAway={handleClickAway}>
-            <Paper elevation={3} sx={{ maxHeight: 200, overflow: 'auto', minWidth: 200 }}>
-              <MenuList dense>
-                {suggestions.map((suggestion, index) => (
+    <div>
+      <ClickAwayListener onClickAway={closeSuggestions}>
+        <div style={{ position: 'relative' }}>
+          <TextField
+            autoFocus={autoFocus}
+            inputRef={inputRef as unknown as React.Ref<HTMLTextAreaElement | HTMLInputElement>}
+            value={value}
+            onChange={handleInputChange}
+            slotProps={{
+              input: {
+                onKeyDown: handleKeyDown,
+                endAdornment: (
+                  <InputAdornment position="end" sx={{ alignSelf: 'end' }}>
+                    <IconButton aria-label="send" size='small' onClick={() => { if (typeof handleSendToAime === 'function') handleSendToAime(value ?? ''); }} edge="end">
+                      <SendIcon />
+                    </IconButton>
+                  </InputAdornment>
+                )
+              }
+            }}
+            placeholder={placeholder}
+            multiline
+            minRows={3}
+            maxRows={10}
+            fullWidth
+            variant="outlined"
+            disabled={disabled}
+            sx={{
+              backgroundColor: (disabled) ? 'divider' : 'transparent',
+            }}
+          />
+
+          <Popper
+            {...({
+              open,
+              anchorEl: anchorEl ?? undefined,
+              placement: 'bottom-start',
+              strategy: 'fixed',
+              modifiers: [
+                { name: 'offset', options: { offset: [0, 6] } },
+                { name: 'preventOverflow', options: { boundary: 'viewport' } },
+                { name: 'computeStyles', options: { adaptive: false } }
+              ],
+              style: { zIndex: 1300 }
+            } as PopperProps)}
+          >
+            <Paper style={{ minWidth: 260 }}>
+              <MenuList ref={menuRef}>
+                {filtered.map((item, idx) => (
                   <MenuItem
-                    key={suggestion.id}
-                    selected={index === selectedIndex}
-                    onClick={() => applySuggestion(suggestion)}
-                    sx={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'flex-start',
-                      minHeight: '40px'
-                    }}
+                    key={item.id}
+                    selected={idx === highlightIndex}
+                    onClick={() => insertSuggestion(item)}
                   >
-                    <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
-                      {suggestion.icon && `${suggestion.icon} `}
-                      {suggestion.display}
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <strong>{item.label}</strong>
+                      <small style={{ color: '#666' }}>{item.description}</small>
                     </div>
-                    {suggestion.description && (
-                      <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>
-                        {suggestion.description}
-                      </div>
-                    )}
                   </MenuItem>
                 ))}
               </MenuList>
             </Paper>
-          </ClickAwayListener>
-        </Popper>
-      )}
-    </>
+          </Popper>
+          {/* Temporary visual debug overlay for computed caret rect */}
+          {latestRect && open && (
+            <div style={{
+              position: 'fixed',
+              left: latestRect.left,
+              top: latestRect.top,
+              width: Math.max(8, latestRect.width || 8),
+              height: 8,
+              background: 'rgba(255,0,0,0.25)',
+              border: '1px solid rgba(255,0,0,0.5)',
+              pointerEvents: 'none',
+              zIndex: 99999
+            }} />
+          )}
+        </div>
+      </ClickAwayListener>
+    </div>
   );
-};
+}

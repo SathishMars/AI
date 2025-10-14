@@ -56,6 +56,30 @@ import "@fontsource/roboto/700.css";
 - **Step Naming**: Professional naming convention: "Start:", "Check:", "Action:", "End:" prefixes (NO emojis in names)
 - **Workflow Triggering**: Workflows can trigger other workflows within the same account using `type: "workflow"` steps with `workflowId` parameter
 - **Template Structure**: Templates have separate ID (10-char short-id, auto-generated) and NAME (user-editable)
+
+### ID generation
+
+- **MANDATORY**: All generated short IDs (the 10-char template `id` and any other short identifiers used across the codebase) MUST be produced using the `short-unique-id` package to guarantee consistent, testable, and dependency-tracked identifiers. Do not roll or invent ad-hoc generators in multiple files.
+
+- Version to use: the repository currently uses `short-unique-id@^5.3.2` (check `package.json` before adding/updating). Use that exact major version range unless you coordinate a bump.
+
+- Recommended TypeScript usage (example):
+
+```ts
+import ShortUniqueId from 'short-unique-id';
+
+// create a reusable generator (do not recreate inside tight loops)
+const uid = new ShortUniqueId({ length: 10, dictionary: 'alphanum' });
+
+// generate a 10-char short id
+const templateId = uid(); // e.g. 'aB3k9ZpQ1x'
+```
+
+- Policy notes:
+  - Reuse a single `ShortUniqueId` instance where possible (e.g., in a util) instead of instantiating repeatedly.
+  - Prefer the `alphanum` dictionary and length 10 to match existing DB indexes and expectations.
+  - Always `import` from the top-level package name (`'short-unique-id'`) and avoid copying the implementation.
+  - If you must change the generator settings (length/dictionary), update `copilot-instructions.md` and the integration tests that assert ID length/format.
 - **Metadata Separation**: Workflow definition contains ONLY steps - NO duplicated account/org/name metadata
 - **Version Management**: Only 1 published + max 1 draft per template ID; others become archived/deprecated
 - **Auto-Save Rules**: Save only when workflow has ≥1 real step AND template is named (not 'new'/'create')

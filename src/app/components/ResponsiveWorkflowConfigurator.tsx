@@ -15,7 +15,6 @@ import {
   Tooltip
 } from '@mui/material';
 import {
-  Save as SaveIcon,
   Publish as PublishIcon,
   Fullscreen as FullscreenIcon,
   Code as CodeIcon,
@@ -25,14 +24,12 @@ import {
   History as HistoryIcon,
   Edit as EditIcon
 } from '@mui/icons-material';
-import { WorkflowJSON, ValidationResult } from '@/app/types/workflow';
-import { WorkflowDefinition } from '@/app/types/workflow-template-v2';
-import { workflowDefinitionToJSON } from '@/app/utils/workflow-template-migration';
-import WorkflowCreationPane from './WorkflowCreationPane';
+import { WorkflowDefinition, WorkflowTemplate } from '@/app/types/workflowTemplate';
 import VisualizationPane from './VisualizationPane';
-import HistoryPanel from './HistoryPanel';
-import WorkflowTemplateSelector from './WorkflowTemplateSelector';
+import WorkflowTemplateSelector, {workflowTemplateSelectorMenuItem} from './WorkflowTemplateSelector';
 import WorkflowTemplateNameDialog from './WorkflowTemplateNameDialog';
+import AimeWorkflowPane from './AimeWorkflowPane';
+import { WorkflowMessage } from '../types/aimeWorkflowMessages';
 
 /**
  * Format a date as relative time (e.g., "2 minutes ago", "3 hours ago")
@@ -41,12 +38,12 @@ import WorkflowTemplateNameDialog from './WorkflowTemplateNameDialog';
 function formatRelativeTime(date: Date | string): string {
   // Convert string to Date if needed
   const dateObj = typeof date === 'string' ? new Date(date) : date;
-  
+
   // Check if date is valid
   if (isNaN(dateObj.getTime())) {
     return 'recently';
   }
-  
+
   const now = new Date();
   const diffMs = now.getTime() - dateObj.getTime();
   const diffSec = Math.floor(diffMs / 1000);
@@ -61,198 +58,142 @@ function formatRelativeTime(date: Date | string): string {
   if (diffHour < 24) return `${diffHour} hours ago`;
   if (diffDay === 1) return 'yesterday';
   if (diffDay < 7) return `${diffDay} days ago`;
-  
+
   // For older dates, show formatted date
   return dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-interface ConversationState {
-  activeConversationId: string;
-  inputContent: string;
-  scrollPosition: number;
-  streamingResponse?: {
-    isActive: boolean;
-    currentChunk: string;
-  };
-  chatHistory: {
-    id: string;
-    content: string;
-    sender: 'user' | 'aime';
-    timestamp: Date;
-  }[];
-  lastActiveTimestamp: Date;
-}
 
 interface ResponsiveWorkflowConfiguratorProps {
-  // Legacy support - WorkflowJSON (will be converted internally)
-  workflow?: WorkflowJSON;
-  // New support - WorkflowDefinition (preferred)
-  workflowDefinition?: WorkflowDefinition;
-  onWorkflowChange: (workflow: WorkflowJSON) => void;
-  validationResult: ValidationResult | null;
-  isNewWorkflow: boolean;
-  currentTemplateId?: string; // 10-char composite key identifier
-  currentTemplateName?: string; // Template name (for backward compatibility during migration)
-  lastUpdated?: Date; // Last updated timestamp
-  onTemplateNameChange?: (name: string) => Promise<void>;
-  refreshTrigger?: number; // External trigger to refresh template list
+  workflowTemplate?: WorkflowTemplate;
+  messages?: WorkflowMessage[];
+  sendMessage?: (message: string) => Promise<void>;
+  onWorkflowDefinitionChange: (workflowDefinition: WorkflowDefinition, mermaidDiagram?: string) => void;
+  onTemplateLabelChange?: (name: string) => Promise<void>;
 }
 
 export default function ResponsiveWorkflowConfigurator({
-  workflow: legacyWorkflow,
-  workflowDefinition,
-  onWorkflowChange,
-  validationResult,
-  isNewWorkflow,
-  currentTemplateId = 'new',
-  currentTemplateName,
-  lastUpdated,
-  onTemplateNameChange,
-  refreshTrigger: externalRefreshTrigger
+  workflowTemplate,
+  messages,
+  sendMessage,
+  onWorkflowDefinitionChange,
+  onTemplateLabelChange,
 }: ResponsiveWorkflowConfiguratorProps) {
-  // Convert WorkflowDefinition to WorkflowJSON if provided
-  const workflow = React.useMemo(() => {
-    if (workflowDefinition) {
-      return workflowDefinitionToJSON(workflowDefinition);
-    }
-    return legacyWorkflow;
-  }, [workflowDefinition, legacyWorkflow]);
-  
+
   // Ensure we have a workflow object
-  if (!workflow) {
-    throw new Error('ResponsiveWorkflowConfigurator requires either workflow or workflowDefinition prop');
+  if (!workflowTemplate) {
+    throw new Error('ResponsiveWorkflowConfigurator requires a workflowTemplate');
   }
   // Custom breakpoints: Mobile ≤767px, Tablet 768px-1199px, Desktop ≥1200px
   const isDesktop = useMediaQuery('(min-width: 1200px)');
   const isTablet = useMediaQuery('(min-width: 768px) and (max-width: 1199px)');
   const isMobile = useMediaQuery('(max-width: 767px)');
-  
+
   // Layout state
   const [showFullVisualization, setShowFullVisualization] = useState(false);
   const [showRawJSON, setShowRawJSON] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [activeTab, setActiveTab] = useState(0); // For mobile tab navigation
   const [conversationPaneWidth, setConversationPaneWidth] = useState(400); // Default 400px
-  const [isDragging, setIsDragging] = useState(false);
-  
+  const [isDragging, setIsDragging] = useState(false); // For resizable divider
+
   // Template naming state
   const [showNameDialog, setShowNameDialog] = useState(false);
-  const [internalRefreshTrigger, setInternalRefreshTrigger] = useState(0);
-  const [hasAutoShownDialog, setHasAutoShownDialog] = useState(false);
-  
-  // Use external refresh trigger if provided, otherwise use internal
-  const refreshTrigger = externalRefreshTrigger !== undefined ? externalRefreshTrigger : internalRefreshTrigger;
-  
+  const [isTemplateValid, setIsTemplateValid] = useState(false); // just as a place holder for now to prevent accidental publish
+  const [workflowTemplateSelectorItem, setWorkflowTemplateSelectorItem] = useState<workflowTemplateSelectorMenuItem | null>(null);
+
+
+  const updateWorkflowTemplateSelectorItem = useCallback((loadedTemplate: WorkflowTemplate) => {
+    console.log('🔄 Updating selector item for template:', loadedTemplate.id, loadedTemplate.metadata.label);
+    setWorkflowTemplateSelectorItem({
+      id: loadedTemplate.id,
+      label: loadedTemplate.metadata.label,
+      version: loadedTemplate.version,
+      status: loadedTemplate.metadata.status
+    });
+  }, []);
+
   // Auto-show dialog for new templates that need naming (only once)
   useEffect(() => {
-    if (!hasAutoShownDialog && isNewWorkflow && (currentTemplateName === 'new' || currentTemplateName === 'create' || currentTemplateName === 'New Workflow')) {
+    if (workflowTemplate && workflowTemplate.metadata && !workflowTemplate.metadata.label) { // New templates won't have a label yet
       console.log('🆕 Auto-showing name dialog for new template');
       setShowNameDialog(true);
-      setHasAutoShownDialog(true);
     }
-  }, [isNewWorkflow, currentTemplateName, hasAutoShownDialog]);
-  
-  // Conversation continuity state
-  const conversationStateRef = useRef<ConversationState | null>(null);
-  
+    updateWorkflowTemplateSelectorItem(workflowTemplate);
+  }, [updateWorkflowTemplateSelectorItem, workflowTemplate, workflowTemplate.metadata.label]);
+
+
   // Resizable divider functionality
   const dividerRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  
+
   const MIN_CONVERSATION_WIDTH = 500;
   const MAX_CONVERSATION_WIDTH_PERCENT = 0.5; // 50% of container width
-  
-  // Handle conversation state preservation during layout transitions
-  const preserveConversationState = useCallback(() => {
-    // This will be called by WorkflowCreationPane when state changes
-    if (conversationStateRef.current) {
-      // State is preserved in the ref for future conversation continuity features
-      console.log('Conversation state preserved during layout transition');
-    }
-  }, []);
-  
-  // Handle layout transitions with conversation continuity
-  useEffect(() => {
-    const prevLayout = isDesktop ? 'dual-pane' : 'single-pane';
-    const currentLayout = isDesktop ? 'dual-pane' : 'single-pane';
-    
-    if (prevLayout !== currentLayout) {
-      // Layout transition detected - preserve conversation state
-      preserveConversationState();
-    }
-  }, [isDesktop, preserveConversationState]);
-  
+
+
   // Resizable divider logic
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     setIsDragging(true);
-    
+
     const handleMouseMove = (e: MouseEvent) => {
       if (!containerRef.current) return;
-      
+
       const containerRect = containerRef.current.getBoundingClientRect();
       const newWidth = e.clientX - containerRect.left;
       const maxWidth = containerRect.width * MAX_CONVERSATION_WIDTH_PERCENT;
-      
+
       const clampedWidth = Math.max(
         MIN_CONVERSATION_WIDTH,
         Math.min(newWidth, maxWidth)
       );
-      
+
       setConversationPaneWidth(clampedWidth);
     };
-    
+
     const handleMouseUp = () => {
       setIsDragging(false);
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-    
+
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
   }, []);
-  
+
   // Workflow actions
-  const handleSave = useCallback(() => {
-    // WorkflowJSON only has steps - metadata is handled at template level
-    onWorkflowChange(workflow);
-  }, [workflow, onWorkflowChange]);
-  
   const handlePublish = useCallback(() => {
-    if (validationResult?.isValid) {
+    if (isTemplateValid) {
       // WorkflowJSON only has steps - status is handled at template level
-      onWorkflowChange(workflow);
+      onWorkflowDefinitionChange(workflowTemplate.workflowDefinition);
     }
-  }, [workflow, validationResult, onWorkflowChange]);
-  
+  }, [workflowTemplate, isTemplateValid, onWorkflowDefinitionChange]);
+
   // Mobile tab change handler
   const handleTabChange = useCallback((_: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
   }, []);
-  
+
   // Handle template naming
   const handleTemplateNameSubmit = useCallback(async (name: string) => {
-    if (onTemplateNameChange) {
-      await onTemplateNameChange(name);
+    if (onTemplateLabelChange) {
+      await onTemplateLabelChange(name);
+      console.log('✏️ Updated template label:', name);
     }
     setShowNameDialog(false);
-    // Small delay to ensure database write completes, then trigger refresh
-    setTimeout(() => {
-      setInternalRefreshTrigger((prev: number) => prev + 1);
-    }, 300);
-  }, [onTemplateNameChange]);
-  
+  }, [onTemplateLabelChange]);
+
   // Render toolbar
   const renderToolbar = () => (
-    <Box sx={{ 
-      p: 2, 
-      borderBottom: 1, 
+    <Box sx={{
+      p: 2,
+      borderBottom: 1,
       borderColor: 'divider',
       bgcolor: 'background.paper'
     }}>
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
+      <Box sx={{
+        display: 'flex',
+        justifyContent: 'space-between',
         alignItems: 'center',
         flexDirection: { xs: 'column', sm: 'row' },
         gap: { xs: 2, sm: 1 }
@@ -260,57 +201,44 @@ export default function ResponsiveWorkflowConfigurator({
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <WorkflowTemplateSelector
-              currentTemplateId={currentTemplateId}
-              currentTemplateName={currentTemplateName}
-              refreshTrigger={refreshTrigger}
+              currentTemplateMenuItem={workflowTemplateSelectorItem ? workflowTemplateSelectorItem : undefined}
             />
-            
-            {/* Edit Template Name Button - Show when template has been saved (has real ID) */}
-            {currentTemplateId && currentTemplateId !== 'new' && (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Tooltip title="Rename template">
-                  <IconButton
-                    size="small"
-                    onClick={() => setShowNameDialog(true)}
-                    sx={{ color: 'text.secondary' }}
-                  >
-                    <EditIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-                
-                {/* Last Updated Timestamp */}
-                {lastUpdated && (
-                  <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-                    Updated {formatRelativeTime(lastUpdated)}
-                  </Typography>
-                )}
-              </Box>
-            )}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Tooltip title="Rename template">
+                <IconButton
+                  size="small"
+                  onClick={() => setShowNameDialog(true)}
+                  sx={{ color: 'text.secondary' }}
+                >
+                  <EditIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+
+              {/* Last Updated Timestamp */}
+              {workflowTemplate?.metadata?.updatedAt && (
+                <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+                  Updated {formatRelativeTime(workflowTemplate.metadata.updatedAt)}
+                </Typography>
+              )}
+            </Box>
           </Box>
         </Box>
-        
+
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-          <Button
-            startIcon={<SaveIcon />}
-            variant="outlined"
-            size="small"
-            onClick={handleSave}
-            sx={{ minWidth: { xs: 'auto', sm: 'unset' } }}
-          >
-            Save
-          </Button>
-          
-          <Button
-            startIcon={<PublishIcon />}
-            variant="contained"
-            size="small"
-            onClick={handlePublish}
-            disabled={!validationResult?.isValid}
-            sx={{ minWidth: { xs: 'auto', sm: 'unset' } }}
-          >
-            Publish
-          </Button>
-          
+          {(workflowTemplate.metadata.status === "draft") && (
+            <Button
+              startIcon={<PublishIcon />}
+              variant="contained"
+              size="small"
+              onClick={handlePublish}
+              disabled={!isTemplateValid}
+              sx={{ minWidth: { xs: 'auto', sm: 'unset' } }}
+            >
+              Publish
+            </Button>
+          )}
+
+          {/* will have to change this to a menu with the versions as a dropdown to select from */}
           <IconButton
             size="small"
             onClick={() => setShowHistory(!showHistory)}
@@ -318,7 +246,7 @@ export default function ResponsiveWorkflowConfigurator({
           >
             <HistoryIcon />
           </IconButton>
-          
+
           <IconButton
             size="small"
             onClick={() => setShowFullVisualization(!showFullVisualization)}
@@ -326,7 +254,7 @@ export default function ResponsiveWorkflowConfigurator({
           >
             <FullscreenIcon />
           </IconButton>
-          
+
           <IconButton
             size="small"
             onClick={() => setShowRawJSON(!showRawJSON)}
@@ -338,7 +266,7 @@ export default function ResponsiveWorkflowConfigurator({
       </Box>
     </Box>
   );
-  
+
   // Render mobile tabs
   const renderMobileTabs = () => (
     <AppBar position="static" color="default" elevation={1} className="mobile-tabs-container">
@@ -349,25 +277,25 @@ export default function ResponsiveWorkflowConfigurator({
         indicatorColor="primary"
         textColor="primary"
       >
-        <Tab 
-          icon={<ChatIcon />} 
-          label="Chat" 
+        <Tab
+          icon={<ChatIcon />}
+          label="aime"
           sx={{ minWidth: 0, fontSize: '0.875rem' }}
         />
-        <Tab 
-          icon={<VisualizationIcon />} 
-          label="Workflow" 
+        <Tab
+          icon={<VisualizationIcon />}
+          label="Workflow"
           sx={{ minWidth: 0, fontSize: '0.875rem' }}
         />
-        <Tab 
-          icon={<HistoryIcon />} 
-          label="History" 
+        <Tab
+          icon={<HistoryIcon />}
+          label="History"
           sx={{ minWidth: 0, fontSize: '0.875rem' }}
         />
       </Tabs>
     </AppBar>
   );
-  
+
   // Render resizable divider
   const renderDivider = () => (
     <Box
@@ -392,171 +320,148 @@ export default function ResponsiveWorkflowConfigurator({
       <DragIcon sx={{ fontSize: '16px', color: 'text.secondary' }} />
     </Box>
   );
-  
-  // Main layout content
-  if (showHistory) {
-    return (
-      <Container maxWidth={false} sx={{ height: '100vh', p: 0 }}>
-        {renderToolbar()}
-        <Box sx={{ flex: 1, overflow: 'hidden' }}>
-          <HistoryPanel
-            workflowId={currentTemplateId || 'new'}
-            isOpen={true}
-            onToggle={() => setShowHistory(false)}
-          />
-        </Box>
-      </Container>
-    );
-  }
-  
+
+
   if (showFullVisualization) {
     return (
       <Container maxWidth={false} sx={{ height: '100vh', p: 0 }}>
         {renderToolbar()}
         <Box sx={{ flex: 1, overflow: 'hidden' }}>
-          <VisualizationPane
-            workflow={workflow}
+          {/* <VisualizationPane
+            workflowTemplate={workflowTemplate}
             validationResult={validationResult}
             onWorkflowChange={onWorkflowChange}
             fullScreen
-          />
+          /> */}
         </Box>
       </Container>
     );
   }
-  
+
   if (showRawJSON) {
     return (
       <Container maxWidth={false} sx={{ height: '100vh', p: 0 }}>
         {renderToolbar()}
         <Box sx={{ p: 2, height: 'calc(100vh - 100px)', overflow: 'auto' }}>
           <Typography variant="h6" gutterBottom>Raw Workflow JSON</Typography>
-          <Box 
-            sx={{ 
-              p: 2, 
-              bgcolor: 'grey.50', 
+          <Box
+            sx={{
+              p: 2,
+              bgcolor: 'grey.50',
               borderRadius: 1,
               border: 1,
               borderColor: 'divider'
             }}
           >
-            <pre style={{ 
-              margin: 0, 
-              fontSize: '12px', 
+            <pre style={{
+              margin: 0,
+              fontSize: '12px',
               whiteSpace: 'pre-wrap',
               fontFamily: 'Monaco, Consolas, monospace'
             }}>
-              {JSON.stringify(workflow, null, 2)}
+              {JSON.stringify(workflowTemplate, null, 2)}
             </pre>
           </Box>
         </Box>
       </Container>
     );
   }
-  
+
   return (
-    <Container 
-      maxWidth={false} 
+    <Container
+      maxWidth={false}
       className="responsive-workflow-container"
-      sx={{ height: '100vh', p: 0, display: 'flex', flexDirection: 'column' }}
+      sx={{ flex:1, p: 0, display: 'flex', flexDirection: 'column' }}
     >
       {renderToolbar()}
-      
+
       {/* Mobile Layout */}
       {isMobile && (
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
           {renderMobileTabs()}
           <Box sx={{ flex: 1, overflow: 'hidden' }}>
             {activeTab === 0 ? (
-              <WorkflowCreationPane
-                workflow={workflow}
-                onWorkflowChange={onWorkflowChange}
-                isNewWorkflow={isNewWorkflow}
-                workflowTemplateId={currentTemplateId}
-                workflowTemplateName={currentTemplateName}
-                mrfData={undefined}
-              />
+              <></>
+              // <WorkflowCreationPane
+              //   workflow={workflow}
+              //   onWorkflowChange={onWorkflowChange}
+              //   isNewWorkflow={isNewWorkflow}
+              //   workflowTemplateId={currentTemplateId}
+              //   workflowTemplateName={currentTemplateLabel}
+              //   mrfData={undefined}
+              // />
             ) : activeTab === 1 ? (
-              <VisualizationPane
-                workflow={workflow}
-                validationResult={validationResult}
-                onWorkflowChange={onWorkflowChange}
-              />
+              <></>
+              // <VisualizationPane
+              //   workflowTemplate={workflowTemplate}
+              //   validationResult={validationResult}
+              //   onWorkflowChange={onWorkflowChange}
+              // />
             ) : (
-              <HistoryPanel
-                workflowId={currentTemplateId || 'new'}
-                isOpen={true}
-                onToggle={() => setActiveTab(0)}
-              />
+              <></>
+              // <HistoryPanel
+              //   workflowId={currentTemplateId || 'new'}
+              //   isOpen={true}
+              //   onToggle={() => setActiveTab(0)}
+              // />
             )}
           </Box>
         </Box>
       )}
-      
+
       {/* Desktop/Tablet Layout */}
       {(isDesktop || isTablet) && (
-        <Box 
+        <Box
           ref={containerRef}
-          sx={{ 
-            flex: 1, 
-            display: 'flex', 
+          sx={{
+            flex: 1,
+            display: 'flex',
             overflow: 'hidden',
-            position: 'relative'
+            position: 'relative',
+            alignItems: 'stretch'
           }}
         >
           {/* Conversation Pane */}
-          <Box 
-            sx={{ 
+          <Box
+            sx={{
               width: isDesktop ? `${conversationPaneWidth}px` : '50%',
               minWidth: `${MIN_CONVERSATION_WIDTH}px`,
               borderRight: 1,
               borderColor: 'divider',
-              display: 'flex',
-              flexDirection: 'column'
             }}
           >
-            <WorkflowCreationPane
-              workflow={workflow}
-              onWorkflowChange={onWorkflowChange}
-              isNewWorkflow={isNewWorkflow}
-              workflowTemplateId={currentTemplateId}
-              workflowTemplateName={currentTemplateName}
-              mrfData={undefined}
+            <AimeWorkflowPane
+              messages={messages || []}
+              sendMessage={sendMessage ? sendMessage : async (msg: string) => { console.log('SendMessage not provided. Message:', msg); }}
+              workflowDefinition={workflowTemplate.workflowDefinition}
+              workflowTemplateId={workflowTemplate.id}
             />
           </Box>
-          
+
           {/* Resizable Divider (Desktop only) */}
           {isDesktop && renderDivider()}
-          
+
           {/* Visualization Pane */}
-          <Box sx={{ 
-            flex: 1, 
+          <Box sx={{
+            flex: 1,
             minWidth: 0, // Allows flex item to shrink below content size
             display: 'flex',
             flexDirection: 'column'
           }}>
             <VisualizationPane
-              workflow={workflow}
-              validationResult={validationResult}
-              onWorkflowChange={onWorkflowChange}
+              workflowTemplate={workflowTemplate}
+              onWorkflowDefinitionChange={onWorkflowDefinitionChange}
             />
           </Box>
         </Box>
       )}
-      
+
       {/* Template Name Dialog */}
       <WorkflowTemplateNameDialog
         open={showNameDialog}
         onClose={() => setShowNameDialog(false)}
         onSubmit={handleTemplateNameSubmit}
-        currentName={
-          (currentTemplateName === 'new' || 
-           currentTemplateName === 'create' || 
-           currentTemplateName === 'New Workflow') 
-            ? '' 
-            : currentTemplateName
-        }
-        mode={isNewWorkflow ? 'create' : 'rename'}
+        currentName={workflowTemplate?.metadata?.label}
       />
     </Container>
   );

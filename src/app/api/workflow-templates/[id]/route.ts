@@ -1,19 +1,23 @@
 // src/app/api/workflow-templates/[templateName]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  getWorkflowTemplate,
-  createDraftFromPublished,
-  updateWorkflowTemplate,
-  publishWorkflowTemplate,
-  deleteWorkflowTemplate
-} from '@/app/utils/workflow-template-database';
-import { TemplateError } from '@/app/types/workflow-template';
-import { WorkflowTemplateService } from '@/app/services/workflow-template-service';
+import WorkflowTemplateDbUtil from '@/app/utils/workflowTemplateDbUtil';
+import { workflowTemplateStarter } from '@/app/data/workflow-template-starter';
+import { WorkflowTemplateSchema, WorkflowTemplate } from '@/app/types/workflowTemplate';
+import ShortUniqueId from 'short-unique-id';
+
+// Reusable ShortUniqueId instance (10 chars, alphanum) — follow repo policy
+const uid = new ShortUniqueId({ length: 10, dictionary: 'alphanum' });
+
+// Wrapper to call uid in a type-safe way (the package instance is callable at runtime)
+function generateShortUniqueId(): string {
+  // runtime-callable but typings sometimes lack call signature; coerce to function
+  return uid.rnd();
+}
 
 /**
  * Workflow Template API Routes
  * 
- * GET    /api/workflow-templates/[templateName] - Get template with conversation history
+ * GET    /api/workflow-templates/[templateName] - Get template details
  * PUT    /api/workflow-templates/[templateName] - Update template
  * DELETE /api/workflow-templates/[templateName] - Delete template
  * POST   /api/workflow-templates/[templateName] - Create draft from published template
@@ -51,33 +55,44 @@ export async function GET(
     const account = url.searchParams.get('account') || request.headers.get('x-account') || 'groupize-demos';
     const organization = url.searchParams.get('organization') || request.headers.get('x-organization') || null;
 
-    // Get template with conversation history
-    const result = await getWorkflowTemplate(account, organization,decodedTemplateId);
-
-    return NextResponse.json({
-      success: true,
-      data: result
-    });
-
-  } catch (error) {
-    console.error('Failed to get workflow template:', error);
-
-    if (error instanceof TemplateError) {
-      const statusCode = error.code === 'NOT_FOUND' ? 404 : 400;
-      return NextResponse.json(
-        { 
-          error: error.message,
-          code: error.code,
-          details: error.details
-        },
-        { status: statusCode }
-      );
+    // Get template (latest or single version) from DB util
+    // If frontend requests a new template (id === 'new'), return a starter template
+    if (decodedTemplateId === 'new') {
+      const userId = request.headers.get('x-user-id') || 'unknown-user';
+      const starter = JSON.parse(JSON.stringify(workflowTemplateStarter));
+      starter.id = generateShortUniqueId();
+      starter.account = account;
+      starter.organization = organization;
+      // reset version and metadata for a new draft
+      starter.version = '0.1.0';
+      starter.metadata = {
+        ...starter.metadata,
+        label: '',
+        description: '',
+        status: 'draft',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        createdBy: userId,
+        updatedBy: userId,
+        tags: []
+      };
+      starter.workflowDefinition = { steps: [] };
+      starter.mermaidDiagram = '';
+      return NextResponse.json({ success: true, data: starter });
     }
 
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    const result = await WorkflowTemplateDbUtil.get(account, organization, decodedTemplateId);
+
+    if (!result) {
+      return NextResponse.json({ error: 'Template not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, data: result });
+
+  } catch (error) {
+    console.error('[WorkflowTemplatesRoute] Failed to get workflow template:', error);
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -91,120 +106,50 @@ export async function PUT(
 ): Promise<NextResponse> {
   try {
     const { id: templateName } = await params;
-    const body = await request.json();
+    const body = await request.text();
 
     if (!templateName) {
-      return NextResponse.json(
-        { error: 'Template name is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Template name is required' }, { status: 400 });
     }
-
-    const { version, updates, action } = body;
-
-    if (!version) {
-      return NextResponse.json(
-        { error: 'Template version is required' },
-        { status: 400 }
-      );
-    }
-
-    // Get account from headers or body
-    const account = body.account || request.headers.get('x-account') || 'default-account';
 
     // Decode URL-encoded template name
     const decodedTemplateName = decodeURIComponent(templateName);
 
-    let result;
-
-    // Handle different actions
-    switch (action) {
-      case 'publish':
-        result = await publishWorkflowTemplate(account, decodedTemplateName, version);
-        break;
-
-      case 'update':
-        if (!updates) {
-          return NextResponse.json(
-            { error: 'Updates are required for update action' },
-            { status: 400 }
-          );
-        }
-        
-        // Validate workflow structure if workflowDefinition is being updated
-        if (updates.workflowDefinition) {
-          const service = new WorkflowTemplateService();
-          
-          // Support both legacy WorkflowJSON and new WorkflowDefinition format
-          // WorkflowDefinition has { steps: WorkflowStep[] }
-          // WorkflowJSON has { steps: unknown[], metadata: {...}, schemaVersion: string }
-          const isWorkflowDefinition = updates.workflowDefinition.steps && 
-            !updates.workflowDefinition.metadata && 
-            !updates.workflowDefinition.schemaVersion;
-          
-          if (isWorkflowDefinition) {
-            // Validate new format
-            const workflowValidation = service.validateWorkflow(updates.workflowDefinition);
-            
-            if (!workflowValidation.isValid) {
-              return NextResponse.json(
-                { 
-                  error: 'Invalid workflow structure',
-                  code: 'INVALID_WORKFLOW',
-                  details: workflowValidation.errors
-                },
-                { status: 400 }
-              );
-            }
-          } else {
-            // Legacy format - WorkflowJSON with metadata
-            // Basic validation only (full validation requires WorkflowDefinition)
-            if (!Array.isArray(updates.workflowDefinition.steps)) {
-              return NextResponse.json(
-                { 
-                  error: 'Invalid workflow structure: steps must be an array',
-                  code: 'INVALID_WORKFLOW'
-                },
-                { status: 400 }
-              );
-            }
-          }
-        }
-        
-        result = await updateWorkflowTemplate(account, decodedTemplateName, version, updates);
-        break;
-
-      default:
-        return NextResponse.json(
-          { error: 'Invalid action. Use "update" or "publish"' },
-          { status: 400 }
-        );
+    // Parse body as full WorkflowTemplate (client should send JSON)
+    let parsedBody: unknown;
+    try {
+      parsedBody = JSON.parse(body);
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
     }
 
-    return NextResponse.json({
-      success: true,
-      data: result
-    });
+    // Validate against Zod schema
+    try {
+      WorkflowTemplateSchema.parse(parsedBody);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Invalid template data';
+      return NextResponse.json({ error: 'Invalid template data', details: msg }, { status: 400 });
+    }
+
+  const template = parsedBody as WorkflowTemplate;
+
+    // Determine account and organization from body or headers
+    const account = template.account || request.headers.get('x-account') || 'default-account';
+    const organization = template.organization !== undefined ? template.organization : (request.headers.get('x-organization') || null);
+    const version = template.version;
+
+    if (!version) {
+      return NextResponse.json({ error: 'Template version is required' }, { status: 400 });
+    }
+
+    // Upsert using composite key
+    const upserted = await WorkflowTemplateDbUtil.upsert(account, organization, decodedTemplateName, version, template);
+    return NextResponse.json({ success: true, data: upserted });
 
   } catch (error) {
-    console.error('Failed to update workflow template:', error);
-
-    if (error instanceof TemplateError) {
-      const statusCode = error.code === 'NOT_FOUND' ? 404 : 400;
-      return NextResponse.json(
-        { 
-          error: error.message,
-          code: error.code,
-          details: error.details
-        },
-        { status: statusCode }
-      );
-    }
-
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    console.error('[WorkflowTemplatesRoute] Failed to update workflow template:', error);
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -218,70 +163,55 @@ export async function POST(
 ): Promise<NextResponse> {
   try {
     const { id: templateName } = await params;
-    const body = await request.json();
+    const bodyText = await request.text();
 
     if (!templateName) {
-      return NextResponse.json(
-        { error: 'Template name is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Template name is required' }, { status: 400 });
     }
-
-    const { publishedVersion, author } = body;
-
-    if (!publishedVersion) {
-      return NextResponse.json(
-        { error: 'Published version is required' },
-        { status: 400 }
-      );
-    }
-
-    if (!author) {
-      return NextResponse.json(
-        { error: 'Author is required' },
-        { status: 400 }
-      );
-    }
-
-    // Get account from headers or body
-    const account = body.account || request.headers.get('x-account') || 'default-account';
 
     // Decode URL-encoded template name
+    // [POST /api/workflow-templates/[templateName]] Decoding template name
+    console.log('[POST /api/workflow-templates/[templateName]] Received templateName:', templateName);
     const decodedTemplateName = decodeURIComponent(templateName);
+    console.log('[POST /api/workflow-templates/[templateName]] Decoded templateName:', decodedTemplateName);
 
-    // Create draft from published template
-    const result = await createDraftFromPublished(
-      account,
-      decodedTemplateName,
-      publishedVersion,
-      author
-    );
+    // Parse body as full WorkflowTemplate (client should send JSON)
+    let parsedBody: unknown;
+    try {
+      parsedBody = JSON.parse(bodyText);
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+    console.log('[POST /api/workflow-templates/[templateName]] Parsed the request body:', parsedBody);
 
-    return NextResponse.json({
-      success: true,
-      data: result
-    }, { status: 201 });
+    // Validate against schema
+    try {
+      WorkflowTemplateSchema.parse(parsedBody);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Invalid template data';
+      return NextResponse.json({ error: 'Invalid template data', details: msg }, { status: 400 });
+    }
+    console.log('[POST /api/workflow-templates/[templateName]] validated against workflowTemplateSchema');
 
-  } catch (error) {
-    console.error('Failed to create draft from published template:', error);
+    const template = parsedBody as WorkflowTemplate;
+    const account = template.account || request.headers.get('x-account') || 'default-account';
+    const organization = template.organization !== undefined ? template.organization : (request.headers.get('x-organization') || null);
+    const version = template.version;
 
-    if (error instanceof TemplateError) {
-      const statusCode = error.code === 'NOT_FOUND' ? 404 : 
-                        error.code === 'DRAFT_EXISTS' ? 409 : 400;
-      return NextResponse.json(
-        { 
-          error: error.message,
-          code: error.code,
-          details: error.details
-        },
-        { status: statusCode }
-      );
+    if (!version) {
+      return NextResponse.json({ error: 'Template version is required' }, { status: 400 });
     }
 
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    console.log('[POST /api/workflow-templates/[templateName]] About to upsert the template with composite key:', { account, organization, decodedTemplateName, version });
+
+    // Upsert the template
+    const upserted = await WorkflowTemplateDbUtil.upsert(account, organization, decodedTemplateName, version, template);
+    return NextResponse.json({ success: true, data: upserted }, { status: 201 });
+
+  } catch (error) {
+    console.error('[WorkflowTemplatesRoute] Failed to create draft from published template:', error);
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -319,7 +249,7 @@ export async function DELETE(
     const decodedTemplateName = decodeURIComponent(templateName);
 
     // Delete template
-    const deleted = await deleteWorkflowTemplate(account, decodedTemplateName, version);
+    const deleted = await WorkflowTemplateDbUtil.delete(account, decodedTemplateName, version);
 
     if (!deleted) {
       return NextResponse.json(
@@ -334,24 +264,8 @@ export async function DELETE(
     });
 
   } catch (error) {
-    console.error('Failed to delete workflow template:', error);
-
-    if (error instanceof TemplateError) {
-      const statusCode = error.code === 'NOT_FOUND' ? 404 : 
-                        error.code === 'DELETION_BLOCKED' ? 409 : 400;
-      return NextResponse.json(
-        { 
-          error: error.message,
-          code: error.code,
-          details: error.details
-        },
-        { status: statusCode }
-      );
-    }
-
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    console.error('[WorkflowTemplatesRoute] Failed to delete workflow template:', error);
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

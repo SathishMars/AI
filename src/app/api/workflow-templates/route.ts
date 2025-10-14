@@ -1,17 +1,17 @@
 // src/app/api/workflow-templates/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  createWorkflowTemplate,
-  listWorkflowTemplates
-} from '@/app/utils/workflow-template-database';
-import {
-  TemplateError,
-  TemplateStatus,
-  TemplateQueryFilters
-} from '@/app/types/workflow-template';
-import {
-  CreateWorkflowTemplateInputSchema
-} from '@/app/types/workflow-template-v2';
+import WorkflowTemplateDbUtil from '@/app/utils/workflowTemplateDbUtil';
+import { WorkflowTemplate, WorkflowTemplateSchema, TemplateStatus } from '@/app/types/workflowTemplate';
+
+type TemplateQueryFilters = {
+  status?: TemplateStatus[] | TemplateStatus;
+  category?: string;
+  author?: string;
+  tags?: string[];
+  createdAfter?: Date;
+  createdBefore?: Date;
+  organization?: string | null;
+};
 
 /**
  * Workflow Templates API Routes
@@ -38,7 +38,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       ? statusParam.split(',').map(s => s.trim() as TemplateStatus)
       : undefined;
     
-    const category = searchParams.get('category');
     const author = searchParams.get('author');
     const tags = searchParams.get('tags')?.split(',').filter(Boolean);
     const createdAfter = searchParams.get('createdAfter') 
@@ -77,7 +76,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // Build filters
     const filters: TemplateQueryFilters = {};
     if (status) filters.status = status;
-    if (category) filters.category = category;
     if (author) filters.author = author;
     if (tags) filters.tags = tags;
     if (createdAfter) filters.createdAfter = createdAfter;
@@ -85,36 +83,28 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (organization !== null) filters.organization = organization; // Include organization filter
 
     // Get templates (returns only latest version per template ID)
-    const result = await listWorkflowTemplates(account, filters, page, pageSize);
-    
-    console.log('✅ [API GET] Returning templates:');
-    console.log('  - Total unique templates:', result.templates.length);
-    console.log('  - Template IDs:', result.templates.map(t => t.id));
-    console.log('  - Template names:', result.templates.map(t => t.metadata.name));
+    const result = await WorkflowTemplateDbUtil.list(account, {
+      organization: filters.organization,
+      status: filters.status,
+      label: undefined,
+      tags: filters.tags,
+      createdAfter: filters.createdAfter,
+      createdBefore: filters.createdBefore
+    }, page, pageSize);
 
-    return NextResponse.json({
-      success: true,
-      data: result
-    });
+    const templates = result.templates as WorkflowTemplate[];
+
+    console.log('✅ [API GET] Returning templates:');
+    console.log('  - Total unique templates:', templates.length);
+    console.log('  - Template IDs:', templates.map((t) => t.id));
+    console.log('  - Template labels:', templates.map((t) => t.metadata.label));
+
+    return NextResponse.json({ success: true, data: result });
 
   } catch (error) {
     console.error('Failed to list workflow templates:', error);
-
-    if (error instanceof TemplateError) {
-      return NextResponse.json(
-        { 
-          error: error.message,
-          code: error.code,
-          details: error.details
-        },
-        { status: 400 }
-      );
-    }
-
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -136,74 +126,38 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       inputWithContext.organization = organization;
     }
 
-    // Validate input
-    const validationResult = CreateWorkflowTemplateInputSchema.safeParse(inputWithContext);
-    if (!validationResult.success) {
-      return NextResponse.json(
-        { 
-          error: 'Invalid template data',
-          details: validationResult.error.issues
-        },
-        { status: 400 }
-      );
+    // Validate input against WorkflowTemplate schema (expects full WorkflowTemplate)
+    // For convenience we accept a full WorkflowTemplate object from the client.
+    try {
+      WorkflowTemplateSchema.parse(inputWithContext);
+    } catch (e) {
+      return NextResponse.json({ error: 'Invalid template data', details: (e as Error).message }, { status: 400 });
     }
 
-    const templateInput = validationResult.data;
+    const templateInput = inputWithContext as WorkflowTemplate;
 
     console.log('📥 [API] Received template data from frontend:');
     console.log('📋 [API] Full request body JSON:', JSON.stringify(templateInput, null, 2));
 
-    // Transform to database format
-    // Database expects: composite keys (id, account, organization, version) at top level
-    // Descriptive fields (name, description, status, author, timestamps) in metadata object
-    const dbInput = {
-      account: templateInput.account,
-      organization: templateInput.organization || undefined,
-      name: templateInput.name,
-      workflowDefinition: {
-        steps: templateInput.workflowDefinition?.steps || []
-      },
-      mermaidDiagram: templateInput.mermaidDiagram,
-      description: templateInput.description,
-      category: templateInput.category,
-      tags: templateInput.tags || ['ai-generated'],
-      author: templateInput.author || 'system'
-    };
+    // Received a WorkflowTemplate-shaped object. We accept it as-is and store it.
 
-    console.log('🔄 [API] Transformed data for database:');
-    console.log('📋 [API] Full transformed dbInput JSON:', JSON.stringify(dbInput, null, 2));
-
-    // Create template (id, version, status will be generated by createWorkflowTemplate)
-    const result = await createWorkflowTemplate(dbInput);
-    
-    console.log('✅ [API] Template created successfully:');
-    console.log('  - ID:', result.id);
-    console.log('  - Version:', result.version);
-    console.log('  - Status:', result.metadata.status);
-    console.log('  - Name:', result.metadata.name);
-
-    return NextResponse.json({
-      success: true,
-      data: result
-    }, { status: 201 });
+    // Create template in the database via util
+    try {
+      const created = await WorkflowTemplateDbUtil.create(templateInput);
+      console.log('✅ [API] Template created successfully:');
+      console.log('  - ID:', created.id);
+      console.log('  - Version:', created.version);
+      console.log('  - Status:', created.metadata.status);
+      console.log('  - Label:', created.metadata.label);
+      return NextResponse.json({ success: true, data: created }, { status: 201 });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to create template';
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
 
   } catch (error) {
     console.error('Failed to create workflow template:', error);
-
-    if (error instanceof TemplateError) {
-      return NextResponse.json(
-        { 
-          error: error.message,
-          code: error.code,
-          details: error.details
-        },
-        { status: 400 }
-      );
-    }
-
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

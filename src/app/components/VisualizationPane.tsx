@@ -6,43 +6,22 @@ import {
   Box,
   Typography,
   Alert,
-  Chip,
   Tabs,
   Tab,
-  Button,
-  CircularProgress,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField
 } from '@mui/material';
 import {
   AccountTree as WorkflowIcon,
-  Error as ErrorIcon,
-  Refresh as RefreshIcon,
   AutoAwesome as AIIcon
 } from '@mui/icons-material';
-import { WorkflowJSON, ValidationResult, WorkflowStep } from '@/app/types/workflow';
-import { useMermaidGeneration } from '@/app/hooks/useMermaidGeneration';
-import MermaidChart from '@/app/components/MermaidChart';
 import WorkflowStepTree from '@/app/components/WorkflowStepTree';
-import { ensureNestedArrayFormat } from '@/app/utils/workflow-format-adapter';
-import { getLLMContext } from '@/app/data/workflow-conversation-autocomplete';
-import {
-  buildFunctionDefinitionLookup,
-  getRoutingKeysForStep,
-  ROUTING_FIELD_CONFIG,
-  RoutingFieldKey,
-  getRoutingFieldValue
-} from '@/app/utils/workflow-routing-helpers';
+import { WorkflowStep, WorkflowDefinition, WorkflowTemplate } from '../types/workflowTemplate';
+import MermaidChart from './MermaidChart';
 
 
 
 interface VisualizationPaneProps {
-  workflow: WorkflowJSON;
-  validationResult: ValidationResult | null;
-  onWorkflowChange: (workflow: WorkflowJSON) => void;
+  workflowTemplate: WorkflowTemplate;
+  onWorkflowDefinitionChange: (workflowDefinition: WorkflowDefinition) => void;
   fullScreen?: boolean;
 }
 
@@ -77,256 +56,209 @@ function a11yProps(index: number) {
 }
 
 export default function VisualizationPane({
-  workflow,
-  onWorkflowChange,
+  workflowTemplate,
+  onWorkflowDefinitionChange,
   fullScreen = false
 }: VisualizationPaneProps) {
   const [tabValue, setTabValue] = useState(0);
   const [editingStep, setEditingStep] = useState<WorkflowStep | null>(null);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const llmFunctionDefinitions = React.useMemo(() => getLLMContext(), []);
-  const functionDefinitionLookup = React.useMemo(
-    () => buildFunctionDefinitionLookup(llmFunctionDefinitions),
-    [llmFunctionDefinitions]
-  );
-  
+  // const llmFunctionDefinitions = React.useMemo(() => getLLMContext(), []);
+  // const functionDefinitionLookup = React.useMemo(
+  //   () => buildFunctionDefinitionLookup(llmFunctionDefinitions),
+  //   [llmFunctionDefinitions]
+  // );
+
   // Initialize Mermaid generation hook
-  const mermaidGeneration = useMermaidGeneration(workflow, onWorkflowChange, {
-    autoGenerate: true,
-    debounceMs: 2000
-  });
+  // const mermaidGeneration = useMermaidGeneration(workflow, onWorkflowChange, {
+  //   autoGenerate: true,
+  //   debounceMs: 2000
+  // });
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
 
-  // Convert workflow to nested array format (handles both array and object storage)
-  const workflowSteps = React.useMemo(() => {
-    if (!workflow) return [];
-    return ensureNestedArrayFormat(workflow);
-  }, [workflow]);
-
-  const handleEditStep = (step: WorkflowStep) => {
-    setEditingStep(step);
-    setEditDialogOpen(true);
-  };
-
-  const handleCloseEditDialog = () => {
-    setEditDialogOpen(false);
-    setEditingStep(null);
-  };
-
-  const handleSaveEditedStep = () => {
-    if (!editingStep) return;
-    
-    // Recursive function to update step in nested structure
-    const updateStepInTree = (steps: WorkflowStep[]): WorkflowStep[] => {
+  const handleStepSave = (updatedStep: WorkflowStep) => {
+    // Update the step in the workflow definition
+    const updateStepsRecursively = (steps: Array<WorkflowStep | string>): Array<WorkflowStep | string> => {
       return steps.map(step => {
-        if (step.id === editingStep.id) {
-          return editingStep;
+        if (typeof step === 'string') {
+          return step;
         }
-        
-        // Check children
-        if (step.children && step.children.length > 0) {
+        if (step.id === updatedStep.id) {
+          // Since the edit form only allows the user to edit label, type, stepFunction, and functionParams we do not want the children steps to be overwritten
+          // we will allow the children steps that are references to other steps (string ids) to be modified though
           return {
             ...step,
-            children: updateStepInTree(step.children)
+            ...{ label: updatedStep.label, type: updatedStep.type, stepFunction: updatedStep.stepFunction, functionParams: updatedStep.functionParams }
           };
+        } else if (step.next && step.next.length > 0) {
+          return { ...step, next: updateStepsRecursively(step.next) };
+        } else if (step.onConditionPass && typeof step.onConditionPass === 'object') {
+          return { ...step, onConditionPass: updateStepsRecursively([step.onConditionPass])[0] };
+        } else if (step.onConditionFail && typeof step.onConditionFail === 'object') {
+          return { ...step, onConditionFail: updateStepsRecursively([step.onConditionFail])[0] };
+        } else if (step.onError && typeof step.onError === 'object') {
+          return { ...step, onError: updateStepsRecursively([step.onError])[0] };
+        } else if (step.onTimeout && typeof step.onTimeout === 'object') {
+          return { ...step, onTimeout: updateStepsRecursively([step.onTimeout])[0] };
+        } else {
+          return step;
         }
-        
-        // Check inline branches
-        if (step.onSuccess && typeof step.onSuccess === 'object' && 'id' in step.onSuccess) {
-          if (step.onSuccess.id === editingStep.id) {
-            return {
-              ...step,
-              onSuccess: editingStep
-            };
-          }
-          // Recurse into onSuccess branch
-          const updatedSuccess = updateStepInTree([step.onSuccess as WorkflowStep])[0];
-          if (updatedSuccess !== step.onSuccess) {
-            return {
-              ...step,
-              onSuccess: updatedSuccess
-            };
-          }
-        }
-        
-        if (step.onFailure && typeof step.onFailure === 'object' && 'id' in step.onFailure) {
-          if (step.onFailure.id === editingStep.id) {
-            return {
-              ...step,
-              onFailure: editingStep
-            };
-          }
-          // Recurse into onFailure branch
-          const updatedFailure = updateStepInTree([step.onFailure as WorkflowStep])[0];
-          if (updatedFailure !== step.onFailure) {
-            return {
-              ...step,
-              onFailure: updatedFailure
-            };
-          }
-        }
-        
-        return step;
       });
+    }
+    const updatedWorkflowDefinition = { 
+      ...workflowTemplate.workflowDefinition, 
+      steps: updateStepsRecursively(workflowTemplate.workflowDefinition.steps) as WorkflowStep[]
     };
+    onWorkflowDefinitionChange(updatedWorkflowDefinition);
+    setEditingStep(null);
+  }
 
-    const updatedSteps = updateStepInTree(workflowSteps);
-    const updatedWorkflow = {
-      ...workflow,
-      steps: updatedSteps
-    };
-    
-    onWorkflowChange(updatedWorkflow);
-    handleCloseEditDialog();
-  };
+  // const renderMermaidDiagram = () => {
+  //   // Check if workflow has steps (nested array format only)
+  //   const hasSteps = workflowSteps.length > 0;
 
-  const renderMermaidDiagram = () => {
-    // Check if workflow has steps (nested array format only)
-    const hasSteps = workflowSteps.length > 0;
-    
-    if (!hasSteps) {
-      return (
-        <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 4 }}>
-          <Alert severity="info">
-            <Typography variant="h6" gutterBottom>
-              No Workflow Steps
-            </Typography>
-            <Typography variant="body2">
-              Create workflow steps to generate a visual diagram. The diagram will be automatically generated using AI when you add or modify workflow steps.
-            </Typography>
-          </Alert>
-        </Box>
-      );
-    }
-    
-    if (mermaidGeneration.isGenerating) {
-      return (
-        <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 4 }}>
-          <Box sx={{ textAlign: 'center' }}>
-            <CircularProgress size={40} sx={{ mb: 2 }} />
-            <Typography variant="h6" gutterBottom>
-              Generating Workflow Diagram
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              AI is creating a visual representation of your workflow...
-            </Typography>
-          </Box>
-        </Box>
-      );
-    }
-    
-    if (mermaidGeneration.error && !workflow.mermaidDiagram) {
-      return (
-        <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 4 }}>
-          <Alert 
-            severity="warning"
-            action={
-              <Button
-                startIcon={<RefreshIcon />}
-                onClick={mermaidGeneration.regenerateDiagram}
-                size="small"
-              >
-                Retry
-              </Button>
-            }
-          >
-            <Typography variant="h6" gutterBottom>
-              Diagram Generation Failed
-            </Typography>
-            <Typography variant="body2">
-              {mermaidGeneration.error}
-            </Typography>
-          </Alert>
-        </Box>
-      );
-    }
+  //   if (!hasSteps) {
+  //     return (
+  //       <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 4 }}>
+  //         <Alert severity="info">
+  //           <Typography variant="h6" gutterBottom>
+  //             No Workflow Steps
+  //           </Typography>
+  //           <Typography variant="body2">
+  //             Create workflow steps to generate a visual diagram. The diagram will be automatically generated using AI when you add or modify workflow steps.
+  //           </Typography>
+  //         </Alert>
+  //       </Box>
+  //     );
+  //   }
 
-    if (!workflow.mermaidDiagram) {
-      return (
-        <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 4 }}>
-          <Alert 
-            severity="info"
-            action={
-              <Button
-                startIcon={<AIIcon />}
-                onClick={mermaidGeneration.regenerateDiagram}
-                variant="outlined"
-                size="small"
-              >
-                Generate Diagram
-              </Button>
-            }
-          >
-            <Typography variant="h6" gutterBottom>
-              Diagram Not Generated
-            </Typography>
-            <Typography variant="body2">
-              Click &ldquo;Generate Diagram&rdquo; to create an AI-powered visual representation of your workflow.
-            </Typography>
-          </Alert>
-        </Box>
-      );
-    }
+  //   if (mermaidGeneration.isGenerating) {
+  //     return (
+  //       <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 4 }}>
+  //         <Box sx={{ textAlign: 'center' }}>
+  //           <CircularProgress size={40} sx={{ mb: 2 }} />
+  //           <Typography variant="h6" gutterBottom>
+  //             Generating Workflow Diagram
+  //           </Typography>
+  //           <Typography variant="body2" color="text.secondary">
+  //             AI is creating a visual representation of your workflow...
+  //           </Typography>
+  //         </Box>
+  //       </Box>
+  //     );
+  //   }
 
-    return (
-      <Box sx={{ flex: 1, overflow: 'auto' }}>
-        {/* Diagram Controls */}
-        <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
-            {mermaidGeneration.lastGenerated && (
-              `Last generated: ${mermaidGeneration.lastGenerated.toLocaleTimeString()}`
-            )}
-          </Typography>
-          
-          {mermaidGeneration.error && (
-            <Chip 
-              label="Generation Error" 
-              color="warning" 
-              size="small" 
-              icon={<ErrorIcon />}
-            />
-          )}
-          
-          <Button
-            startIcon={<RefreshIcon />}
-            onClick={mermaidGeneration.regenerateDiagram}
-            size="small"
-            disabled={mermaidGeneration.isGenerating}
-          >
-            Regenerate
-          </Button>
-        </Box>
-        
-        {/* Mermaid Viewer */}
-        <Box sx={{ p: 2 }}>
-          <MermaidChart
-            chart={workflow.mermaidDiagram || ''}
-            id="workflow-diagram"
-            onError={(error) => {
-              console.error('Mermaid chart error:', error);
-            }}
-          />
-        </Box>
-      </Box>
-    );
-  };
+  //   if (mermaidGeneration.error && !workflow.mermaidDiagram) {
+  //     return (
+  //       <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 4 }}>
+  //         <Alert 
+  //           severity="warning"
+  //           action={
+  //             <Button
+  //               startIcon={<RefreshIcon />}
+  //               onClick={mermaidGeneration.regenerateDiagram}
+  //               size="small"
+  //             >
+  //               Retry
+  //             </Button>
+  //           }
+  //         >
+  //           <Typography variant="h6" gutterBottom>
+  //             Diagram Generation Failed
+  //           </Typography>
+  //           <Typography variant="body2">
+  //             {mermaidGeneration.error}
+  //           </Typography>
+  //         </Alert>
+  //       </Box>
+  //     );
+  //   }
+
+  //   if (!workflow.mermaidDiagram) {
+  //     return (
+  //       <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 4 }}>
+  //         <Alert 
+  //           severity="info"
+  //           action={
+  //             <Button
+  //               startIcon={<AIIcon />}
+  //               onClick={mermaidGeneration.regenerateDiagram}
+  //               variant="outlined"
+  //               size="small"
+  //             >
+  //               Generate Diagram
+  //             </Button>
+  //           }
+  //         >
+  //           <Typography variant="h6" gutterBottom>
+  //             Diagram Not Generated
+  //           </Typography>
+  //           <Typography variant="body2">
+  //             Click &ldquo;Generate Diagram&rdquo; to create an AI-powered visual representation of your workflow.
+  //           </Typography>
+  //         </Alert>
+  //       </Box>
+  //     );
+  //   }
+
+  //   return (
+  //     <Box sx={{ flex: 1, overflow: 'auto' }}>
+  //       {/* Diagram Controls */}
+  //       <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 2 }}>
+  //         <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
+  //           {mermaidGeneration.lastGenerated && (
+  //             `Last generated: ${mermaidGeneration.lastGenerated.toLocaleTimeString()}`
+  //           )}
+  //         </Typography>
+
+  //         {mermaidGeneration.error && (
+  //           <Chip 
+  //             label="Generation Error" 
+  //             color="warning" 
+  //             size="small" 
+  //             icon={<ErrorIcon />}
+  //           />
+  //         )}
+
+  //         <Button
+  //           startIcon={<RefreshIcon />}
+  //           onClick={mermaidGeneration.regenerateDiagram}
+  //           size="small"
+  //           disabled={mermaidGeneration.isGenerating}
+  //         >
+  //           Regenerate
+  //         </Button>
+  //       </Box>
+
+  //       {/* Mermaid Viewer */}
+  //       <Box sx={{ p: 2 }}>
+  //         <MermaidChart
+  //           chart={workflow.mermaidDiagram || ''}
+  //           id="workflow-diagram"
+  //           onError={(error) => {
+  //             console.error('Mermaid chart error:', error);
+  //           }}
+  //         />
+  //       </Box>
+  //     </Box>
+  //   );
+  // };
 
   return (
-    <Box sx={{ 
-      height: '100%', 
-      display: 'flex', 
-      flexDirection: 'column', 
-      p: fullScreen ? 3 : 2 
+    <Box sx={{
+      height: '100%',
+      display: 'flex',
+      flexDirection: 'column',
+      p: fullScreen ? 3 : 2
     }}>
       {/* Tabs with title integrated */}
-      <Box sx={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        borderBottom: 1, 
-        borderColor: 'divider' 
+      <Box sx={{
+        display: 'flex',
+        alignItems: 'center',
+        borderBottom: 1,
+        borderColor: 'divider'
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', px: 2 }}>
           <WorkflowIcon sx={{ mr: 1, color: 'primary.main', fontSize: 20 }} />
@@ -336,25 +268,25 @@ export default function VisualizationPane({
         </Box>
         <Tabs value={tabValue} onChange={handleTabChange} aria-label="workflow visualization tabs" sx={{ ml: 2 }}>
           <Tab label="Step Tree" {...a11yProps(0)} />
-          <Tab 
+          <Tab
             label={
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 Diagram
-                {mermaidGeneration.isGenerating && (
+                {/* {mermaidGeneration.isGenerating && (
                   <CircularProgress size={12} />
-                )}
+                )} */}
                 <AIIcon fontSize="small" color="primary" />
               </Box>
-            } 
-            {...a11yProps(1)} 
+            }
+            {...a11yProps(1)}
           />
         </Tabs>
       </Box>
-      
+
       {/* Tab Content */}
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <TabPanel value={tabValue} index={0}>
-          {workflowSteps.length > 0 ? (
+          {workflowTemplate.workflowDefinition.steps.length >= 0 ? (
             <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Box>
@@ -366,17 +298,17 @@ export default function VisualizationPane({
                   </Typography>
                 </Box>
               </Box>
-              <WorkflowStepTree 
-                steps={workflowSteps}
-                onStepEdit={handleEditStep}
+              <WorkflowStepTree
+                workflowSteps={workflowTemplate.workflowDefinition.steps}
+                onStepSave={handleStepSave}
               />
             </Box>
           ) : (
-            <Box sx={{ 
-              flex: 1, 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center' 
+            <Box sx={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
             }}>
               <Alert severity="info">
                 <Typography variant="h6" gutterBottom>
@@ -389,179 +321,16 @@ export default function VisualizationPane({
             </Box>
           )}
         </TabPanel>
-        
+
         <TabPanel value={tabValue} index={1}>
-          {renderMermaidDiagram()}
+          <MermaidChart
+            mermaidDiagram={workflowTemplate.mermaidDiagram || ''}
+            onError={(error) => {
+              console.error('Mermaid chart error:', error);
+            }}
+          />
         </TabPanel>
       </Box>
-
-      {/* Step Edit Dialog */}
-      <Dialog 
-        open={editDialogOpen} 
-        onClose={handleCloseEditDialog}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>Edit Workflow Step</DialogTitle>
-        <DialogContent>
-          {editingStep && (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
-              <TextField
-                label="Step Name"
-                value={editingStep.name}
-                onChange={(e) => setEditingStep({ ...editingStep, name: e.target.value })}
-                fullWidth
-              />
-              
-              <TextField
-                label="Step ID"
-                value={editingStep.id}
-                onChange={(e) => setEditingStep({ ...editingStep, id: e.target.value })}
-                fullWidth
-                helperText="Unique identifier for this step"
-              />
-
-              <Chip label={editingStep.type} size="small" sx={{ width: 'fit-content' }} />
-              
-              {editingStep.action && (
-                <TextField
-                  label="Action"
-                  value={editingStep.action}
-                  onChange={(e) => setEditingStep({ ...editingStep, action: e.target.value })}
-                  fullWidth
-                />
-              )}
-              
-              {editingStep.params && (
-                <TextField
-                  label="Parameters (JSON)"
-                  value={JSON.stringify(editingStep.params, null, 2)}
-                  onChange={(e) => {
-                    try {
-                      const params = JSON.parse(e.target.value);
-                      setEditingStep({ ...editingStep, params });
-                    } catch {
-                      // Invalid JSON, don't update
-                    }
-                  }}
-                  multiline
-                  rows={4}
-                  fullWidth
-                />
-              )}
-              
-              {editingStep.condition && (
-                <TextField
-                  label="Condition (JSON)"
-                  value={JSON.stringify(editingStep.condition, null, 2)}
-                  onChange={(e) => {
-                    try {
-                      const condition = JSON.parse(e.target.value);
-                      setEditingStep({ ...editingStep, condition });
-                    } catch {
-                      // Invalid JSON, don't update
-                    }
-                  }}
-                  multiline
-                  rows={6}
-                  fullWidth
-                />
-              )}
-              
-              {(() => {
-                if (!editingStep) return null;
-                const routingKeys = getRoutingKeysForStep(editingStep, functionDefinitionLookup);
-                const orderedKeys = routingKeys.filter((key) => Boolean(ROUTING_FIELD_CONFIG[key]));
-
-                if (orderedKeys.length === 0) {
-                  return null;
-                }
-
-                const handleRoutingChange = (key: RoutingFieldKey, rawValue: string) => {
-                  setEditingStep((prev) => {
-                    if (!prev) return prev;
-                    const trimmed = rawValue.trim();
-
-                    if (key === 'nextSteps') {
-                      const steps = trimmed
-                        .split(',')
-                        .map((item) => item.trim())
-                        .filter(Boolean);
-                      const nextValue = steps.length > 0 ? steps : undefined;
-                      return {
-                        ...prev,
-                        nextSteps: nextValue
-                      };
-                    }
-
-                    return {
-                      ...prev,
-                      [key]: trimmed.length > 0 ? trimmed : undefined
-                    } as WorkflowStep;
-                  });
-                };
-
-                return (
-                  <Box
-                    sx={{
-                      display: 'grid',
-                      gap: 2,
-                      gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' }
-                    }}
-                  >
-                    {orderedKeys.map((key) => {
-                      const config = ROUTING_FIELD_CONFIG[key];
-                      const value = getRoutingFieldValue(editingStep, key);
-
-                      if (!config) {
-                        return null;
-                      }
-
-                      if (config.valueType === 'array') {
-                        const displayValue = Array.isArray(value)
-                          ? value.join(', ')
-                          : typeof value === 'string'
-                            ? value
-                            : '';
-
-                        return (
-                          <TextField
-                            key={key}
-                            label={config.label}
-                            value={displayValue}
-                            onChange={(e) => handleRoutingChange(key, e.target.value)}
-                            helperText={config.helperText}
-                            fullWidth
-                          />
-                        );
-                      }
-
-                      const displayValue = typeof value === 'string' ? value : '';
-
-                      return (
-                        <TextField
-                          key={key}
-                          label={config.label}
-                          value={displayValue}
-                          onChange={(e) => handleRoutingChange(key, e.target.value)}
-                          helperText={config.helperText}
-                          fullWidth
-                        />
-                      );
-                    })}
-                  </Box>
-                );
-              })()}
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseEditDialog}>Cancel</Button>
-          <Button onClick={handleSaveEditedStep} variant="contained" color="primary">
-            Save Changes
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 }

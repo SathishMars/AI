@@ -1,698 +1,375 @@
 // src/app/utils/langchain/langchain-workflow-generator.ts
-import { BaseChatModel } from "@langchain/core/language_models/chat_models";
-import { HumanMessage, SystemMessage, AIMessage, BaseMessage } from "@langchain/core/messages";
-import { BufferMemory } from "langchain/memory";
-import { createWorkflowBuildModel, createConversationModel } from "./providers/llm-factory";
-import { getWorkflowToolRegistry, WorkflowToolRegistry } from "./tools/workflow-tools";
-import { WorkflowJSON, ValidationResult } from "@/app/types/workflow";
-import { getLLMFactory, LLMProvider } from "./providers/llm-factory";
-import { buildWorkflowGenerationPrompt, ensureStepIds } from "@/app/utils/workflow-prompt-templates";
+import { getLLMFactory, type LLMProvider } from './providers/llm-factory';
 
-export interface LangChainWorkflowConfig {
-  provider?: 'openai' | 'anthropic' | 'lmstudio';
+import { WorkflowDefinition, WorkflowDefinitionSchema } from '@/app/types/workflowTemplate';
+import { WorkflowMessage, WorkflowMessageSchema } from '@/app/types/aimeWorkflowMessages';
+import { ChatPromptTemplate } from "@langchain/core/prompts";
+import { RunnableWithMessageHistory } from "@langchain/core/runnables";
+import { ChatMessageHistory } from 'langchain/memory';
+import { AIMessage, HumanMessage } from '@langchain/core/messages';
+import { JsonOutputParser } from '@langchain/core/output_parsers';
+import { workflowFunctionInstructions } from '@/app/data/workflow-tool-defintions';
+import { workflowVariableLLMInstructions } from '@/app/data/workflow-variable-definitions';
+import  { zodToJsonSchema } from 'zod-to-json-schema';
+import ShortUniqueId from 'short-unique-id';
+import { sampleWorkflowDefinitionJSONForLlm } from '@/app/data/sampleWorkflowDefinitionJSONForLlm';
+// 10-char alphanumeric short id generator (reusable instance)
+const uid = new ShortUniqueId({ length: 10, dictionary: 'alphanum' });
+
+// Helper to produce an id string
+function generateShortId(): string {
+    // use rnd() to generate id string with this package version
+    // (instance is not directly callable in typings)
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    return uid.rnd();
+}
+
+/**
+ * Types exported for route usage
+ */
+export type LangChainWorkflowConfig = {
   sessionId: string;
-  workflowId: string;
+  templateId?: string;
+  provider?: LLMProvider;
   userId?: string;
+  account?: string;
   organization?: string;
   conversationalMode?: boolean;
-}
+};
 
-export interface WorkflowGenerationContext {
-  userRole: string;
-  userDepartment: string;
-  workflowId?: string;
-  workflowName?: string;
-  conversationGoal?: 'create' | 'edit';
-  currentWorkflowSteps?: string[];
-  availableFunctions?: string[];
-  mrfData?: {
-    id: string;
-    title: string;
-    purpose: string;
-    maxAttendees: number;
-    startDate: string;
-    endDate: string;
-    location: string;
-    budget: number;
-  };
-  functionDefinitions?: Array<{
-    name: string;
-    description: string;
-    usage: string;
-    stepType?: 'trigger' | 'action' | 'condition' | 'end';
-    supportedOutputs?: string[];
-    contextDescription?: string;
-    parameters?: Array<{
-      name: string;
-      type: string;
-      description: string;
-      required: boolean;
-      options?: string[];
-    }>;
-    example: Record<string, unknown>;
-  }>;
-  // Enhanced conversation features from original system
-  conversationHistory?: Array<{
-    role: 'user' | 'assistant';
-    content: string;
-    timestamp: string;
-  }>;
-  user?: {
-    id: string;
-    name: string;
-    email: string;
-    role: string;
-    department: string;
-    manager: string;
-  };
-  mrf?: {
-    id: string;
-    title: string;
-    purpose: string;
-    maxAttendees: number;
-    startDate: string;
-    endDate: string;
-    location: string;
-    budget: number;
-  };
-  referenceData?: {
-    mrfTemplates?: Array<{ id: string; name: string; category: string; }>;
-    users?: Array<{ id: string; name: string; email: string; role: string; }>;
-    approvalWorkflows?: Array<{ id: string; name: string; approvers: string[]; }>;
-  };
-  currentDate?: string;
-}
 
-export interface LangChainWorkflowResult {
-  workflow: Partial<WorkflowJSON>;
-  conversationalResponse?: string;
-  followUpQuestions?: string[];
-  parameterCollectionNeeded?: boolean;
-  validation?: ValidationResult;
-}
 
-/**
- * LangChain-powered workflow generator replacing direct LLM usage
- */
-export class LangChainWorkflowGenerator {
-  private llm: BaseChatModel;
-  private conversationModel: BaseChatModel;
-  private toolRegistry: WorkflowToolRegistry;
-  private memory?: BufferMemory;
-  private config: LangChainWorkflowConfig;
-  private currentProvider: LLMProvider;
+const WORKFLOW_DEFINITION_SCHEMA = JSON.stringify(zodToJsonSchema(WorkflowDefinitionSchema), null, 2);
+const WORKFLOW_MESSAGE_SCHEMA = JSON.stringify(zodToJsonSchema(WorkflowMessageSchema), null, 2);
+const STEP_FUNCTION_INSTRUCTIONS = `A step function is a reusable function that can be called from multiple workflow steps. 
+It has a unique id, a name, and a definition that describes its behavior. The definition follows the same schema as a workflow definition. 
+Step functions can be used to encapsulate common logic or actions that can be shared across different workflows. 
+When defining a step function, ensure that its id is unique within the workflow and that it does not conflict with any step ids. 
+Step functions can be referenced in workflow steps by their id.
+When creating or modifying step functions, ensure that:
+- Each step function has a unique id that does not conflict with step ids.
+- The definition of the step function adheres to the workflow definition schema.
+- Step functions are used to encapsulate common logic or actions that can be reused across different workflows.
+- When referencing a step function in a workflow step, use its id to ensure clarity and consistency.
 
-  constructor(config: LangChainWorkflowConfig) {
-    this.config = config;
-    const factory = getLLMFactory();
-    this.currentProvider = factory.getDefaultProvider();
-    this.llm = createWorkflowBuildModel(config.provider);
-    this.conversationModel = createConversationModel(config.provider);
-    this.toolRegistry = getWorkflowToolRegistry();
-    
-    console.log(`🚀 LangChain Workflow Generator initialized with ${config.provider || 'default'} provider`);
-  }
+Available step functions are as follows:
+${workflowFunctionInstructions.join('\n')}
+`;
 
-  /**
-   * Format messages for LM Studio compatibility
-   * LM Studio with certain models only supports 'user' and 'assistant' roles
-   */
-  private formatMessagesForLMStudio(messages: BaseMessage[]): BaseMessage[] {
-    if (this.currentProvider !== 'lmstudio') {
-      return messages;
-    }
 
-    const formattedMessages: BaseMessage[] = [];
-    
-    for (const message of messages) {
-      if (message instanceof SystemMessage) {
-        // Convert system message to user message with clear instruction formatting
-        const systemContent = `SYSTEM INSTRUCTIONS: ${message.content}\n\nPlease follow these instructions when responding.`;
-        formattedMessages.push(new HumanMessage(systemContent));
-      } else {
-        formattedMessages.push(message);
-      }
-    }
-    
-    return formattedMessages;
-  }
+const RESPONSE_INSTRUCTIONS = `Respond with a JSON object that matches the following schema:
+\`\`\`json
+${WORKFLOW_MESSAGE_SCHEMA}
+\`\`\`
+IMPORTANT: 
+1. The text property should have your conversational response.
+2. The sender should be "aime"
+3. If there is a workflowDefinition, it should be in the workflowDefinition field.
+4. If you are asking follow-up questions, include them in the followUpQuestions array. Do not assume any values unless specified by the user sometime during the conversation.
+5. If you are providing follow-up options, include them in the followUpOptions field as a map of question to array of options.
+6. The userId and userName fields don't make sense for you. so ignore them.
 
-  /**
-   * Initialize in-memory buffer for the current session
-   * Conversation history is passed explicitly via context, not persisted to MongoDB
-   */
-  public initializeMemory(): void {
-    // Use simple in-memory BufferMemory (not persisted)
-    // Conversation history comes from context.conversationHistory
-    this.memory = new BufferMemory({
-      memoryKey: "chat_history",
-      returnMessages: true
-    });
-    
-    console.log(`🧠 In-memory buffer initialized for session: ${this.config.sessionId}`);
-  }
+Validation rules for the LLM output:
+- Step ids must be short, alphanumeric with dashes or underscores and unique within the workflow.IMPORTANT: They should be 10 characters long.
+- Generate human readable labels for each step describing the action to be taken.
+- If steps need to refer to other steps that are not directly included in the next, onConditionPass, onConditionFail, onError, or onTimeout fields to reference them by id.
+- Even if the response is general conversational and not workflow-related, always respond with a valid JSON object that conforms to the schema above.
+CRITICAL: Please note that the response will be parsed and validated against this schema.
+If you cannot provide a valid JSON response, return an object with an "error" field explaining the issue.
+`;
 
-  /**
-   * Generate workflow using LangChain with tools and memory
-   */
-  public async generateWorkflow(
-    userInput: string,
-    context: WorkflowGenerationContext,
-    currentWorkflow?: Partial<WorkflowJSON>
-  ): Promise<LangChainWorkflowResult> {
-    // Ensure memory is initialized
-    if (!this.memory) {
-      this.initializeMemory();
-    }
+const GENERATION_INSTRUCTIONS = `The user will input a message describing the workflow they want to create or modify. 
+The original workflow (if any) will be provided as JSON and will follow the following schema: 
+\`\`\`json
+${WORKFLOW_DEFINITION_SCHEMA}
+\`\`\`
+Your task is to generate a new or modified workflow definition that meets the user's requirements.
+When given conversation history, use it to decide whether to ask clarifying questions or to modify the workflow. When provided with an existing workflow, prefer editing or annotating that workflow rather than creating an entirely new one unless explicitly requested.
+**CRITICAL SYSTEM GUIDELINES — Follow exactly as written**
+1. If the user message is a request to create or modify a workflow, respond with a JSON object containing the updated workflowDefinition field.
+2. If the user message is ambiguous or seems to require clarification, respond with a JSON object with the followup questions populated. If a partial workflow can be generated from the conversation history, include it in the response.
+3. If the user message is purely conversational and does not relate to workflow creation or modification, you do not need to respond with a workflowDefinition, just respond to the conversation.
+4. Do not include sensitive tokens or environment variables in the output.
+5. Ensure a workflow always begins with a trigger step and ends with an terminate step.
+6. Step Reuse Rule  
+- Do **not** create new step objects that duplicate existing functionality.  
+- Reuse existing steps by **referencing their step IDs**.  
+- Only create new step objects when:  
+  - They perform a **different function**, or  
+  - They are used in **parallel branches**.
+7. Workflow Readability Rule  
+- Wherever possible, **nest** step objects using these fields:  
+  - \`next\`, \`onConditionPass\`, or \`onConditionFail\`.  
+- Use **ID references** (instead of nested steps) **only when necessary** for clarity or structure.
 
-    // Default to conversational mode for better parameter collection
-    const useConversationalMode = this.config.conversationalMode !== false;
-    
-    console.log(`🔄 Generating workflow in ${useConversationalMode ? 'conversational' : 'direct'} mode`);
-    
-    if (useConversationalMode) {
-      return this.generateConversationalWorkflow(userInput, context, currentWorkflow);
-    } else {
-      return this.generateDirectWorkflow(userInput, context, currentWorkflow);
-    }
-  }
+EXAMPLE: An example of a good step definition is as follows. This does the nesting properly and uses references only when needed.It does not duplicate steps unnecessarily.:
+\`\`\`json
+${JSON.stringify(sampleWorkflowDefinitionJSONForLlm, null, 2)}
+\`\`\`
+`;
 
-  /**
-   * Generate workflow using conversational approach with memory
-   */
-  private async generateConversationalWorkflow(
-    userInput: string,
-    context: WorkflowGenerationContext,
-    currentWorkflow?: Partial<WorkflowJSON>
-  ): Promise<LangChainWorkflowResult> {
-    const systemPrompt = this.buildConversationalSystemPrompt(context, currentWorkflow);
-    
-    const messages = [
-      new SystemMessage(systemPrompt)
-    ];
-
-    // Add conversation history from context (last 10 messages)
-    if (context.conversationHistory && context.conversationHistory.length > 0) {
-      console.log(`📚 Adding ${context.conversationHistory.length} conversation history messages`);
-      
-      // Take last 10 messages for context
-      const recentHistory = context.conversationHistory.slice(-10);
-      
-      for (const historyMessage of recentHistory) {
-        if (historyMessage.role === 'user') {
-          messages.push(new HumanMessage(historyMessage.content));
-        } else {
-          messages.push(new AIMessage(historyMessage.content));
-        }
-      }
-    }
-
-    // Note: In-memory buffer history is automatically included by LangChain
-    // No need to manually load it - it's added via saveContext() below
-    
-    // Add current user message
-    messages.push(new HumanMessage(userInput));
-
-    // Format messages for LM Studio compatibility
-    const formattedMessages = this.formatMessagesForLMStudio(messages);
-
-    try {
-      const result = await this.conversationModel.invoke(formattedMessages);
-      const response = typeof result.content === 'string' ? result.content : JSON.stringify(result.content);
-      
-      // Save to memory
-      if (this.memory) {
-        await this.memory.saveContext(
-          { input: userInput },
-          { output: response }
-        );
-      }
-      
-      const parsedResult = this.parseConversationalResponse(response);
-      
-      console.log('✅ Conversational workflow generation completed');
-      return parsedResult;
-      
-    } catch (error) {
-      console.error('❌ Error in conversational workflow generation:', error);
-      return {
-        workflow: currentWorkflow || {},
-        conversationalResponse: `I encountered an error while processing your request: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        followUpQuestions: ["Would you like to try rephrasing your request?"],
-        parameterCollectionNeeded: false
-      };
-    }
-  }
-
-  /**
-   * Generate workflow directly with structured output
-   */
-  private async generateDirectWorkflow(
-    userInput: string,
-    context: WorkflowGenerationContext,
-    currentWorkflow?: Partial<WorkflowJSON>
-  ): Promise<LangChainWorkflowResult> {
-    const systemPrompt = this.buildDirectSystemPrompt(context, currentWorkflow);
-    
-    const messages = [
-      new SystemMessage(systemPrompt),
-      new HumanMessage(userInput)
-    ];
-
-    try {
-      const result = await this.llm.invoke(messages);
-      const response = typeof result.content === 'string' ? result.content : JSON.stringify(result.content);
-      
-      const workflow = JSON.parse(response);
-      
-      console.log('✅ Direct workflow generation completed');
-      return {
-        workflow,
-        conversationalResponse: "Workflow generated successfully.",
-        parameterCollectionNeeded: false
-      };
-      
-    } catch (error) {
-      console.error('❌ Error in direct workflow generation:', error);
-      return {
-        workflow: currentWorkflow || {},
-        conversationalResponse: `Error generating workflow: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        parameterCollectionNeeded: false
-      };
-    }
-  }
-
-  /**
-   * Build system prompt for conversational workflow generation
-   */
-  private buildConversationalSystemPrompt(
-    context: WorkflowGenerationContext,
-    currentWorkflow?: Partial<WorkflowJSON>
-  ): string {
-    // Use rich function definitions if available, otherwise fall back to tool summaries
-    const functionDefinitions = context.functionDefinitions || 
-      this.toolRegistry.getToolSummaries().map(tool => ({
-        name: tool.name,
-        description: tool.description,
-        usage: tool.description,
-        parameters: [],
-        example: {}
-      }));
-
-    return buildWorkflowGenerationPrompt({
-      functionDefinitions,
-      userRole: context.userRole,
-      userDepartment: context.userDepartment,
-      currentDate: context.currentDate,
-      conversationHistory: context.conversationHistory,
-      referenceData: context.referenceData
-    }) + (currentWorkflow ? `
-
-CURRENT WORKFLOW TO MODIFY:
-${JSON.stringify(currentWorkflow, null, 2)}
-
-IMPORTANT: Modify and extend the existing workflow, don't create from scratch. Maintain the nested array format with human-readable IDs.
-` : '') + `
-
-USER CONTEXT:
-- User: ${context.user?.name || context.userRole} (${context.user?.role || context.userRole} in ${context.user?.department || context.userDepartment})
-- Manager: ${context.user?.manager || 'manager@company.com'}
-
-MRF CONTEXT:
-- Current MRF: ${context.mrf?.title || context.mrfData?.title || 'New Event'}
-- Max Attendees: ${context.mrf?.maxAttendees || context.mrfData?.maxAttendees || 50}
-- Location: ${context.mrf?.location || context.mrfData?.location || 'TBD'}
-- Purpose: ${context.mrf?.purpose || context.mrfData?.purpose || 'general'}
-
-Remember: Use nested array format with human-readable IDs and professional naming (no emojis)!`;
-  }
-
-  /**
-   * OLD IMPLEMENTATION - Kept for reference during migration
-   * TODO: Remove after validating new prompt system works
-   */
-  private buildConversationalSystemPromptOld(
-    context: WorkflowGenerationContext,
-    currentWorkflow?: Partial<WorkflowJSON>
-  ): string {
-    // Use rich function definitions if available, otherwise fall back to tool summaries
-    let functionDetails = '';
-    if (context.functionDefinitions && context.functionDefinitions.length > 0) {
-      functionDetails = context.functionDefinitions.map(func => {
-        const params = func.parameters ? func.parameters.map(p => 
-          `  - ${p.name} (${p.type}${p.required ? ', required' : ', optional'}): ${p.description}${p.options ? ` - Options: ${p.options.join(', ')}` : ''}`
-        ).join('\n') : '';
-        
-        return `- ${func.name}: ${func.description}
-  Usage: ${func.usage}
-  Parameters:
-${params}
-  Example: ${JSON.stringify(func.example, null, 2)}`;
-      }).join('\n\n');
-    } else {
-      const toolSummaries = this.toolRegistry.getToolSummaries();
-      functionDetails = toolSummaries.map(tool => 
-        `- ${tool.name}: ${tool.description}`
-      ).join('\n');
-    }
-
-    return `You are Aime, an expert workflow designer assistant. You help users create workflows through conversation.
-
-Your response should be a JSON object with this structure:
-{
-  "workflow": { /* workflow JSON */ },
-  "conversationalResponse": "your explanation to the user",
-  "followUpQuestions": ["question 1", "question 2"],
-  "parameterCollectionNeeded": true/false
-}
-
-WORKFLOW SCHEMA:
-{
-  "schemaVersion": "1.0.0",
-  "metadata": {
-    "id": "workflow-{timestamp}",
-    "name": "string", 
-    "description": "string",
-    "version": "1.0.0",
-    "status": "draft",
-    "createdAt": "${context.currentDate || new Date().toISOString()}",
-    "tags": ["ai-generated"]
-  },
-  "steps": {
-    "stepName": {
-      "name": "Display Name",
-      "type": "trigger|condition|action|end",
-      "action": "function.name", // for trigger/action steps
-      "condition": { // for condition steps - json-rules-engine format
-        "all": [{"fact": "string", "operator": "string", "value": any}],
-        "any": [{"fact": "string", "operator": "string", "value": any}]
+const JSON_RULES_ENGINE_INSTRUCTIONS = `in the decison step, the condition field should contain a rules engine JSON object that defines the conditions for branching.
+This follows the syntax used by the "json-rules-engine" library.
+Here is an example of a rules engine JSON object:
+\`\`\`json
+ {
+    "all": [
+      {
+        "fact": "age",
+        "operator": "greaterThanInclusive",
+        "value": 18
       },
-      "params": {}, // IMPORTANT: Leave empty for functions that need parameter collection
-      "nextSteps": ["array"], // for linear flow
-      "onSuccess": "stepName", // for conditional flow
-      "onFailure": "stepName"  // for conditional flow
+      {
+        "fact": "age",
+        "operator": "lessThanInclusive",
+        "value": 25
+      },
+      {
+        "any": [
+          {
+            "fact": "state",
+            "params": {
+              "country": "us"
+            },
+            "operator": "equal",
+            "value": "colorado"
+          },
+          {
+            "fact": "state",
+            "params": {
+              "country": "us"
+            },
+            "operator": "equal",
+            "value": "utah"
+          }
+        ]
+      }
+    ]
+  }
+\`\`\`
+`
+
+/**
+ * Human-readable instructions that guide the LLM to produce workflow JSON
+ * Keep this strict and explicit so downstream parsing is easier.
+ */
+const INSTRUCTIONS = `You are "aime" an assistant that generates and edits workflow JSON structures.
+${RESPONSE_INSTRUCTIONS}
+
+${GENERATION_INSTRUCTIONS}
+
+Guidance on the step functions to be used to generate the steps:
+${STEP_FUNCTION_INSTRUCTIONS}
+
+${JSON_RULES_ENGINE_INSTRUCTIONS}
+
+${workflowVariableLLMInstructions}
+`;
+
+
+
+
+export async function runLangChainGenerator(
+  messages: WorkflowMessage[],
+  existingWorkflow: WorkflowDefinition | null,
+  config: LangChainWorkflowConfig,
+): Promise<{
+  messages: WorkflowMessage[];
+  modifiedStepIds: string[];
+}> {
+  console.info('[langchain] runLangChainGenerator called', {
+    sessionId: config?.sessionId,
+    templateId: config?.templateId,
+    provider: config?.provider,
+    messagesCount: Array.isArray(messages) ? messages.length : 0,
+  });
+
+  try {
+    // Safe stringify helper to avoid crashes on circular structures
+    const safeStringify = (obj: unknown, maxChars = 10000) => {
+      try {
+        const cache = new Set<unknown>();
+        const str = JSON.stringify(obj, function (_key, value) {
+          if (value && typeof value === 'object') {
+            if (cache.has(value)) return '[Circular]';
+            cache.add(value);
+          }
+          return value;
+        });
+        return typeof str === 'string' && str.length > maxChars ? str.slice(0, maxChars) + '...<truncated>' : str;
+      } catch (e) {
+        return String(e instanceof Error ? e.message : e);
+      }
+    };
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      throw new Error('No messages provided to generator');
     }
-  }
-}
-
-STEP NAME FORMAT RULES (CRITICAL - MUST FOLLOW):
-All workflow step names MUST follow this professional format. This is enforced by validation and non-compliant workflows will be rejected.
-
-PREFIX REQUIREMENTS BY STEP TYPE:
-- trigger steps: MUST start with "Start:"
-- condition steps: MUST start with "Check:"
-- action steps: MUST start with "Action:"
-- end steps: MUST start with "End:"
-
-PROFESSIONAL FORMAT: "{Prefix}: {Clear Description}"
-
-GOOD EXAMPLES (USE THESE PATTERNS):
-✅ "Start: On MRF Submission"
-✅ "Start: Daily at 9 AM"
-✅ "Check: Attendees Over 100"
-✅ "Check: Budget Exceeds Threshold"
-✅ "Action: Request Manager Approval"
-✅ "Action: Send Confirmation Email"
-✅ "Action: Create Event in Calendar"
-✅ "End: Workflow Complete"
-✅ "End: Request Denied"
-
-BAD EXAMPLES (DO NOT USE - WILL CAUSE VALIDATION ERRORS):
-❌ "🎯 Start: On MRF Submission" (NO emojis - will be rejected)
-❌ "✅ Check: Attendees Over 100" (NO emojis - will be rejected)
-❌ "📧 Send Email" (NO emojis, missing "Action:" prefix)
-❌ "Send Approval Request" (missing "Action:" prefix)
-❌ "Check attendance count" (missing "Check:" prefix)
-❌ "Workflow Complete" (missing "End:" prefix)
-❌ "On Form Submit" (missing "Start:" prefix)
-
-EMOJI PROHIBITION:
-- NO emojis anywhere in step names
-- NO decorative symbols or icons
-- Use professional business language only
-- Keep descriptions clear and concise
-
-VALIDATION ENFORCEMENT:
-- All step names are validated before saving
-- Non-compliant names will cause workflow save to fail
-- Validation checks both prefix requirements and emoji presence
-- Always follow the format "{Prefix}: {Description}" exactly
-
-AVAILABLE FUNCTIONS:
-${functionDetails}
-
-${context.conversationHistory && context.conversationHistory.length > 0 ? `
-CONVERSATION HISTORY (Last ${context.conversationHistory.length} messages):
-${context.conversationHistory.map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`).join('\n')}
-
-IMPORTANT: Consider the conversation history when making decisions about parameter collection and workflow modifications.
-` : ''}
-
-${context.referenceData ? `
-AVAILABLE REFERENCE DATA:
-${context.referenceData.mrfTemplates ? `
-MRF Templates: ${context.referenceData.mrfTemplates.map(t => `${t.name} (${t.category})`).join(', ')}` : ''}
-${context.referenceData.users ? `
-Available Users: ${context.referenceData.users.map(u => `${u.name} (${u.role})`).join(', ')}` : ''}
-${context.referenceData.approvalWorkflows ? `
-Approval Workflows: ${context.referenceData.approvalWorkflows.map(w => `${w.name} - Approvers: ${w.approvers.join(', ')}`).join(', ')}` : ''}
-` : ''}
-
-CONVERSATIONAL GUIDELINES:
-1. Generate workflow with EMPTY params for functions that need parameter collection
-2. Explain what you created in conversationalResponse
-3. ONLY ask follow-up questions for parameters that are REQUIRED by the function schemas
-4. DO NOT ask questions about optional parameters unless explicitly needed for workflow logic
-5. DO NOT ask clarifying questions about workflow design preferences or general requirements
-6. Use conversation history to avoid asking for information already provided
-7. Reference available templates/users/workflows when suggesting parameters
-8. For functions with empty params, ask ONLY for the required parameters from function schemas
-9. Set parameterCollectionNeeded: true ONLY when required parameters are missing from function schemas
-10. Keep responses professional and avoid excessive emojis or icons
-11. Focus ONLY on collecting missing required parameters - do not suggest workflow improvements or alternatives
-12. If all required parameters are present, set parameterCollectionNeeded: false and do not ask follow-up questions
-
-PARAMETER COLLECTION RULES:
-- REQUIRED parameters MUST be collected before workflow can execute
-- OPTIONAL parameters should be left empty unless specifically provided by user
-- Only ask for parameters that are marked as "required: true" in function schemas
-- Do not ask about workflow structure, naming, or design decisions
-- Do not ask about business logic or approval thresholds unless they are required parameters
-- Stick strictly to the parameter requirements defined in function schemas
-
-VALID FOLLOW-UP QUESTIONS (Examples):
-✅ "Which MRF form should trigger this workflow?" (for required mrfID parameter)
-✅ "Who should receive the approval request?" (for required 'to' parameter)
-✅ "What should the notification subject be?" (for required 'subject' parameter)
-✅ "What schedule should trigger this workflow?" (for required 'schedule' parameter)
-
-INVALID FOLLOW-UP QUESTIONS (Do NOT ask):
-❌ "Would you like to add error handling to this workflow?"
-❌ "Should we add a delay between steps?"
-❌ "Do you want to customize the workflow name?"
-❌ "Would you like to add logging for this step?"
-❌ "Should we include additional notification recipients?"
-❌ "Do you want to set a different approval threshold?"
-❌ "Would you like to add validation steps?"
-
-Remember: Only collect parameters that are explicitly required by function schemas - nothing more!
-
-USER CONTEXT:
-- User: ${context.user?.name || context.userRole} (${context.user?.role || context.userRole} in ${context.user?.department || context.userDepartment})
-- Manager: ${context.user?.manager || 'manager@company.com'}
-
-MRF CONTEXT:
-- Current MRF: ${context.mrf?.title || context.mrfData?.title || 'New Event'}
-- Max Attendees: ${context.mrf?.maxAttendees || context.mrfData?.maxAttendees || 50}
-- Location: ${context.mrf?.location || context.mrfData?.location || 'TBD'}
-- Purpose: ${context.mrf?.purpose || context.mrfData?.purpose || 'general'}
-
-${currentWorkflow ? `
-CURRENT WORKFLOW TO MODIFY:
-${JSON.stringify(currentWorkflow, null, 2)}
-
-IMPORTANT: Modify and extend the existing workflow, don't create from scratch.
-` : ''}
-
-Remember: Create workflows with empty params for functions that need configuration, then ask conversational questions to collect those parameters!`;
-  }
-
-  /**
-   * Build system prompt for direct workflow generation
-   */
-  private buildDirectSystemPrompt(
-    context: WorkflowGenerationContext,
-    currentWorkflow?: Partial<WorkflowJSON>
-  ): string {
-    // Use rich function definitions if available
-    let functionDetails = '';
-    if (context.functionDefinitions && context.functionDefinitions.length > 0) {
-      functionDetails = context.functionDefinitions.map(func => {
-        const params = func.parameters ? func.parameters.map(p => 
-          `  - ${p.name} (${p.type}${p.required ? ', required' : ', optional'}): ${p.description}`
-        ).join('\n') : '';
-        
-        return `- ${func.name}: ${func.description}
-  Usage: ${func.usage}
-  Parameters:
-${params}
-  Example: ${JSON.stringify(func.example, null, 2)}`;
-      }).join('\n\n');
-    } else {
-      const toolSummaries = this.toolRegistry.getToolSummaries();
-      functionDetails = toolSummaries.map(tool => 
-        `- ${tool.name}: ${tool.description}`
-      ).join('\n');
+    if (!config || !config.sessionId || !config.templateId) {
+      throw new Error('Missing required config parameters');
     }
 
-    return `You are a workflow generation AI. Generate valid workflow JSON based on user requirements.
-
-AVAILABLE FUNCTIONS:
-${functionDetails}
-
-CONTEXT:
-- User Role: ${context.userRole}
-- Department: ${context.userDepartment}
-- Existing Workflow: ${currentWorkflow ? 'Modify existing' : 'Create new'}
-
-CRITICAL REQUIREMENTS:
-1. Generate workflows in EXACT schema format below
-2. Use only available functions listed above
-3. Include proper step connections (nextSteps, onSuccess, onFailure)
-4. Follow json-rules-engine format for conditions
-5. Return ONLY valid JSON - no explanatory text
-
-MANDATORY WORKFLOW SCHEMA:
-{
-  "schemaVersion": "1.0.0",
-  "metadata": {
-    "id": "workflow-id",
-    "name": "Workflow Name",
-    "description": "Brief description",
-    "version": "1.0.0",
-    "status": "draft"
-  },
-  "steps": {
-    "stepName": {
-      "name": "Human-readable step name",
-      "type": "trigger|action|condition|end",
-      "action": "functionName",
-      "params": {},
-      "nextSteps": ["nextStep"] | null,
-      "onSuccess": "successStep" | null,
-      "onFailure": "failureStep" | null
-    }
-  }
-}
-
-STEP TYPES:
-- trigger: onMRF, onRequest
-- action: sendEmail, requestApproval, createEvent
-- condition: Decision points with json-rules-engine conditions
-- end: Workflow termination
-
-CONDITIONS (json-rules-engine format):
-{
-  "type": "condition",
-  "params": {
-    "conditions": {
-      "any": [
-        { "fact": "mrf.location", "operator": "equal", "value": "US" },
-        { "fact": "mrf.maxAttendees", "operator": "greaterThan", "value": 100 }
-      ]
-    }
-  },
-  "onSuccess": "approvalStep",
-  "onFailure": "nextStep"
-}`;
-  }
-
-  /**
-   * Parse conversational response and extract structured data
-   */
-  private parseConversationalResponse(response: string): LangChainWorkflowResult {
+    // Create chat model - wrap to capture any provider/model creation errors
+    let chatModel;
     try {
-      // Try to extract JSON from the response
-      const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/) || response.match(/```\s*([\s\S]*?)\s*```/);
-      let parsed;
-      
-      if (jsonMatch) {
-        parsed = JSON.parse(jsonMatch[1]);
-      } else {
-        // If no JSON block, try to parse the entire response
-        parsed = JSON.parse(response);
-      }
-
-      const workflow = parsed.workflow || {};
-
-      // Ensure workflow has steps in nested array format
-      if (workflow.steps && Array.isArray(workflow.steps)) {
-        // Ensure all steps have IDs (fallback ID generation)
-        ensureStepIds(workflow.steps);
-        console.log('✅ Workflow generated with nested array format and human-readable IDs');
-      } else if (workflow.steps && typeof workflow.steps === 'object') {
-        // Detected legacy format from LLM - log warning
-        console.warn('⚠️ LLM generated legacy numbered object key format. Workflow may need adapter.');
-        console.warn('   Expected: { steps: [{id: "...", ...}] }');
-        console.warn('   Received: { steps: {"1": {...}, "1.1": {...}} }');
-      }
-
-      return {
-        workflow,
-        conversationalResponse: parsed.conversationalResponse || "Workflow updated.",
-        followUpQuestions: parsed.followUpQuestions || [],
-        parameterCollectionNeeded: parsed.parameterCollectionNeeded || false
-      };
-    } catch (error) {
-      console.warn('⚠️ Failed to parse conversational response:', error);
-      return {
-        workflow: {},
-        conversationalResponse: response,
-        followUpQuestions: [],
-        parameterCollectionNeeded: false
-      };
+      chatModel = getLLMFactory().createWorkflowEditModel(config.provider);
+      console.info('[langchain] Initialized chat model ');
+    } catch (createErr: unknown) {
+      console.error('[langchain] Failed to create chat model', {
+        error: createErr instanceof Error ? { message: createErr.message, stack: createErr.stack } : String(createErr),
+        provider: config.provider,
+      });
+      throw createErr;
     }
-  }
+    const shortUniqueIds: string[] = [];
+    for (let i=0; i<20; i++) {
+      shortUniqueIds.push(generateShortId());
+    }
 
-  /**
-   * Get available tools for this generator
-   */
-  public getAvailableTools(): string[] {
-    return this.toolRegistry.getToolSummaries().map(tool => tool.name);
-  }
 
-  /**
-   * Get tool summaries for context
-   */
-  public getToolSummaries() {
-    return this.toolRegistry.getToolSummaries();
-  }
+    const systemInstructions = INSTRUCTIONS + (existingWorkflow ? `\nThe existing workflow is: 
+\`\`\`json
+${JSON.stringify(existingWorkflow, null, 2)} 
+\`\`\`
 
-  /**
-   * Cleanup resources
-   */
-  public async cleanup(): Promise<void> {
-    // Cleanup any resources if needed
-    console.log('🧹 Cleaning up LangChain workflow generator resources');
+use the following short unique ids for any new steps or step functions you create and the messageid.
+${shortUniqueIds.join(', ')}
+` : '\nNo existing workflow provided.');
+
+
+
+
+    // console.info('[langchain] Created system instructions',systemInstructions);
+
+    // Step 1: Set up the stateless components
+    // NOTE: JsonOutputParser was originally created but not used; remove to avoid unused-var warnings.
+    // LangChain prompt templates parse f-strings and will error on unmatched braces.
+    // Escape literal braces in systemInstructions but preserve the special placeholders we use below.
+    const escapeTemplateBraces = (tpl: string, preserve: string[]) => {
+      let out = tpl.replaceAll('{', '{{').replaceAll('}', '}}');
+      for (const p of preserve) {
+        out = out.replaceAll(`{{${p}}}`, `{${p}}`);
+      }
+      return out;
+    };
+
+    console.log('[langchain] system instructions', );
+
+    const escapedSystemInstructions = escapeTemplateBraces(systemInstructions, ['chat_history', 'input']);
+    console.debug('[langchain] systemInstructions length', systemInstructions.length, 'escaped length', escapedSystemInstructions.length);
+
+    const prompt = ChatPromptTemplate.fromMessages([
+      ["system", escapedSystemInstructions],
+      ["placeholder", "{chat_history}"], //placeholder for chat history
+      ["human", "{input}"],
+    ]);
+
+    console.log('[langchain] Created prompt template');
+
+    // Step 2: Build the conversational chain with memory
+    const chain = prompt.pipe(chatModel);
+
+    console.log('[langchain] Created conversational chain');
+
+    // Step 3: Set up the memory with existing messages
+    const messageHistory = new ChatMessageHistory();
+
+    messageHistory.addMessages(messages.map((m: WorkflowMessage) => {
+      if (m.sender === 'aime') {
+        return new AIMessage(m.content.text);
+      } else {
+        return new HumanMessage(m.content.text);
+      }
+    }));
+
+    console.log('[langchain] Populated message history with', messages.length, 'messages');
+
+    // Create the conversational chain with the pre-populated history
+    const conversationalChain = new RunnableWithMessageHistory({
+      runnable: chain,
+      // sessionId is unused because we always return the prefilled history; reference it to avoid lint warnings
+      getMessageHistory: (sessionId) => {
+        void sessionId;
+        return messageHistory;
+      },
+      inputMessagesKey: "input",
+      historyMessagesKey: "chat_history",
+    });
+
+    console.log('[langchain] Created conversational chain with message history');
+
+    // Invoke the chain with the new message.
+    // The history from the previous steps will be included in the prompt.
+    // Avoid mutating the incoming messages array (don't use reverse()). Use the last element directly.
+    const lastMsg = messages[messages.length - 1];
+    const invokeInput = { input: lastMsg.content.text, workflowDefinition: existingWorkflow ? JSON.stringify(existingWorkflow) : 'None' };
+
+
+    console.info('[langchain] invoking conversationalChain', {
+      sessionId: config.sessionId,
+      templateId: config.templateId,
+      provider: config.provider,
+      conversationalMode: config.conversationalMode ?? false,
+      messagesCount: messages.length,
+      lastMessagePreview: typeof lastMsg.content.text === 'string' ? lastMsg.content.text.slice(0, 300) : undefined,
+    });
+
+    try {
+      const response = await conversationalChain.invoke(invokeInput, { configurable: {
+          response_format: { type: 'json_object' },
+          output_parser: new JsonOutputParser(),
+          sessionId: config.sessionId,
+      }});
+      console.info('[langchain] conversationalChain invoke completed', response.content);
+
+      // Strip the ``````json` and ``` fences
+      // if the model added them around the JSON
+      const jsonString = typeof response.content === 'string' ? response.content : JSON.stringify(response.content);
+      // if the content is of type string and does not have the ```json` or ``` fences, we will read this as the text and construct a valid JSON response with just the text field
+      if (typeof response.content === 'string' && !response.content.trim().startsWith('\`\`\`json') && !response.content.trim().startsWith('{')) {
+        const textResponse: WorkflowMessage = {
+          id: generateShortId(),
+          sender: 'aime',
+          content: {
+            text: response.content,
+          },
+          timestamp: new Date().toISOString(),
+        };
+        return { messages: [textResponse], modifiedStepIds: [] };
+      }
+
+      const strippedJson = jsonString.replace(/```json/g, '').replace(/```/g, '').trim();
+      console.log('[langchain] LLM response (stripped):', strippedJson);
+
+      // Parse the JSON and return it
+      const parsed: WorkflowMessage = JSON.parse(strippedJson);
+      parsed.timestamp = new Date().toISOString();
+      parsed.id = generateShortId();
+      return { messages: [parsed], modifiedStepIds: [] };
+
+    } catch (err: unknown) {
+      // Ensure we always log the full error and context for upstream handlers
+      console.error('[langchain] Error invoking conversationalChain', {
+        error: err instanceof Error ? { message: err.message, stack: err.stack } : String(err),
+        invokeInputPreview: { input: typeof invokeInput.input === 'string' ? invokeInput.input.slice(0, 2000) : undefined },
+        sessionId: config.sessionId,
+        templateId: config.templateId,
+        provider: config.provider,
+      });
+      // Re-throw after logging so upstream API handler can still return 500, but now we have logs.
+      throw err;
+    }
+  } catch (topErr: unknown) {
+    console.error('[langchain] runLangChainGenerator unexpected error', {
+      error: topErr instanceof Error ? { message: topErr.message, stack: topErr.stack } : String(topErr),
+      sessionId: config?.sessionId,
+      templateId: config?.templateId,
+      provider: config?.provider,
+      messagesCount: Array.isArray(messages) ? messages.length : 0,
+    });
+    throw topErr;
   }
 }
 
-/**
- * Factory function to create LangChain workflow generator
- */
-export async function createLangChainWorkflowGenerator(
-  config: LangChainWorkflowConfig
-): Promise<LangChainWorkflowGenerator> {
-  const generator = new LangChainWorkflowGenerator(config);
-  await generator.initializeMemory();
-  return generator;
-}
 
-/**
- * Conversation history message format for LangChain integration
- */
-export interface ConversationHistoryMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: string;
-}
+

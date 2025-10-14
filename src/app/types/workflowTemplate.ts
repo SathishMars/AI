@@ -42,13 +42,13 @@ export interface WorkflowStep {
     id: string;                                           // Unique step ID (10-char short-id)
     label: string;                                        // human readable step name
     type: string;                                         // Step type (e.g., task, decision, condition, etc.)
-    stepFunction?: string;                                        // Optional tool or service associated with the step
-    functionParams?: Record<string, unknown>;                 // Optional parameters for the tool
+    stepFunction?: string;                                // Optional tool or service associated with the step
+    functionParams?: Record<string, unknown>;             // Optional parameters for the tool
     next?: Array<string | WorkflowStep>;                  // Optional next steps (for branching)
-    onConditionPass?: Array<string | WorkflowStep>;       // Optional steps if condition passes
-    onConditionFail?: Array<string | WorkflowStep>;       // Optional steps if condition fails
-    onError?: Array<string | WorkflowStep>;               // Optional error handling steps
-    onTimeout?: Array<string | WorkflowStep>;             // Optional timeout handling steps
+    onConditionPass?: string | WorkflowStep;              // Optional steps if condition passes
+    onConditionFail?: string | WorkflowStep;              // Optional steps if condition fails
+    onError?: string | WorkflowStep;                      // Optional error handling steps
+    onTimeout?: string | WorkflowStep;                    // Optional timeout handling steps
     timeout?: number;                                     // Optional timeout in seconds
     retryCount?: number;                                  // Optional retry count on failure
     retryDelay?: number;                                  // Optional delay between retries in seconds
@@ -124,11 +124,12 @@ export const WorkflowStepSchema: z.ZodType<WorkflowStep> = z.lazy(() =>
         type: z.string(),
         stepFunction: z.string().optional(),
         functionParams: z.record(z.unknown()).optional(),
-        next: z.array(z.union([z.string(), WorkflowStepSchema])).optional(),
-        onConditionPass: z.array(z.union([z.string(), WorkflowStepSchema])).optional(),
-        onConditionFail: z.array(z.union([z.string(), WorkflowStepSchema])).optional(),
-        onError: z.array(z.union([z.string(), WorkflowStepSchema])).optional(),
-        onTimeout: z.array(z.union([z.string(), WorkflowStepSchema])).optional(),
+    next: z.array(z.union([z.string(), WorkflowStepSchema])).optional(),
+    // The interface uses a single step reference (string id or nested step) for these handlers
+    onConditionPass: z.union([z.string(), WorkflowStepSchema]).optional(),
+    onConditionFail: z.union([z.string(), WorkflowStepSchema]).optional(),
+    onError: z.union([z.string(), WorkflowStepSchema]).optional(),
+    onTimeout: z.union([z.string(), WorkflowStepSchema]).optional(),
         timeout: z.number().optional(),
         retryCount: z.number().int().optional(),
         retryDelay: z.number().optional(),
@@ -161,5 +162,35 @@ export const WorkflowTemplateHistorySchema = z.object({
 });
 
 export type WorkflowTemplateFromSchema = z.infer<typeof WorkflowTemplateSchema>;
+
+// -------------------------
+// Validation helpers
+// -------------------------
+
+type ValidationSuccess<T> = { valid: true; data: T };
+type ValidationFailure = { valid: false; errors: string[] };
+
+export function validateWorkflowDefinition(obj: unknown): ValidationSuccess<WorkflowDefinition> | ValidationFailure {
+    const result = WorkflowDefinitionSchema.safeParse(obj);
+    if (result.success) return { valid: true, data: result.data };
+
+    // Flatten Zod errors to readable messages
+    const errors = (result.error.errors || []).map(e => {
+        const path = e.path && e.path.length ? e.path.join('.') : '<root>';
+        return `${path}: ${e.message}`;
+    });
+    return { valid: false, errors };
+}
+
+export function validateWorkflowTemplate(obj: unknown): ValidationSuccess<WorkflowTemplate> | ValidationFailure {
+    const result = WorkflowTemplateSchema.safeParse(obj);
+    if (result.success) return { valid: true, data: result.data };
+
+    const errors = (result.error.errors || []).map(e => {
+        const path = e.path && e.path.length ? e.path.join('.') : '<root>';
+        return `${path}: ${e.message}`;
+    });
+    return { valid: false, errors };
+}
 
 

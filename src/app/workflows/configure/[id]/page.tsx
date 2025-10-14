@@ -10,35 +10,49 @@ import {
   Container,
   Button
 } from '@mui/material';
-import { WorkflowJSON, WorkflowStep } from '@/app/types/workflow';
-import { WorkflowTemplate } from '@/app/types/workflow-template-v2';
+import {WorkflowTemplate } from '@/app/types/workflowTemplate';
 import ResponsiveWorkflowConfigurator from '@/app/components/ResponsiveWorkflowConfigurator';
-import { useWorkflowTemplateV2 } from '@/app/hooks/useWorkflowTemplateV2';
+import { useWorkflowTemplate } from '@/app/hooks/useWorkflowTemplate';
+import { useAimeWorkflow } from '@/app/hooks/useAimeWorkflow';
 
 interface PageProps {
   params: Promise<{ id: string }>;
 }
 
 export default function WorkflowConfigurePage({ params }: PageProps) {
-  const [templateId, setTemplateId] = useState<string | null>(null);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-  
+
   // Callback when template is saved (trigger selector refresh)
   const handleTemplateSaved = useCallback((savedTemplate: WorkflowTemplate) => {
-    console.log('🔄 [Page] Template saved, triggering selector refresh:', savedTemplate.id);
-    setRefreshTrigger(prev => prev + 1);
+    console.log('[Page] Template saved, ID:', savedTemplate.id);
   }, []);
-  
+
+
+  const handleTemplateLoad = useCallback((loadedTemplate: WorkflowTemplate) => {
+    console.log('🔄 [Page] Template loaded, updating selector:', loadedTemplate.id);
+  }, []);
+
   // Use workflow template hook with immediate auto-save
   const {
-    template, workflowJSON, isLoading, isContextLoading,
-    error, isNewTemplate, hasUnsavedChanges, isSaving,
-    canAutoSave, loadTemplate, initializeNewTemplate,
-    updateWorkflowDefinition, updateTemplateName,
+    template, isLoading, isContextLoading,
+    error, isNewTemplate, isSaving,
+    loadTemplate, 
+    updateWorkflowDefinition, updateTemplateLabel,
     clearError
-  } = useWorkflowTemplateV2({ 
-    autoSave: true,
-    onTemplateSaved: handleTemplateSaved
+  } = useWorkflowTemplate({ 
+    onTemplateSaved: handleTemplateSaved,
+    onTemplateLoad: handleTemplateLoad
+  });
+
+  const {
+    messages,  
+    sendMessage  
+  } = useAimeWorkflow({
+    workflowTemplateId: template?.id || '',
+    workflowDefinition: template?.workflowDefinition || { steps: [] },
+    onMessage: (message: string) => {
+      console.log('[Page] AIme message:', message);
+    },
+    onWorkflowDefinitionChange: updateWorkflowDefinition
   });
   
   const [initialized, setInitialized] = useState(false);
@@ -48,25 +62,12 @@ export default function WorkflowConfigurePage({ params }: PageProps) {
       try {
         const resolvedParams = await params;
         const id = resolvedParams.id;
-        
-        setTemplateId(id);
+        console.log('🛠️ [Page] Resolved params:', resolvedParams);
         
         // Wait for user context to finish loading before loading/creating template
         if (!isContextLoading && !initialized) {
           setInitialized(true);
-          
-          // Check if this is a new template request
-          if (id === 'new' || id === 'create') {
-            // Initialize a new workflow in memory with empty name so the
-            // name dialog forces the user to enter a valid name.
-            initializeNewTemplate(
-              '',
-              'Created from workflow builder'
-            );
-          } else {
-            // Load existing template by ID
-            await loadTemplate(id);
-          }
+          await loadTemplate(id);
         }
       } catch (err) {
         console.error('Error resolving params:', err);
@@ -76,31 +77,7 @@ export default function WorkflowConfigurePage({ params }: PageProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params, isContextLoading, initialized]);
 
-  const handleSaveTemplate = async (updatedWorkflow: WorkflowJSON) => {
-    try {
-      console.log('💾 Saving workflow template:', {
-        templateId: template?.id,
-        templateName: template?.metadata?.name,
-        stepsCount: updatedWorkflow.steps.length
-      });
-      // Convert WorkflowJSON to WorkflowDefinition (just extract steps)
-      await updateWorkflowDefinition({
-        steps: updatedWorkflow.steps as WorkflowStep[]
-      }, {
-        mermaidDiagram: updatedWorkflow.mermaidDiagram
-      });
-    } catch (err) {
-      console.error('Failed to save workflow:', err);
-    }
-  };
   
-  const handleTemplateNameChange = async (name: string) => {
-    if (!template) return;
-    
-    // Update template name directly (no metadata duplication)
-    await updateTemplateName(name);
-  };
-
   // Show loading state (wait for both context and template)
   if (isContextLoading || isLoading) {
     return (
@@ -134,14 +111,15 @@ export default function WorkflowConfigurePage({ params }: PageProps) {
   }
 
   // Show empty state if no workflow loaded
-  if (!workflowJSON) {
+  console.log('📄 Page render - Template state:', template);
+  if (!(template && template.metadata)) {
     return (
       <Container maxWidth="md" sx={{ py: 4 }}>
         <Box sx={{ textAlign: 'center' }}>
           <Typography variant="h5" gutterBottom>
             No Workflow Loaded
           </Typography>
-          <Typography color="text.secondary" paragraph>
+          <Typography color="text.secondary">
             Loading workflow template...
           </Typography>
         </Box>
@@ -151,56 +129,29 @@ export default function WorkflowConfigurePage({ params }: PageProps) {
 
   // Main workflow configurator
   return (
-    <Container maxWidth="xl" sx={{ py: 2 }}>
-      {hasUnsavedChanges && (
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          You have unsaved changes. Make sure to save your work.
-        </Alert>
-      )}
-      
+    <Container sx={{ m: 0, p: 0, py: 2, flex: 1, display: 'flex', flexDirection: 'column' }}>
       {isSaving && (
         <Alert severity="info" sx={{ mb: 2 }}>
           Saving workflow to database...
         </Alert>
       )}
       
-      {!canAutoSave && template && (
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          Auto-save disabled: Please add at least one workflow step, provide a valid template name, and wait for the workflow diagram to finish generating.
-        </Alert>
-      )}
-      
+
       {/* Debug: Log template state */}
       {(() => {
         console.log('📄 Page render - Template state:', {
-          template: template ? {
-            id: template.id,
-            name: template.metadata?.name,
-            account: template.account,
-            organization: template.organization,
-            version: template.version,
-            stepsCount: template.workflowDefinition?.steps?.length || 0
-          } : null,
-          templateId,
-          isNewTemplate,
-          propsToConfigurator: {
-            currentTemplateId: template?.id || templateId || 'new',
-            currentTemplateName: template?.metadata?.name || 'New Workflow'
-          }
+          template,
+          isNewTemplate
         });
         return null;
       })()}
       
       <ResponsiveWorkflowConfigurator
-        workflow={workflowJSON}
-        onWorkflowChange={handleSaveTemplate}
-        validationResult={null}
-        isNewWorkflow={isNewTemplate}
-        currentTemplateId={template?.id || templateId || 'new'}
-        currentTemplateName={template?.metadata?.name || 'New Workflow'}
-        lastUpdated={template?.metadata?.updatedAt}
-        onTemplateNameChange={handleTemplateNameChange}
-        refreshTrigger={refreshTrigger}
+        workflowTemplate={template}
+        messages={messages}
+        sendMessage={sendMessage}
+        onWorkflowDefinitionChange={updateWorkflowDefinition}
+        onTemplateLabelChange={updateTemplateLabel}
       />
     </Container>
   );

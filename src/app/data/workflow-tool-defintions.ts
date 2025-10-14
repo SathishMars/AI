@@ -1,5 +1,48 @@
 import { WorkflowStepFunction } from "@/app/types/workflowStepFunction";
-import { tr } from "zod/v4/locales";
+
+interface WorkflowFunctionTypeConfig {
+  color: string;
+  label: string;
+  icon: string;
+}
+
+export const workflowFunctionTypeConfig: Record<string, WorkflowFunctionTypeConfig> = {
+  trigger: {
+    color: '#2E7D32',
+    label: 'Trigger',
+    icon: 'start' // Material UI stylesheet icon name
+  },
+  decision: {
+    color: '#F57C00',
+    label: 'Decision',
+    icon: 'help_center' // Material UI stylesheet icon name
+  },
+  task: {
+    color: '#1976D2',
+    label: 'Task',
+    icon: 'task_alt' // Material UI stylesheet icon name
+  },
+  terminate: {
+    color: '#B71C1C',
+    label: 'End',
+    icon: 'stop_circle' // Material UI stylesheet icon name
+  },
+  branch: {
+    color: '#FFA000',
+    label: 'Branch',
+    icon: 'graph_2' // Material UI stylesheet icon name
+  },
+  merge: {
+    color: '#0288D1',
+    label: 'Merge',
+    icon: 'family_history' // Material UI stylesheet icon name
+  },
+  workflow: {
+    color: '#7B1FA2',
+    label: 'Workflow',
+    icon: 'flowchart' // Material UI stylesheet icon name
+  }
+}
 
 export const workflowFunctionDefinitions: Array<WorkflowStepFunction> = [
     // TRIGGER FUNCTIONS
@@ -214,9 +257,9 @@ export const workflowFunctionDefinitions: Array<WorkflowStepFunction> = [
                 approver: '\${manager}', // use the userId as per the org format or use workflow variables like \${manager} to dynamically set the approver based on the request context
                 reason: 'Budget exceeds department threshold' // optional reason for the approval request
             },
-            onConditionPass: ['#createEvent'], // next step ID to execute if approved. could be the terminate step or another task step
-            onConditionFail: ['#notifyRejection'], // next step ID to execute if rejected. could be the terminate step or another task step
-            onTimeout: ['#notifyNoResponse'], // next step ID to execute if no response within timeout period. could be the terminate step or another task step
+            onConditionPass: '7c8aScds7e', // next step ID to execute if approved. could be the terminate step or another task step
+            onConditionFail: '87snjhsw76', // next step ID to execute if rejected. could be the terminate step or another task step
+            onTimeout: 'jds7bbsq7n', // next step ID to execute if no response within timeout period. could be the terminate step or another task step
             timeout: 86400, // optional timeout in seconds (e.g., 86400 seconds = 24 hours)
             retryCount: 2, // optional retry count on failure
             retryDelay: 3600 // optional delay between retries in seconds (e.g., 3600 seconds = 1 hour)
@@ -271,8 +314,8 @@ export const workflowFunctionDefinitions: Array<WorkflowStepFunction> = [
                     ]
                 }
             },
-            onConditionPass: ['ds6ksd7xnm'], // next step ID to execute if condition passes. could be the terminate step or another task step
-            onConditionFail: ['basx6vwqn8'], // next step ID to execute if condition fails. could be the terminate step or another task step
+            onConditionPass: 'ds6ksd7xnm', // next step ID to execute if condition passes. could be the terminate step or another task step
+            onConditionFail: 'basx6vwqn8', // next step ID to execute if condition fails. could be the terminate step or another task step
         }
       \`\`\`      
         Note: This step supports enhanced condition outputs:
@@ -366,4 +409,41 @@ export const workflowFunctionDefinitions: Array<WorkflowStepFunction> = [
     `
         },
     },
+    // TERMINATE FUNCTION
+    {
+        id: 'fn_terminate',
+        label: 'Terminate',
+        type: 'terminate',
+        name: 'terminate',
+        description: 'Terminate the workflow',
+        params: [],
+        outputs: [],
+        llmInstructions: {
+            usageInstruction: `This is a STEP. this step will terminate the workflow.
+            Example usage:
+      \`\`\` json
+        {
+            id: '3klmop4567',  // replace with a generated unique step ID used as refernce in other steps where needed to chain the steps
+            label: 'Terminate workflow', // human readable name for the step based on context of what the step does
+            type: 'terminate',
+            stepFunction: 'terminate',
+            functionParams: { },
+            next: [] // no next step after termination
+        }
+      \`\`\`
+    `
+        },
+    },
 ]
+
+export const workflowFunctionInstructions = workflowFunctionDefinitions.map(def => {
+    // Create a shallow copy and remove llmInstructions
+    const { llmInstructions, ...defWithoutInstructions } = def;
+    return ` Function: - ${def.name}- ${def.description}:
+${llmInstructions.usageInstruction}
+The function definition is as follows:
+\`\`\`json
+${JSON.stringify(defWithoutInstructions, null, 2)}
+\`\`\`
+`;
+});

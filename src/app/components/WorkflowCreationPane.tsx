@@ -20,7 +20,6 @@ import { WorkflowJSON, WorkflowStep } from '@/app/types/workflow';
 import { 
   CreationSession, 
   CreationContext, 
-  MRFData
 } from '@/app/types/workflow-creation';
 import { ConversationMessage } from '@/app/types/conversation';
 import { WorkflowCreationFlow } from '@/app/utils/workflow-creation-flow';
@@ -39,6 +38,7 @@ import {
 import { useWorkflowValidation, WorkflowValidationState } from '@/app/hooks/useWorkflowValidation';
 import { WorkflowValidationFeedback } from './WorkflowValidationFeedback';
 import { useUnifiedUserContext } from '@/app/contexts/UnifiedUserContext';
+import { WorkflowDefinition } from '../types/workflowTemplate';
 
 // Cache for available functions to prevent constant API calls
 let availableFunctionsCache: string[] | null = null;
@@ -155,21 +155,17 @@ const SimpleMessageRenderer = ({
  */
 
 interface WorkflowCreationPaneProps {
-  workflow: WorkflowJSON;
-  onWorkflowChange: (workflow: WorkflowJSON) => void;
-  isNewWorkflow: boolean;
+  workflowDefinition: WorkflowDefinition;
   workflowTemplateId?: string;
-  workflowTemplateName?: string;
-  mrfData?: MRFData;
+  workflowTemplateLabel?: string;
+  onWorkflowChange: (workflowDefinition: WorkflowDefinition) => void;
 }
 
 export default function WorkflowCreationPane({
-  workflow,
-  onWorkflowChange,
-  isNewWorkflow,
+  workflowDefinition,
   workflowTemplateId,
-  workflowTemplateName,
-  mrfData
+  workflowTemplateLabel,
+  onWorkflowChange,
 }: WorkflowCreationPaneProps) {
   // Creation flow state
   const [creationFlow] = useState(() => new WorkflowCreationFlow());

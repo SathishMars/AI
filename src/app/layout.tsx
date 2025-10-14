@@ -25,6 +25,20 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/icon?family=Material+Icons"
+        />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined"
+        />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/icon?family=Material+Icons+Two+Tone"
+        />
+      </head>
       <body>
         <ThemeRegistry>
           <UnifiedUserProvider>
@@ -32,7 +46,7 @@ export default function RootLayout({
             {children}
           </UnifiedUserProvider>
         </ThemeRegistry>
-       </body>
+      </body>
     </html>
   );
 }

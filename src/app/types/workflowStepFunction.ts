@@ -1,5 +1,9 @@
+import { z } from 'zod';
 
-export type ToolType = 'task' | 'decision' | 'trigger' | 'branch' | 'merge' | 'workflow';
+
+export type ToolType = 'task' | 'decision' | 'trigger' | 'branch' | 'merge' | 'workflow' | 'terminate';
+
+
 
 export interface LLMInstructions {
     usageInstruction: string;                                   // Instruction to the LLM on how to use the tool
@@ -43,3 +47,89 @@ export interface WorkflowStepFunction {
 }
 
 
+
+// ToolType enum
+export const ToolTypeSchema = z.enum([
+    'task',
+    'decision',
+    'trigger',
+    'branch',
+    'merge',
+    'workflow',
+    'terminate',
+]);
+
+// LLMInstructions schema
+export const LLMInstructionsSchema = z.object({
+    usageInstruction: z.string(),
+});
+
+// api schema
+export const apiSchema = z.object({
+    endpoint: z.string(),
+    method: z.enum(['GET', 'POST', 'PUT', 'DELETE', 'PATCH']),
+    headers: z.record(z.string()).optional(),
+    params: z.record(z.union([
+        z.string(),
+        z.number(),
+        z.boolean(),
+        z.object({}).passthrough(),
+    ])).optional(),
+    responseMapping: z.record(z.string()).optional(),
+});
+
+// FunctionParam schema
+export const FunctionParamSchema = z.object({
+    name: z.string(),
+    label: z.string(),
+    required: z.boolean(),
+    description: z.string().optional(),
+    type: z.enum(['string', 'number', 'boolean', 'object', 'select', 'list', 'api']),
+    options: z.array(
+        z.union([
+            z.object({
+                value: z.union([
+                    z.string(),
+                    z.number(),
+                    z.boolean(),
+                    z.object({}).passthrough(),
+                ]),
+                label: z.string(),
+            }),
+            apiSchema,
+        ])
+    ).optional(),
+    value: z.union([
+        z.string(),
+        z.number(),
+        z.boolean(),
+        z.object({}).passthrough(),
+        apiSchema,
+    ]).optional(),
+    defaultValue: z.union([
+        z.string(),
+        z.number(),
+        z.boolean(),
+        z.object({}).passthrough(),
+        apiSchema,
+    ]).optional(),
+});
+
+// FunctionOutput schema
+export const FunctionOutputSchema = z.object({
+    type: z.enum(['result', 'pass', 'fail', 'error', 'timeout']),
+    label: z.string(),
+    required: z.boolean(),
+});
+
+// WorkflowStepFunction schema
+export const WorkflowStepFunctionSchema = z.object({
+    id: z.string(),
+    label: z.string(),
+    name: z.string(),
+    type: ToolTypeSchema,
+    description: z.string().optional(),
+    params: z.array(FunctionParamSchema).optional(),
+    outputs: z.array(FunctionOutputSchema),
+    llmInstructions: LLMInstructionsSchema,
+});

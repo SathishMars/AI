@@ -11,3 +11,13 @@ export const workflowVariableDefinitions:Array<WorkflowVariable> = [
     { label: 'today', name: '${today}' },
     { label: 'now', name: '${now}' }
 ];
+
+export const workflowVariableLLMInstructions = `
+Workflow Variables:
+${workflowVariableDefinitions.map(def => 
+    `- ${def.label}: ${def.name}`
+).join('\n')}
+
+Instructions:
+Reference variable types to validate input and guide follow-up questions as well as using them in functionParams.
+`;

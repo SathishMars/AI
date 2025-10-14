@@ -1,251 +1,180 @@
-// src/app/api/generate-workflow/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { LangChainWorkflowGenerator } from '@/app/utils/langchain/langchain-workflow-generator';
-import { getTriggerFunctionAutocomplete, getActionFunctionAutocomplete } from '@/app/data/workflow-conversation-autocomplete';
+import { validateWorkflowDefinition, WorkflowDefinition } from '@/app/types/workflowTemplate';
+import { AimeWorkflowConversationsRecord, WorkflowMessage } from '@/app/types/aimeWorkflowMessages';
+import { runLangChainGenerator } from '@/app/utils/langchain/langchain-workflow-generator';
+import { generateMermaidFromWorkflow } from '@/app/utils/langchain/langchain-mermaid-generator';
+import ShortUniqueId from 'short-unique-id';
+import AimeWorkflowMessagesDBUtil from '@/app/utils/aimeWorkflowMessagesDBUtil';
+// 10-char alphanumeric short id generator (reusable instance)
+const uid = new ShortUniqueId({ length: 10, dictionary: 'alphanum' });
 
-/**
- * Server-side API route for LLM workflow generation using LangChain
- * This prevents API keys from being exposed in the browser
- */
-export async function POST(request: NextRequest) {
+// Helper to produce an id string
+function generateShortId(): string {
+  // use rnd() to generate id string with this package version
+  // (instance is not directly callable in typings)
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore
+  return uid.rnd();
+}
+
+
+type GenerateRequestBody = {
+  templateId?: string; // optional template ID for context
+  sessionId?: string; // optional session ID for context
+  // one of these may be present or both absent
+  workflowDefinition?: unknown; // will validate if present
+  messages: unknown; // should be WorkflowMessage[]
+};
+
+type GenerateResponseBody = {
+  messages: WorkflowMessage[]; // responses from aime
+  workflowDefinition?: WorkflowDefinition; // optional modified definition
+  mermaidDiagram?: string; // optional mermaid diagram text
+  modifiedStepIds?: string[]; // step ids added/modified
+};
+
+export async function POST(req: NextRequest) {
   try {
-    const body = await request.json();
-    const { userInput, context, currentWorkflow } = body;
+    const body = (await req.json()) as GenerateRequestBody;
+    const account = req.headers.get('x-account');
+    const organizationHeader = req.headers.get('x-organization');
+    const organization = organizationHeader === null ? null : organizationHeader;
 
-    // Validate required fields
-    if (!userInput || typeof userInput !== 'string') {
-      return NextResponse.json(
-        { error: 'userInput is required and must be a string' },
-        { status: 400 }
-      );
+    let isNewConversation: boolean = false;
+
+    if (!body || typeof body !== 'object') {
+      return NextResponse.json({ error: 'Missing request body' }, { status: 400 });
     }
 
-    // Get available functions from autocomplete system
-    const triggerFunctions = getTriggerFunctionAutocomplete();
-    const actionFunctions = getActionFunctionAutocomplete();
-    
-    // Create a default context if none provided or incomplete
-    const defaultContext = {
-      user: {
-        id: 'user-123',
-        name: 'Current User',
-        email: 'user@company.com',
-        role: 'employee',
-        department: 'general',
-        manager: 'manager@company.com'
-      },
-      mrf: {
-        id: 'mrf-123',
-        title: 'New Event Request',
-        purpose: 'general',
-        maxAttendees: 50,
-        startDate: new Date().toISOString(),
-        endDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-        location: 'TBD',
-        budget: 1000
-      },
-      // Enhanced function context from autocomplete system
-      availableFunctions: [...triggerFunctions.map(f => f.name), ...actionFunctions.map(f => f.name)],
-      triggerFunctions: triggerFunctions.map(f => ({
-        name: f.name,
-        description: f.description,
-        parameters: f.parameters || [],
-        examples: f.examples,
-        llmInstructions: f.llmInstructions
-      })),
-      actionFunctions: actionFunctions.map(f => ({
-        name: f.name,
-        description: f.description,
-        parameters: f.parameters || [],
-        examples: f.examples,
-        llmInstructions: f.llmInstructions
-      })),
-      currentDate: new Date().toISOString()
-    };
-
-    // Merge with default context, preserving enhanced fields
-    const fullContext = {
-      ...defaultContext,
-      user: { ...defaultContext.user, ...(context?.user || {}) },
-      mrf: { ...defaultContext.mrf, ...(context?.mrf || {}) },
-      // Preserve enhanced context fields
-      functionSchemas: context?.functionSchemas || [],
-      conversationHistory: context?.conversationHistory || [],
-      referenceData: context?.referenceData || undefined
-    };
-
-    // Get API configuration from environment variables
-    const apiKey = process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY;
-    const provider = (process.env.LLM_PROVIDER as 'openai' | 'anthropic') || 'openai';
-
-    if (!apiKey) {
-      console.log('⚠️  No API key found, using fallback simulation');
-      // Return a simulated workflow for testing
-      const simulatedWorkflow = {
-        schemaVersion: '1.0',
-        metadata: {
-          id: `workflow-${Date.now()}`,
-          name: 'AI Generated Workflow',
-          description: `Workflow generated from: ${userInput}`,
-          version: '1.0.0',
-          status: 'draft',
-          createdAt: new Date().toISOString(),
-          tags: ['ai-generated', 'simulated']
-        },
-        steps: {
-          start: {
-            name: 'MRF Submitted',
-            type: 'trigger',
-            action: 'onMRFSubmit',
-            params: { mrfID: 'dynamic' },
-            nextSteps: ['checkApprovalNeeded']
-          },
-          checkApprovalNeeded: {
-            name: 'Check Approval Requirements',
-            type: 'condition',
-            condition: {
-              any: [
-                {
-                  fact: 'mrf.purpose',
-                  operator: 'equal',
-                  value: 'external'
-                },
-                {
-                  fact: 'mrf.maxAttendees',
-                  operator: 'greaterThan',
-                  value: 100
-                }
-              ]
-            },
-            onSuccess: 'requestManagerApproval',
-            onFailure: 'proceedDirectly'
-          },
-          requestManagerApproval: {
-            name: 'Request Manager Approval',
-            type: 'action',
-            action: 'functions.requestApproval',
-            params: {
-              to: 'user.manager',
-              subject: 'Event Approval Required',
-              data: 'mrf'
-            },
-            onSuccess: 'createEvent',
-            onFailure: 'notifyUser'
-          },
-          proceedDirectly: {
-            name: 'Proceed Without Approval',
-            type: 'action',
-            action: 'functions.proceedDirectly',
-            params: { reason: 'No approval required' },
-            nextSteps: ['createEvent']
-          },
-          createEvent: {
-            name: 'Create Event',
-            type: 'action',
-            action: 'functions.createEvent',
-            params: { mrfID: 'dynamic' },
-            nextSteps: ['end']
-          },
-          end: {
-            name: 'Workflow Complete',
-            type: 'end',
-            result: 'success'
-          }
-        },
-        mermaidDiagram: `\`\`\`mermaid
-flowchart TD
-    start[("🚀 MRF Submitted")] --> checkApprovalNeeded{"❓ Check Approval Requirements"}
-    checkApprovalNeeded -->|"✅ Needs Approval"| requestManagerApproval["👤 Request Manager Approval"]
-    checkApprovalNeeded -->|"❌ No Approval Needed"| proceedDirectly["⚡ Proceed Without Approval"]
-    requestManagerApproval -->|"✅ Approved"| createEvent["📅 Create Event"]
-    requestManagerApproval -->|"❌ Rejected"| notifyUser["📧 Notify User"]
-    proceedDirectly --> createEvent
-    createEvent --> end(["🏁 Workflow Complete"])
-\`\`\``,
-      };
-
-      return NextResponse.json({
-        workflow: simulatedWorkflow,
-        source: 'simulation',
-        message: 'Generated using simulation mode (no API key configured)'
-      });
+    if (!account) {
+      return NextResponse.json({ error: 'Missing account information in the request' }, { status: 400 });
     }
 
-    // Initialize LangChain generator with conversational mode enabled
-    const generator = new LangChainWorkflowGenerator({
-      provider: provider === 'openai' ? 'openai' : provider === 'anthropic' ? 'anthropic' : 'lmstudio',
-      sessionId: `workflow-gen-${Date.now()}`,
-      workflowId: currentWorkflow?.metadata?.id || `new-workflow-${Date.now()}`,
-      userId: fullContext.user?.id,
-      organization: fullContext.user?.department,
-      conversationalMode: true // Enable conversational mode for parameter collection
+    const { workflowDefinition: rawDef, messages: rawMessages, sessionId, templateId } = body as GenerateRequestBody;
+    if (!templateId) {
+      return NextResponse.json({ error: 'Missing templateId in request' }, { status: 400 });
+    }
+
+
+    // Validate workflowDefinition if present
+    let parsedWorkflowDef: WorkflowDefinition | null = null;
+    if (rawDef !== undefined && rawDef !== null) {
+      const vd = validateWorkflowDefinition(rawDef);
+      if (!vd.valid) {
+        return NextResponse.json({ error: 'Invalid workflowDefinition', details: vd.errors }, { status: 400 });
+      }
+      parsedWorkflowDef = vd.data;
+    }
+
+    // Validate messages
+    if (!Array.isArray(rawMessages)) {
+      return NextResponse.json({ error: 'messages must be an array' }, { status: 400 });
+    }
+
+    const messages: WorkflowMessage[] = (rawMessages as unknown[]).map((m) => {
+      const mm = m as Record<string, unknown>;
+      const sender = (mm['sender'] === 'aime' || mm['sender'] === 'user' || mm['sender'] === 'system')
+        ? (mm['sender'] as 'aime' | 'user' | 'system')
+        : 'user';
+
+      // Build a properly typed content object
+      const content: WorkflowMessage['content'] = (mm['content'] && typeof mm['content'] === 'object')
+        ? (mm['content'] as WorkflowMessage['content'])
+        : { text: String(mm['content'] ?? '') };
+
+      return {
+        id: String(mm['id'] ?? ''),
+        sender,
+        content,
+        timestamp: String(mm['timestamp'] ?? new Date().toISOString()),
+        userId: mm['userId'] as string | undefined,
+        userName: mm['userName'] as string | undefined,
+        type: mm['type'] as ('text' | 'image' | 'file') | undefined,
+        metadata: mm['metadata'] as Record<string, unknown> | undefined,
+      } as WorkflowMessage;
     });
 
-    // Initialize memory for the session
-    generator.initializeMemory();
+    isNewConversation = messages.length === 2 && messages[0].sender === 'aime';
+    if (isNewConversation) { //we need to store these in the database
+      const upsertPromises = messages.map(async (m) => {
 
-    // Map fullContext to LangChain's WorkflowGenerationContext
-    const functionDefs = [...(fullContext.triggerFunctions || []), ...(fullContext.actionFunctions || [])].map(f => ({
-      name: f.name,
-      description: f.description,
-      usage: f.llmInstructions?.usage || f.description,
-      parameters: (f.parameters || []).map(p => {
-        let options: string[] | undefined = undefined;
-        if (p.options && Array.isArray(p.options)) {
-          if (p.options.length > 0 && typeof p.options[0] === 'object') {
-            options = (p.options as Array<{value: string | number}>).map(o => String(o.value));
-          } else {
-            options = p.options.map(o => String(o));
+        const messageToStore: AimeWorkflowConversationsRecord = {
+          ...m,
+          account,
+          organization,
+          templateId,
+        } as AimeWorkflowConversationsRecord;
+        try {
+          await AimeWorkflowMessagesDBUtil.upsertMessage(messageToStore);
+        } catch (error) {
+          console.error('Error storing message in DB:', error);
+        }
+      });
+      await Promise.all(upsertPromises);
+      console.log('Stored new conversation messages in DB');
+    } else {
+      //We need to store just the last message that has come from the user.
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage && lastMessage.sender !== 'aime') {
+        const messageToStore: AimeWorkflowConversationsRecord = {
+          ...lastMessage,
+          account,
+          organization,
+          templateId,
+        } as AimeWorkflowConversationsRecord;
+        try {
+          await AimeWorkflowMessagesDBUtil.upsertMessage(messageToStore);
+          console.log('Stored user message in DB:', lastMessage.id);
+        } catch (error) {
+          console.error('Error storing user message in DB:', error);
+        }
+      }
+    }
+
+    const result = await runLangChainGenerator(messages, parsedWorkflowDef, { sessionId: sessionId ?? generateShortId(), templateId });
+
+    //stored the "aime" messages 
+    if (result.messages && result.messages.length > 0) {
+      const upsertPromises = result.messages.map(async (m) => {
+        if (m.sender === 'aime') {
+          const messageToStore: AimeWorkflowConversationsRecord = {
+            ...m,
+            account,
+            organization,
+            templateId,
+          } as AimeWorkflowConversationsRecord;
+          try {
+            await AimeWorkflowMessagesDBUtil.upsertMessage(messageToStore);
+          } catch (error) {
+            console.error('Error storing message in DB:', error);
           }
         }
-        return {
-          name: p.name,
-          type: String(p.type),
-          description: p.description,
-          required: p.required,
-          options
-        };
-      }),
-      example: (f.llmInstructions?.jsonExample || (f.examples && f.examples[0]) || {}) as Record<string, unknown>
-    }));
+      });
+      await Promise.all(upsertPromises);
+      console.log('Stored aime response messages in DB');
+    }
 
-    const langchainContext = {
-      userRole: fullContext.user?.role || 'employee',
-      userDepartment: fullContext.user?.department || 'general',
-      workflowId: currentWorkflow?.metadata?.id,
-      workflowName: currentWorkflow?.metadata?.name,
-      conversationGoal: 'create' as const,
-      currentWorkflowSteps: Array.isArray(currentWorkflow?.steps) ? currentWorkflow.steps.map((s: { id?: string; name?: string }) => s.id || s.name || '') : [],
-      availableFunctions: fullContext.availableFunctions || [],
-      functionDefinitions: functionDefs,
-      conversationHistory: fullContext.conversationHistory || [],
-      user: fullContext.user,
-      mrf: fullContext.mrf,
-      referenceData: fullContext.referenceData,
-      currentDate: fullContext.currentDate
+    const receivedWorkflowDefinition: WorkflowDefinition | undefined = (result.messages && result.messages[result.messages.length - 1]?.content.workflowDefinition)
+      ? (result.messages[result.messages.length - 1]?.content.workflowDefinition as WorkflowDefinition)
+      : undefined;
+
+    // Build response
+
+    const mermaidDiagram: string | undefined = receivedWorkflowDefinition ? generateMermaidFromWorkflow(receivedWorkflowDefinition) : undefined;
+    console.log('[route] generated mermaid diagram', mermaidDiagram);
+
+    const responseBody: GenerateResponseBody = {
+      messages: result.messages,
+      workflowDefinition: receivedWorkflowDefinition,
+      mermaidDiagram,
+      modifiedStepIds: result.modifiedStepIds ?? [],
     };
 
-    // Handle backend-only processing with conversational responses
-    const result = await generator.generateWorkflow(userInput, langchainContext, currentWorkflow);
-    
-    return NextResponse.json({
-      workflow: result.workflow,
-      conversationalResponse: result.conversationalResponse,
-      followUpQuestions: result.followUpQuestions,
-      parameterCollectionNeeded: result.parameterCollectionNeeded,
-      source: 'llm',
-      provider,
-      message: result.conversationalResponse || `Workflow updated successfully based on your request: "${userInput.substring(0, 100)}${userInput.length > 100 ? '...' : ''}"`
-    });
 
-  } catch (error) {
-    console.error('API Error:', error);
-    return NextResponse.json(
-      { 
-        error: 'Failed to generate workflow',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    );
+
+    return NextResponse.json(responseBody, { status: 200 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

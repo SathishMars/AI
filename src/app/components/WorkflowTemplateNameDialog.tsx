@@ -18,7 +18,6 @@ interface WorkflowTemplateNameDialogProps {
   onClose: () => void;
   onSubmit: (name: string) => Promise<void>;
   currentName?: string;
-  mode?: 'create' | 'rename';
 }
 
 export default function WorkflowTemplateNameDialog({
@@ -26,16 +25,20 @@ export default function WorkflowTemplateNameDialog({
   onClose,
   onSubmit,
   currentName = '',
-  mode = 'create'
 }: WorkflowTemplateNameDialogProps) {
   const [templateName, setTemplateName] = useState(currentName);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const labelTextFieldRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
       setTemplateName(currentName);
       setError(null);
+      console.log('Focusing text field');
+      setTimeout(() => {
+        labelTextFieldRef.current?.focus();
+      }, 100); // Delay to ensure dialog is fully open
     }
   }, [open, currentName]);
 
@@ -58,13 +61,11 @@ export default function WorkflowTemplateNameDialog({
       setError(validationError);
       return;
     }
-
     setIsSubmitting(true);
     setError(null);
 
     try {
       await onSubmit(templateName.trim());
-      setTemplateName('');
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save template name');
@@ -73,7 +74,7 @@ export default function WorkflowTemplateNameDialog({
     }
   };
 
-  const handleKeyPress = (event: React.KeyboardEvent) => {
+  const handleKeyUp = (event: React.KeyboardEvent) => {
     if (event.key === 'Enter' && !isSubmitting) {
       event.preventDefault();
       handleSubmit();
@@ -83,17 +84,16 @@ export default function WorkflowTemplateNameDialog({
   return (
     <Dialog 
       open={open} 
-      onClose={mode === 'create' ? undefined : onClose} // Prevent closing for new templates
-      disableEscapeKeyDown={mode === 'create'} // Disable Escape key for create mode
+      onClose={!currentName? undefined : onClose} // Prevent closing if template name is blank
       maxWidth="sm"
       fullWidth
     >
       <DialogTitle>
-        {mode === 'create' ? 'Name Your Workflow Template' : 'Rename Workflow Template'}
+        {currentName ? 'Rename Workflow Template' : 'Name Your Workflow Template'}
       </DialogTitle>
       
       <DialogContent>
-        {mode === 'create' && (
+        {!currentName && (
           <Alert severity="info" sx={{ mb: 2 }}>
             Give your workflow template a descriptive name to help identify it later.
           </Alert>
@@ -108,7 +108,7 @@ export default function WorkflowTemplateNameDialog({
         <TextField
           autoFocus
           margin="dense"
-          label="Template Name"
+          label="Workflow Template Name"
           type="text"
           fullWidth
           variant="outlined"
@@ -117,10 +117,11 @@ export default function WorkflowTemplateNameDialog({
             setTemplateName(e.target.value);
             setError(null);
           }}
-          onKeyPress={handleKeyPress}
+          onKeyUp={handleKeyUp}
           disabled={isSubmitting}
           placeholder="e.g., Event Approval Workflow"
           helperText="Use letters, numbers, spaces, hyphens, and underscores"
+          inputRef={labelTextFieldRef}
         />
       </DialogContent>
       
@@ -132,7 +133,7 @@ export default function WorkflowTemplateNameDialog({
           startIcon={isSubmitting && <CircularProgress size={16} />}
           fullWidth
         >
-          {mode === 'create' ? 'Create Template' : 'Save'}
+          {currentName ? 'Save' : 'Create Template'}
         </Button>
       </DialogActions>
     </Dialog>
