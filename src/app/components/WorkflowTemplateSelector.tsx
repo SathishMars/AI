@@ -95,7 +95,7 @@ export default function WorkflowTemplateSelector({
     };
     console.log('🔄 useEffect triggered - fetching templates');
     fetchTemplates();
-  }, []);
+  }, [currentTemplateMenuItem]);
 
   useEffect(() => {
     if (!currentTemplateMenuItem) return;

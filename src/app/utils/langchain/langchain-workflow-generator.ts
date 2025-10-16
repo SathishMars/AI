@@ -190,22 +190,7 @@ export async function runLangChainGenerator(
   });
 
   try {
-    // Safe stringify helper to avoid crashes on circular structures
-    const safeStringify = (obj: unknown, maxChars = 10000) => {
-      try {
-        const cache = new Set<unknown>();
-        const str = JSON.stringify(obj, function (_key, value) {
-          if (value && typeof value === 'object') {
-            if (cache.has(value)) return '[Circular]';
-            cache.add(value);
-          }
-          return value;
-        });
-        return typeof str === 'string' && str.length > maxChars ? str.slice(0, maxChars) + '...<truncated>' : str;
-      } catch (e) {
-        return String(e instanceof Error ? e.message : e);
-      }
-    };
+    // Safe stringify helper intentionally omitted to avoid unused-var warnings; use JSON.stringify directly where needed.
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       throw new Error('No messages provided to generator');
     }

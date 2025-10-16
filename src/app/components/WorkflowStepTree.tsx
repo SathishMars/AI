@@ -11,7 +11,7 @@ import WorkflowStepTrigger from './WorkflowStepTrigger';
 import WorkflowStepDecision from './WorkflowStepDecision';
 import WorkflowStepApproval from './WorkflowStepApproval';
 import WorkflowStepGeneric from './WorkflowStepGeneric';
-import { get } from 'http';
+// 'get' from 'http' was unused and removed
 import { getReferredSteps, getStepsLabelsMap } from '../utils/WorkflowStepUtils';
 import WorkflowStepSwitchCase from './WorkflowStepSwitchCase';
 import WorkflowStepNotify from './WorkflowStepNotify';
@@ -191,6 +191,10 @@ export default function WorkflowStepTree({ workflowSteps, onStepSave }: Workflow
 
     const onSave = (updated: WorkflowStep) => {
       console.log("Step saved:", updated);
+      // Call optional prop to notify parent
+      if (onStepSave) {
+        onStepSave(updated);
+      }
       // update the step in local state
       setEditingStepId(null);
     }

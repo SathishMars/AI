@@ -33,8 +33,8 @@ export default function WorkflowConfigurePage({ params }: PageProps) {
 
   // Use workflow template hook with immediate auto-save
   const {
-    template, isLoading, isContextLoading,
-    error, isNewTemplate, isSaving,
+  template, isLoading, isContextLoading,
+  error, isSaving,
     loadTemplate, 
     updateWorkflowDefinition, updateTemplateLabel,
     clearError

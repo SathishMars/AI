@@ -216,9 +216,8 @@ export async function GET(request: NextRequest) {
     // 2. Apply user-specific customizations
     // 3. Check user permissions
     
-    const searchParams = request.nextUrl.searchParams;
-    const templateId = searchParams.get('templateId') || 'standard';
-    const includeExamples = searchParams.get('includeExamples') !== 'false';
+  const searchParams = request.nextUrl.searchParams;
+  const includeExamples = searchParams.get('includeExamples') !== 'false';
     
     // For now, return the sample template
     const template = { ...sampleMRFTemplate };
@@ -250,9 +249,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+  await request.json();
     
-    // In a real application, you might:
+  // In a real application, you might:
     // 1. Validate the MRF submission
     // 2. Save to database
     // 3. Trigger workflow processes

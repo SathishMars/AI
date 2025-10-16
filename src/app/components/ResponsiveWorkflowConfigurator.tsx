@@ -99,12 +99,11 @@ export default function ResponsiveWorkflowConfigurator({
 
   // Template naming state
   const [showNameDialog, setShowNameDialog] = useState(false);
-  const [isTemplateValid, setIsTemplateValid] = useState(false); // just as a place holder for now to prevent accidental publish
+  const [isTemplateValid] = useState(false); // placeholder to prevent accidental publish; setter intentionally unused
   const [workflowTemplateSelectorItem, setWorkflowTemplateSelectorItem] = useState<workflowTemplateSelectorMenuItem | null>(null);
 
 
   const updateWorkflowTemplateSelectorItem = useCallback((loadedTemplate: WorkflowTemplate) => {
-    console.log('🔄 Updating selector item for template:', loadedTemplate.id, loadedTemplate.metadata.label);
     setWorkflowTemplateSelectorItem({
       id: loadedTemplate.id,
       label: loadedTemplate.metadata.label,
@@ -115,12 +114,11 @@ export default function ResponsiveWorkflowConfigurator({
 
   // Auto-show dialog for new templates that need naming (only once)
   useEffect(() => {
-    if (workflowTemplate && workflowTemplate.metadata && !workflowTemplate.metadata.label) { // New templates won't have a label yet
-      console.log('🆕 Auto-showing name dialog for new template');
+    if (workflowTemplate && workflowTemplate.metadata && !workflowTemplate.metadata.label) {
       setShowNameDialog(true);
     }
     updateWorkflowTemplateSelectorItem(workflowTemplate);
-  }, [updateWorkflowTemplateSelectorItem, workflowTemplate, workflowTemplate.metadata.label]);
+  }, [updateWorkflowTemplateSelectorItem, workflowTemplate, workflowTemplate?.metadata?.label]);
 
 
   // Resizable divider functionality

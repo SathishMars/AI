@@ -61,7 +61,6 @@ export default function VisualizationPane({
   fullScreen = false
 }: VisualizationPaneProps) {
   const [tabValue, setTabValue] = useState(0);
-  const [editingStep, setEditingStep] = useState<WorkflowStep | null>(null);
   // const llmFunctionDefinitions = React.useMemo(() => getLLMContext(), []);
   // const functionDefinitionLookup = React.useMemo(
   //   () => buildFunctionDefinitionLookup(llmFunctionDefinitions),
@@ -111,8 +110,7 @@ export default function VisualizationPane({
       ...workflowTemplate.workflowDefinition,
       steps: updateStepsRecursively(workflowTemplate.workflowDefinition.steps) as WorkflowStep[]
     };
-    onWorkflowDefinitionChange(updatedWorkflowDefinition);
-    setEditingStep(null);
+  onWorkflowDefinitionChange(updatedWorkflowDefinition);
   }
 
   // const renderMermaidDiagram = () => {

@@ -15,18 +15,18 @@ export type ListFilters = {
 
 export class WorkflowTemplateDbUtil {
   static async create(template: WorkflowTemplate): Promise<WorkflowTemplate> {
-    // Validate and normalize timestamps (allow ISO strings)
-    const normalized = WorkflowTemplateDbUtil.normalizeForDb(template);
-    // Validate shape using Zod
-    const parsed = WorkflowTemplateSchema.parse(normalized);
+  // Validate and normalize timestamps (allow ISO strings)
+  const normalized = WorkflowTemplateDbUtil.normalizeForDb(template);
+  // Validate shape using Zod (result not needed beyond validation)
+  WorkflowTemplateSchema.parse(normalized);
 
     const db = await getMongoDatabase();
     const collection = db.collection<Document>(COLLECTION);
 
-    await collection.insertOne(parsed as unknown as Document);
+  await collection.insertOne(normalized as unknown as Document);
 
-    // Build returned object from parsed + insertedId
-    const insertedObj = { ...(parsed as unknown as Record<string, unknown>) } as Record<string, unknown>;
+  // Build returned object from normalized
+  const insertedObj = { ...(normalized as unknown as Record<string, unknown>) } as Record<string, unknown>;
     // Do not expose MongoDB internal _id to API consumers
     if ('_id' in insertedObj) delete insertedObj._id;
 
@@ -133,8 +133,8 @@ export class WorkflowTemplateDbUtil {
       copy.organization = organization;
     }
 
-    // Validate shape
-    const parsed = WorkflowTemplateSchema.parse(copy);
+  // Validate shape (result not needed beyond validation)
+  WorkflowTemplateSchema.parse(copy);
 
     // Normalize dates for DB
     const normalized = WorkflowTemplateDbUtil.normalizeForDb(copy as unknown as WorkflowTemplate);

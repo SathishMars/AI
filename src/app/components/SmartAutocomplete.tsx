@@ -16,7 +16,6 @@ import {
 import SendIcon from '@mui/icons-material/Send';
 import { WorkflowAutocompleteItem } from '@/app/types/workflowAutocomplete';
 import { WorkflowDefinition, WorkflowStep } from '../types/workflowTemplate';
-import { set } from 'zod';
 
 
 interface SmartAutocompleteProps {

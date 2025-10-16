@@ -2,8 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { DataGrid, GridColDef, GridRenderCellParams, GridRowParams } from '@mui/x-data-grid';
-import { Box, Typography, Avatar } from '@mui/material';
+import { DataGrid, GridColDef, GridRowParams } from '@mui/x-data-grid';
+import { Box, Typography } from '@mui/material';
 import { useUnifiedUserContext } from '@/app/contexts/UnifiedUserContext';
 import type { WorkflowTemplate } from '@/app/types/workflowTemplate';
 

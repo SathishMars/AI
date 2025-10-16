@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { WorkflowMessage } from "../types/aimeWorkflowMessages";
 import ShortUniqueId from 'short-unique-id';
 import { WorkflowDefinition } from "../types/workflowTemplate";
-import { text } from "stream/consumers";
+// removed unused import 'text'
 import { useUnifiedUserContext } from "../contexts/UnifiedUserContext";
 
 // 10-char alphanumeric short id generator (reusable instance)
@@ -55,7 +55,7 @@ export function useAimeWorkflow({
     const sessionIDRef = useRef<string>(generateShortId());
     const sessionId = sessionIDRef.current;
     const [messages, setMessages] = useState<WorkflowMessage[]>([]);
-    const { user, isLoading: userContextLoading } = useUnifiedUserContext();
+    const { user } = useUnifiedUserContext();
 
     useEffect(() => {
         if (!workflowTemplateId || workflowTemplateId.trim()==="new") {
@@ -110,8 +110,8 @@ export function useAimeWorkflow({
             id: generateShortId(),
             sender: 'user',
             type: 'text',
-            userId: user.id, // Replace with actual user ID if available
-            userName: user.lastName +", "+ user.firstName, // Replace with actual user name if available
+            userId: user?.id ?? 'unknown',
+            userName: `${user?.profile?.lastName ?? ''}${user?.profile?.lastName && user?.profile?.firstName ? ', ' : ''}${user?.profile?.firstName ?? 'user'}`,
             content: { text: message },
             timestamp: new Date().toISOString()
         };
@@ -159,7 +159,7 @@ export function useAimeWorkflow({
         if (onMessage) {
             onMessage(message);
         }
-    }, [messages, onMessage, onWorkflowDefinitionChange, sessionId, workflowDefinition, workflowTemplateId]);
+    }, [messages, onMessage, onWorkflowDefinitionChange, sessionId, workflowDefinition, workflowTemplateId, user?.id, user?.profile?.firstName, user?.profile?.lastName]);
 
     return {
         messages,
