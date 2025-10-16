@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import TemplatesGrid from './components/TemplatesGrid';
 
 export default function Home() {
   return (
@@ -23,6 +24,11 @@ export default function Home() {
           >
             Get Started
           </Link>
+        </div>
+
+        {/* Templates grid - shows available workflow templates */}
+        <div className="w-full mt-6">
+          <TemplatesGrid />
         </div>
 
  

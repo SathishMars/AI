@@ -63,6 +63,25 @@ export function generateMermaidFromWorkflow(workflow: WorkflowDefinition): strin
             if (step.onConditionPass) addEdgeTo(step.onConditionPass, 'pass');
             if (step.onConditionFail) addEdgeTo(step.onConditionFail, 'fail');
 
+            // Support for decision-style conditions where a 'conditions' array
+            // contains value->next mappings (e.g. multiCheckCondition)
+            // Each condition will become a labeled edge from this node to the target
+            type Condition = { value?: unknown; next?: string | WorkflowStep };
+            const maybeConds = (step as unknown as { conditions?: Condition[] }).conditions;
+            if (Array.isArray(maybeConds)) {
+                for (const c of maybeConds) {
+                    if (!c) continue;
+                    const label = c.value !== undefined ? String(c.value) : undefined;
+                    addEdgeTo(c.next as string | WorkflowStep | undefined, label);
+                }
+            }
+
+            // defaultNext: a fallback branch from decision nodes
+            const maybeDefault = (step as unknown as { defaultNext?: string | WorkflowStep }).defaultNext;
+            if (maybeDefault) {
+                addEdgeTo(maybeDefault, 'default');
+            }
+
             if (step.onError) addEdgeTo(step.onError, 'error');
             if (step.onTimeout) addEdgeTo(step.onTimeout, 'timeout');
         } catch (err: unknown) {
@@ -105,7 +124,7 @@ title: "Generated mermaid diagram"
 
     nodes.forEach((n) => {
         // Build the full label (including type) and then escape it so newlines become '\n'
-        const fullLabel = `${n.label || ''}${n.type ? `\n(${n.type})` : ''}`;
+        const fullLabel = `\`**${n.label || ''}**${n.type ? `(${n.type})\`` : ''}`;
         const safeLabel = escapeLabel(fullLabel);
 
         // Assign a class name for this node's type if present

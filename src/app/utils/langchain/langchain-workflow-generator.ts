@@ -10,19 +10,20 @@ import { AIMessage, HumanMessage } from '@langchain/core/messages';
 import { JsonOutputParser } from '@langchain/core/output_parsers';
 import { workflowFunctionInstructions } from '@/app/data/workflow-tool-defintions';
 import { workflowVariableLLMInstructions } from '@/app/data/workflow-variable-definitions';
-import  { zodToJsonSchema } from 'zod-to-json-schema';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 import ShortUniqueId from 'short-unique-id';
 import { sampleWorkflowDefinitionJSONForLlm } from '@/app/data/sampleWorkflowDefinitionJSONForLlm';
+import MrfTemplateDBUtil from '../mrfTemplateDBUtil';
 // 10-char alphanumeric short id generator (reusable instance)
 const uid = new ShortUniqueId({ length: 10, dictionary: 'alphanum' });
 
 // Helper to produce an id string
 function generateShortId(): string {
-    // use rnd() to generate id string with this package version
-    // (instance is not directly callable in typings)
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    return uid.rnd();
+  // use rnd() to generate id string with this package version
+  // (instance is not directly callable in typings)
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore
+  return uid.rnd();
 }
 
 /**
@@ -99,7 +100,7 @@ When given conversation history, use it to decide whether to ask clarifying ques
   - They perform a **different function**, or  
   - They are used in **parallel branches**.
 7. Workflow Readability Rule  
-- Wherever possible, **nest** step objects using these fields:  
+- Wherever possible, **embed** step objects using these fields:  
   - \`next\`, \`onConditionPass\`, or \`onConditionFail\`.  
 - Use **ID references** (instead of nested steps) **only when necessary** for clarity or structure.
 
@@ -174,6 +175,9 @@ export async function runLangChainGenerator(
   messages: WorkflowMessage[],
   existingWorkflow: WorkflowDefinition | null,
   config: LangChainWorkflowConfig,
+  accountId?: string,
+  organizationId?: string,
+  userId?: string
 ): Promise<{
   messages: WorkflowMessage[];
   modifiedStepIds: string[];
@@ -222,19 +226,25 @@ export async function runLangChainGenerator(
       throw createErr;
     }
     const shortUniqueIds: string[] = [];
-    for (let i=0; i<20; i++) {
+    for (let i = 0; i < 20; i++) {
       shortUniqueIds.push(generateShortId());
     }
 
+    const availableMRFTemplates = accountId ? await MrfTemplateDBUtil.getTemplatesForAccount(accountId, organizationId, userId) : [];
 
     const systemInstructions = INSTRUCTIONS + (existingWorkflow ? `\nThe existing workflow is: 
 \`\`\`json
 ${JSON.stringify(existingWorkflow, null, 2)} 
 \`\`\`
 
-use the following short unique ids for any new steps or step functions you create and the messageid.
+**Use the following short unique ids** for any new steps or step functions you create and the messageid.
 ${shortUniqueIds.join(', ')}
-` : '\nNo existing workflow provided.');
+` : '\nNo existing workflow provided.' ) + `
+
+**Use from one of the following** list of available MRF templates for onMRF trigger steps:
+${availableMRFTemplates.map(t => `- label: ${t.name}, value: ${t.id}`).join('\n')}
+
+`;
 
 
 
@@ -253,7 +263,7 @@ ${shortUniqueIds.join(', ')}
       return out;
     };
 
-    console.log('[langchain] system instructions', );
+    console.log('[langchain] system instructions',);
 
     const escapedSystemInstructions = escapeTemplateBraces(systemInstructions, ['chat_history', 'input']);
     console.debug('[langchain] systemInstructions length', systemInstructions.length, 'escaped length', escapedSystemInstructions.length);
@@ -276,7 +286,8 @@ ${shortUniqueIds.join(', ')}
 
     messageHistory.addMessages(messages.map((m: WorkflowMessage) => {
       if (m.sender === 'aime') {
-        return new AIMessage(m.content.text);
+        const aimeMessage = m.content.text + (m.content.followUpQuestions ? `\n**Questions for user:** ${m.content.followUpQuestions.join('\n')}` : '') + (m.content.followUpOptions ? `\n**Options for user:** ${JSON.stringify(m.content.followUpOptions)}` : '');
+        return new AIMessage(aimeMessage);
       } else {
         return new HumanMessage(m.content.text);
       }
@@ -315,11 +326,13 @@ ${shortUniqueIds.join(', ')}
     });
 
     try {
-      const response = await conversationalChain.invoke(invokeInput, { configurable: {
+      const response = await conversationalChain.invoke(invokeInput, {
+        configurable: {
           response_format: { type: 'json_object' },
           output_parser: new JsonOutputParser(),
           sessionId: config.sessionId,
-      }});
+        }
+      });
       console.info('[langchain] conversationalChain invoke completed', response.content);
 
       // Strip the ``````json` and ``` fences

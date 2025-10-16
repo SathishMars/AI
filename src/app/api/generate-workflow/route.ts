@@ -41,6 +41,9 @@ export async function POST(req: NextRequest) {
     const organization = organizationHeader === null ? null : organizationHeader;
 
     let isNewConversation: boolean = false;
+    // Middleware injects user info into headers; prefer header value
+    const userIdHeader = req.headers.get('x-user-id');
+    const resolvedUserId = userIdHeader && userIdHeader.trim() !== '' ? userIdHeader : undefined;
 
     if (!body || typeof body !== 'object') {
       return NextResponse.json({ error: 'Missing request body' }, { status: 400 });
@@ -103,6 +106,7 @@ export async function POST(req: NextRequest) {
           account,
           organization,
           templateId,
+          userId: resolvedUserId || m.userId || undefined,
         } as AimeWorkflowConversationsRecord;
         try {
           await AimeWorkflowMessagesDBUtil.upsertMessage(messageToStore);
@@ -121,6 +125,7 @@ export async function POST(req: NextRequest) {
           account,
           organization,
           templateId,
+          userId: resolvedUserId || lastMessage.userId || undefined,
         } as AimeWorkflowConversationsRecord;
         try {
           await AimeWorkflowMessagesDBUtil.upsertMessage(messageToStore);
@@ -131,7 +136,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const result = await runLangChainGenerator(messages, parsedWorkflowDef, { sessionId: sessionId ?? generateShortId(), templateId });
+    const orgForCall: string | undefined = organization === null ? undefined : organization;
+    const result = await runLangChainGenerator(messages, parsedWorkflowDef, { sessionId: sessionId ?? generateShortId(), templateId }, account ?? undefined, orgForCall, resolvedUserId);
 
     //stored the "aime" messages 
     if (result.messages && result.messages.length > 0) {
@@ -142,6 +148,7 @@ export async function POST(req: NextRequest) {
             account,
             organization,
             templateId,
+            userId: resolvedUserId || m.userId || undefined,
           } as AimeWorkflowConversationsRecord;
           try {
             await AimeWorkflowMessagesDBUtil.upsertMessage(messageToStore);

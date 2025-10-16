@@ -107,8 +107,8 @@ export default function VisualizationPane({
         }
       });
     }
-    const updatedWorkflowDefinition = { 
-      ...workflowTemplate.workflowDefinition, 
+    const updatedWorkflowDefinition = {
+      ...workflowTemplate.workflowDefinition,
       steps: updateStepsRecursively(workflowTemplate.workflowDefinition.steps) as WorkflowStep[]
     };
     onWorkflowDefinitionChange(updatedWorkflowDefinition);
@@ -323,12 +323,14 @@ export default function VisualizationPane({
         </TabPanel>
 
         <TabPanel value={tabValue} index={1}>
-          <MermaidChart
-            mermaidDiagram={workflowTemplate.mermaidDiagram || ''}
-            onError={(error) => {
-              console.error('Mermaid chart error:', error);
-            }}
-          />
+          <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
+            <MermaidChart
+              mermaidDiagram={workflowTemplate.mermaidDiagram || ''}
+              onError={(error) => {
+                console.error('Mermaid chart error:', error);
+              }}
+            />
+          </Box>
         </TabPanel>
       </Box>
     </Box>

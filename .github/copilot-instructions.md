@@ -213,8 +213,10 @@ const templateId = uid(); // e.g. 'aB3k9ZpQ1x'
 
 ## Development Workflow
 
-### Manual Change Awareness
-- Assume files may contain manual adjustments that differ from cached or previously seen versions.
+ - **Manual Change Awareness**
+ - Assume files may contain manual adjustments that differ from cached or previously seen versions.
+ - Always read the current code before applying updates and reconcile differences instead of overwriting custom logic.
+ - **Formatting rule (MANDATORY)**: After finishing any code modification in the repository, always run the project's default formatter (the one the repository is configured to use) on the modified files and save the formatted results before committing. This ensures consistent style and reduces unrelated diffs.
 - Always read the current code before applying updates and reconcile differences instead of overwriting custom logic.
 
 ### Build Commands

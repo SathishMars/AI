@@ -17,6 +17,11 @@ export const workflowFunctionTypeConfig: Record<string, WorkflowFunctionTypeConf
     label: 'Decision',
     icon: 'help_center' // Material UI stylesheet icon name
   },
+  approval: {
+    color: '#F57C00',
+    label: 'Approval',
+    icon: 'person_check' // Material UI stylesheet icon name
+  },
   task: {
     color: '#1976D2',
     label: 'Task',
@@ -70,7 +75,7 @@ export const workflowFunctionDefinitions: Array<WorkflowStepFunction> = [
             type: 'result', label: 'The request form information', required: true
         }],
         llmInstructions: {
-            usageInstruction: `This is a STEP. Workflow entry point that activates when a request is submitted. Use requestType parameter to filter specific request (use the api definition to get the values) types or leave as "all" for any request
+            usageInstruction: `This is a STEP. Workflow entry point that activates when a request is submitted. 
             Example usage:
       \`\`\` json
         {
@@ -79,11 +84,32 @@ export const workflowFunctionDefinitions: Array<WorkflowStepFunction> = [
             type: 'trigger',
             stepFunction: 'onRequest',
             functionParams: {
-                requestType: 'all' // if provided by the user in their description, match to the available request types from the api or use 'all' for any request. 
+                requestType: 'Travel Request' // if provided by the user in their description, match to the available request types from the api or use 'all' for any request. 
             },
-            next: ['7hhs67klm9'] // next step ID to execute after this step
+            next: ['7hhs67klm9'] // The next step object (preferred) or step ID to execute after this step
         }
       \`\`\`      
+      **Mandatory rule:** The **\`requestType\`** parameter is **required** and must be one of the **valid request types** provided to you.
+---
+## What to do
+1. **Detect and map**
+   - Parse the user's intent and **map it to one valid \`requestType\`** from the provided list.
+   - Use **exact label matching** where possible; otherwise use **semantic matching** to pick the closest valid type.
+2. **When confident**
+   - If the mapping is **clear and unambiguous**, include the chosen **\`requestType\`** in your JSON response.
+3. **When ambiguous or missing**
+   - If you **cannot confidently** map the user's intent, respond with **follow-up options**:
+     - Return a JSON object with **\`followupOptions\`** that **lists the valid request types** as selectable options.
+     - Do **not** invent new request types.
+4. **When user supplies an invalid requestType**
+   - Do **not** accept it.  
+   - Return **\`followupOptions\`** asking the user to select from the **valid list**, and include that list.
+5. **Echo and consistency**
+   - Always **echo back the resolved \`requestType\`** in your output once selected.
+   - Keep the **exact casing/spelling** of the valid type as provided.
+## Matching guidance (recommended)
+- Prefer **exact match** on keywords in the user request (e.g., "stay"", "hotel" → \`Accomodations Request\`; "meeting", "conference" → \`Meeting Request (MRF)\`;).
+- If multiple types seem plausible, **do not guess** → use the **Ambiguous** pattern above.
     `
         },
     },
@@ -113,18 +139,39 @@ export const workflowFunctionDefinitions: Array<WorkflowStepFunction> = [
         llmInstructions: {
             usageInstruction: `This is a STEP. Workflow entry point that activates when an MRF is submitted. Use mrfTemplateName parameter to filter specific MRF templates or leave as "all" for any MRF submission.
             Example usage:
-      \`\`\` json
+        \`\`\` json
         {
             id: 'ght223nmop',  // replace with a generated unique step ID used as refernce in other steps where needed to chain the steps
             label: 'On receiving the MRF', // human readable name for the step based on context of what the step does
             type: 'trigger',
             stepFunction: 'onMRF',
             functionParams: {
-                mrfTemplateName: 'all' // if provided by the user in their description, match to the available MRF types from the api or use 'all' for any MRF. 
+                mrfTemplateName: 'tpl0000004' // // if provided by the user in their description, match to the available mrf types and use the value field or use 'all' for any mrf. 
             },
-            next: ['7hhs67klm9'] // next step ID to execute after this step
+            next: ['7hhs67klm9'] // The next step object (preferred) or step ID to execute after this step
         },
-      \`\`\`      
+        \`\`\` 
+      **Mandatory rule:** The **\`requestType\`** parameter is **required** and must be one of the **valid request types** provided to you.
+---
+## What to do
+1. **Detect and map**
+   - Parse the user's intent and **map it to one valid \`requestType\`** from the provided list.
+   - Use **exact label matching** where possible; otherwise use **semantic matching** to pick the closest valid type.
+2. **When confident**
+   - If the mapping is **clear and unambiguous**, include the chosen **\`requestType\`** in your JSON response.
+3. **When ambiguous or missing**
+   - If you **cannot confidently** map the user's intent, respond with **follow-up options**:
+     - Return a JSON object with **\`followupOptions\`** that **lists the valid request types** as selectable options.
+     - Do **not** invent new request types.
+4. **When user supplies an invalid requestType**
+   - Do **not** accept it.  
+   - Return **\`followupOptions\`** asking the user to select from the **valid list**, and include that list.
+5. **Echo and consistency**
+   - Always **echo back the resolved \`requestType\`** in your output once selected.
+   - Keep the **exact casing/spelling** of the valid type as provided.
+## Matching guidance (recommended)
+- Prefer **exact match** on keywords in the user request (e.g., "stay"", "hotel" → \`Accomodations Request\`; "meeting", "conference" → \`Meeting Request (MRF)\`;).
+- If multiple types seem plausible, **do not guess** → use the **Ambiguous** pattern above.     
     `
         },
     },
@@ -144,13 +191,6 @@ export const workflowFunctionDefinitions: Array<WorkflowStepFunction> = [
                 required: true,
             },
             {
-                name: 'cc',
-                label: 'CC',
-                type: 'string',
-                description: 'CC recipients (optional)',
-                required: false,
-            },
-            {
                 name: 'subject',
                 label: 'Subject',
                 type: 'string',
@@ -168,7 +208,7 @@ export const workflowFunctionDefinitions: Array<WorkflowStepFunction> = [
         ],
         outputs: [{ type: 'result', label: 'The request form information', required: false }],
         llmInstructions: {
-            usageInstruction: `This is a STEP. this step will execute a task to notify one or more users. Use the to, cc, subject, and notificationTemplateName parameters to customize the notification.
+            usageInstruction: `This is a STEP. this step will execute a task to notify one or more users. Use the to,subject, and notificationTemplateName parameters to customize the notification.
             Example usage:
       \`\`\` json
         {
@@ -177,12 +217,11 @@ export const workflowFunctionDefinitions: Array<WorkflowStepFunction> = [
             type: 'task',
             stepFunction: 'notify',
             functionParams: {
-                to: '\${userId: "jdoe@company.com", name: "John Doe"}', // use the userId as per the org format
-                cc: '\${userId: "finance-team@company.com", name: "Finance Team"}', // use the userId as per the org format
+                to: '\${id: "jdoe@company.com", name: "John Doe", type: "user"}, \${id:"org-fin", name: "Finance Team", type: "dept"}', // use the userId as per the org format
                 subject: 'A new meeting request from John Doe was submitted',
                 notificationTemplateName: 'notification-template-1' // if provided by the user in their description, match to the available notification templates from the api.
             },
-            next: ['7hhs67klm9'] // next step ID to execute after this step. could be the terminate step or another task step
+            next: ['7hhs67klm9'] // The next step object (preferred) or step ID to execute after this step
         }
       \`\`\`      
     `
@@ -206,7 +245,7 @@ export const workflowFunctionDefinitions: Array<WorkflowStepFunction> = [
             type: 'task',
             stepFunction: 'createEvent',
             functionParams: { },
-            next: ['87snjhsw76'] // next step ID to execute after this step. could be the terminate step or another task step. 
+            next: ['87snjhsw76'] // The next step object (preferred) or step ID to execute after this step.
         }
       \`\`\`      
     `
@@ -216,7 +255,7 @@ export const workflowFunctionDefinitions: Array<WorkflowStepFunction> = [
     {
         id: 'fn_request_approval',
         label: 'Request for approval',
-        type: 'decision',
+        type: 'approval',
         name: 'requestApproval',
         description: 'Request approval from designated approvers',
         params: [
@@ -257,9 +296,9 @@ export const workflowFunctionDefinitions: Array<WorkflowStepFunction> = [
                 approver: '\${manager}', // use the userId as per the org format or use workflow variables like \${manager} to dynamically set the approver based on the request context
                 reason: 'Budget exceeds department threshold' // optional reason for the approval request
             },
-            onConditionPass: '7c8aScds7e', // next step ID to execute if approved. could be the terminate step or another task step
-            onConditionFail: '87snjhsw76', // next step ID to execute if rejected. could be the terminate step or another task step
-            onTimeout: 'jds7bbsq7n', // next step ID to execute if no response within timeout period. could be the terminate step or another task step
+            onConditionPass: '7c8aScds7e', // The next step object (preferred) or step ID to execute after this step
+            onConditionFail: '87snjhsw76', // The next step object (preferred) or step ID to execute if rejected. could be the terminate step or another task step
+            onTimeout: 'jds7bbsq7n', // The next step object (preferred) or step ID to execute if no response within timeout period. could be the terminate step or another task step
             timeout: 86400, // optional timeout in seconds (e.g., 86400 seconds = 24 hours)
             retryCount: 2, // optional retry count on failure
             retryDelay: 3600 // optional delay between retries in seconds (e.g., 3600 seconds = 1 hour)
@@ -314,8 +353,8 @@ export const workflowFunctionDefinitions: Array<WorkflowStepFunction> = [
                     ]
                 }
             },
-            onConditionPass: 'ds6ksd7xnm', // next step ID to execute if condition passes. could be the terminate step or another task step
-            onConditionFail: 'basx6vwqn8', // next step ID to execute if condition fails. could be the terminate step or another task step
+            onConditionPass: 'ds6ksd7xnm', // The next step object (preferred) or step ID to execute after this step
+            onConditionFail: 'basx6vwqn8', // The next step object (preferred) or step ID to execute if condition fails. could be the terminate step or another task step
         }
       \`\`\`      
         Note: This step supports enhanced condition outputs:
@@ -324,6 +363,49 @@ export const workflowFunctionDefinitions: Array<WorkflowStepFunction> = [
     `
         },
     },
+    {
+        id: 'fn_switch_condition',
+        label: 'Multi Decision Point',
+        type: 'decision',
+        name: 'multiCheckCondition',
+        description: 'Evaluate a variable to determine workflow path with multiple outcomes based on its value',
+        params: [
+            {
+                name: 'evaluate',
+                label: 'Variable to evaluate',
+                type: 'string',
+                description: 'A variable value to check against multiple possible values',
+                required: true,
+            },
+        ],
+        outputs: [{
+            type: 'condition', label: 'Passed', required: true, value: 'value of the matched condition', next: 'next step id for the matched condition'
+        }],
+        llmInstructions: {
+            usageInstruction: `This is a STEP. **Evaluates a variable to determine the workflow path. Use the evaluate parameter to specify the variable to check.**
+            Example usage:
+      \`\`\` json
+        {
+            id: '3klmop4567',  // replace with a generated unique step ID used as refernce in other steps where needed to chain the steps   
+            label: 'Branch based on department', // human readable name for the step based on context of what the step does
+            type: 'decision',
+            stepFunction: 'multiCheckCondition',
+            functionParams: {
+                evaluate: {\${department}} // the variable to evaluate. could be department, region, requestType, etc.
+            },
+            conditions: [ // list of possible values to check against the variable
+                { value: 'Finance', next: '2347y82wef' },  // if variable matches 'Finance', go to stepId '2347y82wef'. ** ALWAYS use STEP IDs for next references. DO NOT embed step objects **
+                { value: 'HR', next: '787cbks76f' }, 
+                { value: 'IT', next: 'nbjshd567b' },
+                { value: 'Admin', next: 't7tsajs7bq' }
+            ],
+            defaultNext: 'defaultStepId', // optional default step ID if no conditions match
+        }
+      \`\`\`      
+    `
+        },
+    },
+
     // Branch / Merge functions
     {
         id: 'fn_branch_workflow',
@@ -345,7 +427,7 @@ export const workflowFunctionDefinitions: Array<WorkflowStepFunction> = [
             functionParams: {
                 // no parameters for branch step
             },
-            next: ['889gfhhy65', '7hhs67klm9', 'vvs6ojhwtF'] // array of next step IDs to execute in parallel
+            next: ['889gfhhy65', '7hhs67klm9', 'vvs6ojhwtF'] // The next set of step objects (preferred) or step IDs to execute after this step. It can be a mix of both step objects and step IDs
         },
       \`\`\`
     `
@@ -403,7 +485,7 @@ export const workflowFunctionDefinitions: Array<WorkflowStepFunction> = [
                 waitForAll: true, // set to true if all steps must succeed, false if partial success is acceptable
                 timeout: 120 // maximum wait time in seconds before proceeding (e.g., 120 seconds = 2 minutes)
             },
-            next: ['proceedWithProcess'] // next step ID to execute after merging
+            next: ['proceedWithProcess'] // The next step object (preferred) or step ID to execute after this step
         }
       \`\`\`      
     `

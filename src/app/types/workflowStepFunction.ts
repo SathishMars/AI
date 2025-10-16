@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 
-export type ToolType = 'task' | 'decision' | 'trigger' | 'branch' | 'merge' | 'workflow' | 'terminate';
+export type ToolType = 'task' | 'decision' | 'approval'| 'trigger' | 'branch' | 'merge' | 'workflow' | 'terminate';
 
 
 
@@ -29,9 +29,11 @@ export interface FunctionParam {
 }
 
 export interface FunctionOutput {
-    type: 'result' | 'pass' | 'fail' | 'error' | 'timeout';     // Output type
-    label: string;                                              // Human-readable output label
+    type: 'result' | 'pass' | 'fail' | 'error' | 'timeout' | 'condition';     // Output type
+    label?: string;                                              // Human-readable output label
     required: boolean;                                          // Is the output required
+    value?: string|number|boolean;                                             // Optional value to be returned
+    next?: string;                                              // Optional next step ID
 }
 
 

@@ -45,6 +45,7 @@ export interface WorkflowStep {
     stepFunction?: string;                                // Optional tool or service associated with the step
     functionParams?: Record<string, unknown>;             // Optional parameters for the tool
     next?: Array<string | WorkflowStep>;                  // Optional next steps (for branching)
+    conditions?: Array<{ value: string; next: string }>; // Optional conditions for switch case branching steps
     onConditionPass?: string | WorkflowStep;              // Optional steps if condition passes
     onConditionFail?: string | WorkflowStep;              // Optional steps if condition fails
     onError?: string | WorkflowStep;                      // Optional error handling steps
