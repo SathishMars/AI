@@ -216,7 +216,6 @@ export default function AimeWorkflowPane({
                             flex: 1,
                             mb: 1,
                             minHeight: 0,
-                            position: 'relative',
                             overflowY: 'auto',
                             maxHeight: '100%',
                         }}
@@ -232,8 +231,8 @@ export default function AimeWorkflowPane({
                                 ))
                             )}
                         </List>
-                        {isLoading && (<LinearProgress sx={{ position: 'absolute', bottom: 0, left: 0, right: 0 }} />)}
                     </Box>
+                    {isLoading && (<LinearProgress sx={{ width: '100%' }} />)}
                     <SmartAutocomplete
                         value={userInput}
                         autoFocus={true}

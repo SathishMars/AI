@@ -21,6 +21,7 @@ import MermaidChart from './MermaidChart';
 
 interface VisualizationPaneProps {
   workflowTemplate: WorkflowTemplate;
+  regenerateMermaidDiagram: () => Promise<void>;
   onWorkflowDefinitionChange: (workflowDefinition: WorkflowDefinition) => void;
   fullScreen?: boolean;
 }
@@ -57,6 +58,7 @@ function a11yProps(index: number) {
 
 export default function VisualizationPane({
   workflowTemplate,
+  regenerateMermaidDiagram,
   onWorkflowDefinitionChange,
   fullScreen = false
 }: VisualizationPaneProps) {
@@ -113,136 +115,6 @@ export default function VisualizationPane({
   onWorkflowDefinitionChange(updatedWorkflowDefinition);
   }
 
-  // const renderMermaidDiagram = () => {
-  //   // Check if workflow has steps (nested array format only)
-  //   const hasSteps = workflowSteps.length > 0;
-
-  //   if (!hasSteps) {
-  //     return (
-  //       <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 4 }}>
-  //         <Alert severity="info">
-  //           <Typography variant="h6" gutterBottom>
-  //             No Workflow Steps
-  //           </Typography>
-  //           <Typography variant="body2">
-  //             Create workflow steps to generate a visual diagram. The diagram will be automatically generated using AI when you add or modify workflow steps.
-  //           </Typography>
-  //         </Alert>
-  //       </Box>
-  //     );
-  //   }
-
-  //   if (mermaidGeneration.isGenerating) {
-  //     return (
-  //       <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 4 }}>
-  //         <Box sx={{ textAlign: 'center' }}>
-  //           <CircularProgress size={40} sx={{ mb: 2 }} />
-  //           <Typography variant="h6" gutterBottom>
-  //             Generating Workflow Diagram
-  //           </Typography>
-  //           <Typography variant="body2" color="text.secondary">
-  //             AI is creating a visual representation of your workflow...
-  //           </Typography>
-  //         </Box>
-  //       </Box>
-  //     );
-  //   }
-
-  //   if (mermaidGeneration.error && !workflow.mermaidDiagram) {
-  //     return (
-  //       <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 4 }}>
-  //         <Alert 
-  //           severity="warning"
-  //           action={
-  //             <Button
-  //               startIcon={<RefreshIcon />}
-  //               onClick={mermaidGeneration.regenerateDiagram}
-  //               size="small"
-  //             >
-  //               Retry
-  //             </Button>
-  //           }
-  //         >
-  //           <Typography variant="h6" gutterBottom>
-  //             Diagram Generation Failed
-  //           </Typography>
-  //           <Typography variant="body2">
-  //             {mermaidGeneration.error}
-  //           </Typography>
-  //         </Alert>
-  //       </Box>
-  //     );
-  //   }
-
-  //   if (!workflow.mermaidDiagram) {
-  //     return (
-  //       <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 4 }}>
-  //         <Alert 
-  //           severity="info"
-  //           action={
-  //             <Button
-  //               startIcon={<AIIcon />}
-  //               onClick={mermaidGeneration.regenerateDiagram}
-  //               variant="outlined"
-  //               size="small"
-  //             >
-  //               Generate Diagram
-  //             </Button>
-  //           }
-  //         >
-  //           <Typography variant="h6" gutterBottom>
-  //             Diagram Not Generated
-  //           </Typography>
-  //           <Typography variant="body2">
-  //             Click &ldquo;Generate Diagram&rdquo; to create an AI-powered visual representation of your workflow.
-  //           </Typography>
-  //         </Alert>
-  //       </Box>
-  //     );
-  //   }
-
-  //   return (
-  //     <Box sx={{ flex: 1, overflow: 'auto' }}>
-  //       {/* Diagram Controls */}
-  //       <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 2 }}>
-  //         <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
-  //           {mermaidGeneration.lastGenerated && (
-  //             `Last generated: ${mermaidGeneration.lastGenerated.toLocaleTimeString()}`
-  //           )}
-  //         </Typography>
-
-  //         {mermaidGeneration.error && (
-  //           <Chip 
-  //             label="Generation Error" 
-  //             color="warning" 
-  //             size="small" 
-  //             icon={<ErrorIcon />}
-  //           />
-  //         )}
-
-  //         <Button
-  //           startIcon={<RefreshIcon />}
-  //           onClick={mermaidGeneration.regenerateDiagram}
-  //           size="small"
-  //           disabled={mermaidGeneration.isGenerating}
-  //         >
-  //           Regenerate
-  //         </Button>
-  //       </Box>
-
-  //       {/* Mermaid Viewer */}
-  //       <Box sx={{ p: 2 }}>
-  //         <MermaidChart
-  //           chart={workflow.mermaidDiagram || ''}
-  //           id="workflow-diagram"
-  //           onError={(error) => {
-  //             console.error('Mermaid chart error:', error);
-  //           }}
-  //         />
-  //       </Box>
-  //     </Box>
-  //   );
-  // };
 
   return (
     <Box sx={{
@@ -324,6 +196,7 @@ export default function VisualizationPane({
           <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
             <MermaidChart
               mermaidDiagram={workflowTemplate.mermaidDiagram || ''}
+              regenerateMermaidDiagram={regenerateMermaidDiagram}
               onError={(error) => {
                 console.error('Mermaid chart error:', error);
               }}

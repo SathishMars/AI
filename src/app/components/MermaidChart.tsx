@@ -10,11 +10,13 @@ import mermaid from 'mermaid';
 
 interface MermaidChartProps {
     mermaidDiagram: string;
+    regenerateMermaidDiagram?: () => Promise<void>;
     onError?: (error: string) => void;
 }
 
 export default function MermaidChart({
     mermaidDiagram,
+    regenerateMermaidDiagram,
     onError
 }: MermaidChartProps) {
     const [isLoading, setIsLoading] = useState(true);
@@ -159,6 +161,11 @@ export default function MermaidChart({
     return (
         <Box sx={{ height: '100%', width: '100%' }}>
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                <Tooltip title="Regenerate Diagram">
+                    <IconButton size="small" onClick={regenerateMermaidDiagram} aria-label="regenerate-diagram">
+                        <RefreshIcon />
+                    </IconButton>
+                </Tooltip>
                 <Tooltip title="Zoom out ( - )">
                     <IconButton size="small" onClick={zoomOut} aria-label="zoom-out">
                         <ZoomOutIcon />

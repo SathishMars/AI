@@ -44,8 +44,10 @@ export default function WorkflowConfigurePage({ params }: PageProps) {
   });
 
   const {
-    messages,  
-    sendMessage  
+    messages,
+    sendMessage,
+    regenerateMermaidDiagram,
+    regenerateWorkflowDefinition
   } = useAimeWorkflow({
     workflowTemplateId: template?.id || '',
     workflowDefinition: template?.workflowDefinition || { steps: [] },
@@ -140,6 +142,7 @@ export default function WorkflowConfigurePage({ params }: PageProps) {
         workflowTemplate={template}
         messages={messages}
         sendMessage={sendMessage}
+        regenerateMermaidDiagram={regenerateMermaidDiagram}
         onWorkflowDefinitionChange={updateWorkflowDefinition}
         onTemplateLabelChange={updateTemplateLabel}
       />

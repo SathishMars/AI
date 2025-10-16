@@ -68,6 +68,7 @@ interface ResponsiveWorkflowConfiguratorProps {
   workflowTemplate?: WorkflowTemplate;
   messages?: WorkflowMessage[];
   sendMessage?: (message: string) => Promise<void>;
+  regenerateMermaidDiagram?: () => Promise<void>;
   onWorkflowDefinitionChange: (workflowDefinition: WorkflowDefinition, mermaidDiagram?: string) => void;
   onTemplateLabelChange?: (name: string) => Promise<void>;
 }
@@ -76,6 +77,7 @@ export default function ResponsiveWorkflowConfigurator({
   workflowTemplate,
   messages,
   sendMessage,
+  regenerateMermaidDiagram,
   onWorkflowDefinitionChange,
   onTemplateLabelChange,
 }: ResponsiveWorkflowConfiguratorProps) {
@@ -453,6 +455,7 @@ export default function ResponsiveWorkflowConfigurator({
           >
             <VisualizationPane
               workflowTemplate={workflowTemplate}
+              regenerateMermaidDiagram={regenerateMermaidDiagram ? regenerateMermaidDiagram : async () => { console.log('regenerateMermaidDiagram not provided.'); }}
               onWorkflowDefinitionChange={onWorkflowDefinitionChange}
             />
           </Box>

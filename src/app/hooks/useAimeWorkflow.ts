@@ -27,6 +27,8 @@ interface AImeWorkflowOptions {
 interface UseAimeWorkflowReturn {
     messages: WorkflowMessage[];
     sendMessage: (message: string) => Promise<void>;
+    regenerateMermaidDiagram: () => Promise<void>;
+    regenerateWorkflowDefinition: () => Promise<void>;
 }
 
 const seedWelcomeMessage = (): WorkflowMessage => {
@@ -161,8 +163,74 @@ export function useAimeWorkflow({
         }
     }, [messages, onMessage, onWorkflowDefinitionChange, sessionId, workflowDefinition, workflowTemplateId, user?.id, user?.profile?.firstName, user?.profile?.lastName]);
 
+
+    const regenerateMermaidDiagram = useCallback(async () => {
+        if (!workflowTemplateId || workflowTemplateId.trim() === "new") {
+            console.warn('Cannot regenerate mermaid diagram for new template');
+            return;
+        }
+        const payload = {
+            sessionId: sessionIDRef.current,
+            workflowTemplateId,
+            workflowDefinition
+        };
+
+        const response = await fetch('/api/generate-mermaid', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            throw new Error(`API error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        console.log('Regenerate mermaid API response data:', data);
+
+        if (onWorkflowDefinitionChange) {
+            onWorkflowDefinitionChange(workflowDefinition, data.mermaidDiagram.trim());
+        }
+    } , [onWorkflowDefinitionChange, workflowDefinition, workflowTemplateId]);
+
+    const regenerateWorkflowDefinition = useCallback(async () => {
+        if (!workflowTemplateId || workflowTemplateId.trim() === "new") {
+            console.warn('Cannot regenerate workflow definition for new template');
+            return;
+        }
+        const payload = {
+            sessionId,
+            templateId: workflowTemplateId,
+            messages,
+            workflowDefinition
+        };
+
+        const response = await fetch('/api/regenerate-workflow-definition', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            throw new Error(`API error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        console.log('Regenerate workflow definition API response data:', data);
+
+        if (data.workflowDefinition && onWorkflowDefinitionChange) {
+            onWorkflowDefinitionChange(data.workflowDefinition, data.mermaidDiagram?.trim());
+        }
+    } , [messages, onWorkflowDefinitionChange, sessionId, workflowDefinition, workflowTemplateId]);
+
     return {
         messages,
-        sendMessage
+        sendMessage,
+        regenerateMermaidDiagram,
+        regenerateWorkflowDefinition
     };
 }
