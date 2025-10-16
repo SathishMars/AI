@@ -13,6 +13,86 @@ const roboto = Roboto({
   display: 'swap',
 });
 
+export const colors = {
+  black: '#000000',
+  blackTwo: '#333333',
+  darkpurple: '#554280',
+  white: '#FFFFFF',
+  whiteTwo: '#F4F4F4',
+  whiteThree: '#EBEBEB',
+  lightGrey: '#D1D1D1',
+  veryLightGrey: '#E8E8E8',
+  grey: '#A2A2A2',
+  greyPrimary: '#808080',
+  greyMedium: '#C4C4C4',
+  greyMidDark: '#606060',
+  greyDark: '#505050',
+  greyBorder: '#D8D8D8',
+  greyDivider: '#E8E8E8',
+  violetLight: '#CB28EB',
+  violet: '#BE14DE',
+  violet50: '#F6F5FF',
+  violet100: '#EBE7FE',
+  violet600: '#7C3BED',
+  violetDark: '#A306C1',
+  violetDark2: '#5F0A70',
+  red: '#FF0000',
+  veryLightBlue: '#E8FAFD',
+  lightBlue: '#5CDAF0',
+  darkSkyBlue: '#57BDDA',
+  blue: '#14BFDE',
+  seafoamBlue: '#5ECAAB',
+  aqua: '#14BFDE',
+  gold: '#FD994D',
+  dustyOrange: '#ED664C',
+  brandRed: '#FF5B41',
+  brandGreen: '#10CEA9',
+  brandOrange: '#FF994D',
+  lavenderLight: '#F9E8FC',
+  lavender: '#EACAF0',
+  lavenderDark: '#E9D3EF',
+  veryLightCoral: '#FFEFEC',
+  veryLightGreen: '#E7FAF6',
+  veryLightYellow: '#FFF8F3',
+  purple: '#554280',
+  // new theme colors
+  'primary-emerald-500': '#65B29F',
+  'primary-emerald-600': '#488071',
+  'primary-purple-500': '#765CB2',
+  'primary-yellow-700': '#A26107',
+  'primary-pink-300': '#D495DA',
+  'primary-pink-400': '#CF5FD0',
+  'primary-pink-500': '#BD15DD',
+  'primary-pink-600': '#9F12B9',
+  'primary-brand-400': '#8ED679',
+  'primary-brand-700': '#4C8D39',
+  'primary-brand-800': '#447634',
+  'primary-green-50': '#F0FFEC',
+  'primary-green-300': '#A0E08D',
+  'primary-green-450': '#73BD5B',
+  'primary-green-500': '#73BD5D',
+  'primary-green-600': '#5EA349',
+  'primary-green-700': '#4C8D39',
+  'primary-blue-50': '#F2F7FF',
+  'primary-blue-300': '#91C3FD',
+  'primary-blue-400': '#61A6FA',
+  'primary-blue-600': '#2463EB',
+  'primary-blue-500': '#3479E9',
+  'primary-blue-700': '#1D4FD7',
+  'primary-grey-50': '#F9FAFB',
+  'primary-grey-100': '#F4F6F8',
+  'primary-grey-200': '#E6EAF0',
+  'primary-grey-300': '#C8D2DB',
+  'primary-grey-400': '#9DACBB',
+  'primary-grey-600': '#637584',
+  'primary-grey-700': '#3A4553',
+  'primary-grey-800': '#212B36',
+  'primary-red-50': '#FEF1F1',
+  'primary-red-500': '#EF4343',
+  'primary-red-600': '#DC2828',
+  'primary-red-700': '#BA1C1C',
+} as const;
+
 export type ThemeMode = 'light' | 'dark' | 'device';
 
 interface ThemeModeContextType {
@@ -48,54 +128,56 @@ function createAppTheme(mode: PaletteMode) {
       mode,
       ...(mode === 'light'
         ? {
-            // Light theme colors
-            primary: {
-              main: '#1976d2',
-              light: '#42a5f5',
-              dark: '#1565c0',
-            },
-            secondary: {
-              main: '#dc004e',
-              light: '#ff5983',
-              dark: '#9a0036',
-            },
-            background: {
-              default: '#fafafa',
-              paper: '#ffffff',
-            },
-            text: {
-              primary: '#212121',
-              secondary: '#757575',
-            },
-          }
+          // Light theme colors
+          primary: {
+            main: '#1976d2',
+            light: '#42a5f5',
+            dark: '#1565c0',
+          },
+          secondary: {
+            main: '#dc004e',
+            light: '#ff5983',
+            dark: '#9a0036',
+          },
+          background: {
+            default: '#fafafa',
+            paper: '#ffffff',
+          },
+          text: {
+            primary: '#212121',
+            secondary: '#757575',
+          },
+          custom: colors,
+        }
         : {
-            // Dark theme colors
-            primary: {
-              main: '#90caf9',
-              light: '#e3f2fd',
-              dark: '#42a5f5',
-            },
-            secondary: {
-              main: '#f48fb1',
-              light: '#fce4ec',
-              dark: '#e91e63',
-            },
-            background: {
-              default: '#121212',
-              paper: '#1e1e1e',
-            },
-            text: {
-              primary: '#ffffff',
-              secondary: '#aaaaaa',
-            },
-            divider: '#333333',
-            action: {
-              hover: 'rgba(255, 255, 255, 0.08)',
-              selected: 'rgba(255, 255, 255, 0.12)',
-              disabled: 'rgba(255, 255, 255, 0.26)',
-              disabledBackground: 'rgba(255, 255, 255, 0.12)',
-            },
-          }),
+          // Dark theme colors
+          primary: {
+            main: '#90caf9',
+            light: '#e3f2fd',
+            dark: '#42a5f5',
+          },
+          secondary: {
+            main: '#f48fb1',
+            light: '#fce4ec',
+            dark: '#e91e63',
+          },
+          background: {
+            default: '#121212',
+            paper: '#1e1e1e',
+          },
+          text: {
+            primary: '#ffffff',
+            secondary: '#aaaaaa',
+          },
+          divider: '#333333',
+          action: {
+            hover: 'rgba(255, 255, 255, 0.08)',
+            selected: 'rgba(255, 255, 255, 0.12)',
+            disabled: 'rgba(255, 255, 255, 0.26)',
+            disabledBackground: 'rgba(255, 255, 255, 0.12)',
+          },
+          custom: colors,
+        }),
     },
     typography: {
       fontFamily: roboto.style.fontFamily,
@@ -140,8 +222,8 @@ function createAppTheme(mode: PaletteMode) {
               fontWeight: 600,
             },
             '&:hover': {
-              backgroundColor: mode === 'dark' 
-                ? 'rgba(144, 202, 249, 0.08)' 
+              backgroundColor: mode === 'dark'
+                ? 'rgba(144, 202, 249, 0.08)'
                 : 'rgba(25, 118, 210, 0.04)',
             },
           },
@@ -221,7 +303,7 @@ export function ThemeModeProvider({ children }: ThemeModeProviderProps) {
     };
 
     mediaQuery.addEventListener('change', handleChange);
-    
+
     return () => {
       mediaQuery.removeEventListener('change', handleChange);
     };
@@ -230,7 +312,7 @@ export function ThemeModeProvider({ children }: ThemeModeProviderProps) {
   const setThemeMode = (mode: ThemeMode) => {
     setThemeModeState(mode);
     localStorage.setItem('theme-mode', mode);
-    
+
     // Update effective mode immediately
     if (mode === 'device') {
       const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
