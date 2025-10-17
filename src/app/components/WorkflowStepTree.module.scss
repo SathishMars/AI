@@ -1,13 +1,11 @@
-
-
 .tree-item {
   border-radius: 8px;
-  background-color: violet50;
-  border-color: violet100;
-
-}
-
-.tree-item-chip {
-  margin: 4px;
-  background-color: #e0e0e0;
+  background-color: #F6F5FF;
+  border-color: #EBE7FE;
+  border-width: 2px;
+  border-style: solid;
+  .tree-item-chip {
+    margin: 4px;
+    background-color: #fefefe;
+  }
 }

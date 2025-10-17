@@ -8,27 +8,27 @@ interface WorkflowFunctionTypeConfig {
 
 export const workflowFunctionTypeConfig: Record<string, WorkflowFunctionTypeConfig> = {
   trigger: {
-    color: '#2E7D32',
+    color: '#16A249',
     label: 'Trigger',
     icon: 'start' // Material UI stylesheet icon name
   },
   decision: {
-    color: '#F57C00',
+    color: '#7C3BED',
     label: 'Decision',
     icon: 'help_center' // Material UI stylesheet icon name
   },
   approval: {
-    color: '#F57C00',
+    color: '#7C3BED',
     label: 'Approval',
     icon: 'person_check' // Material UI stylesheet icon name
   },
   task: {
-    color: '#1976D2',
+    color: '#7C3BED',
     label: 'Task',
     icon: 'task_alt' // Material UI stylesheet icon name
   },
   terminate: {
-    color: '#B71C1C',
+    color: '#090909',
     label: 'End',
     icon: 'stop_circle' // Material UI stylesheet icon name
   },

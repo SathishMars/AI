@@ -2,8 +2,10 @@
 
 .aime-message {
   border-radius: 10px;
-  background-color: rgba(0,200,0,0.5); 
+  background-color: transparent;
+  // color: rgba(0,200,0,1); 
   margin-bottom: 5px;
+  border: 1px solid rgba(0,200,0,0.2);
 }
 
 .user-message {

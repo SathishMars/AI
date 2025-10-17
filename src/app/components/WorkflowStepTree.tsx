@@ -265,7 +265,7 @@ export default function WorkflowStepTree({ workflowSteps, onStepSave }: Workflow
         key={step.id}
         itemId={step.id}
         label={(
-          <Paper sx={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', width: '100%', p: 1 }} className={styles["tree-item"]}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', width: '100%', p: 1 }} className={styles["tree-item"]}>
             {(step.id !== editingStepId) ? (
               <>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -308,9 +308,8 @@ export default function WorkflowStepTree({ workflowSteps, onStepSave }: Workflow
                             Next: {referredNextSteps.map(id => workflowStepsMap[id]).join(', ')}
                           </>
                         }
+                        className={styles["tree-item-chip"]}
                           sx={{
-                            backgroundColor: '#D0F0C0',
-                            color: 'black',
                             height: 20,
                             fontSize: '0.75rem',
                             fontWeight: 500,
@@ -318,15 +317,29 @@ export default function WorkflowStepTree({ workflowSteps, onStepSave }: Workflow
                             m: 1
                           }} />
                       )}
+                      {step.onConditionPass && (
+                        <Chip label={
+                          <>
+                            On Pass: {(typeof step.onConditionPass === 'object') ? step.onConditionPass.label : workflowStepsMap[step.onConditionPass]}
+                          </>
+                        }
+                          className={styles["tree-item-chip"]}
+                          sx={{
+                            height: 20,
+                            fontSize: '0.75rem',
+                            fontWeight: 500,
+                            p: 1,
+                            m: 1
+                          }} />
+                      )}                      
                       {step.onConditionFail && (
                         <Chip label={
                           <>
                             On Fail: {(typeof step.onConditionFail === 'object') ? step.onConditionFail.label : workflowStepsMap[step.onConditionFail]}
                           </>
                         }
+                          className={styles["tree-item-chip"]}
                           sx={{
-                            backgroundColor: '#F8D7DA',
-                            color: 'black',
                             height: 20,
                             fontSize: '0.75rem',
                             fontWeight: 500,
@@ -340,9 +353,8 @@ export default function WorkflowStepTree({ workflowSteps, onStepSave }: Workflow
                             On Error: {(typeof step.onError === 'object') ? step.onError.label : workflowStepsMap[step.onError]}
                           </>
                         }
+                          className={styles["tree-item-chip"]}
                           sx={{
-                            backgroundColor: '#FFF3CD',
-                            color: 'black',
                             height: 20,
                             fontSize: '0.75rem',
                             fontWeight: 500,
@@ -356,9 +368,8 @@ export default function WorkflowStepTree({ workflowSteps, onStepSave }: Workflow
                             On Timeout: {(typeof step.onTimeout === 'object') ? step.onTimeout.label : workflowStepsMap[step.onTimeout]}
                           </>
                         }
+                          className={styles["tree-item-chip"]}
                           sx={{
-                            backgroundColor: '#D1ECF1',
-                            color: 'black',
                             height: 20,
                             fontSize: '0.75rem',
                             fontWeight: 500,
@@ -372,9 +383,8 @@ export default function WorkflowStepTree({ workflowSteps, onStepSave }: Workflow
                             {cond.value}: {workflowStepsMap[cond.next]}
                           </>
                         }
+                          className={styles["tree-item-chip"]}
                           sx={{
-                            backgroundColor: '#E2E3E5',
-                            color: 'black',
                             height: 20,
                             fontSize: '0.75rem',
                             fontWeight: 500,
@@ -391,7 +401,7 @@ export default function WorkflowStepTree({ workflowSteps, onStepSave }: Workflow
                 {renderEditingForm(step)}
               </>
             )}
-          </Paper>
+          </Box>
         )}
       >
         {(children.length > 0) && (children.map((child) => renderTreeItem(child)))}
