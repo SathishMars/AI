@@ -246,7 +246,7 @@ export default function WorkflowStepTree({ workflowSteps, onStepSave }: Workflow
               onSave={onSave}
               onCancel={onCancel}
             />
-          );  
+          );
         default:
           return (
             <WorkflowStepGeneric
@@ -308,7 +308,7 @@ export default function WorkflowStepTree({ workflowSteps, onStepSave }: Workflow
                             Next: {referredNextSteps.map(id => workflowStepsMap[id]).join(', ')}
                           </>
                         }
-                        className={styles["tree-item-chip"]}
+                          className={styles["tree-item-chip"]}
                           sx={{
                             height: 20,
                             fontSize: '0.75rem',
@@ -320,7 +320,9 @@ export default function WorkflowStepTree({ workflowSteps, onStepSave }: Workflow
                       {step.onConditionPass && (
                         <Chip label={
                           <>
-                            On Pass: {(typeof step.onConditionPass === 'object') ? step.onConditionPass.label : workflowStepsMap[step.onConditionPass]}
+                            <Icon className={styles["tree-item-chip-icon"]}>check</Icon>
+                            Criteria Met: <Icon className={styles["tree-item-chip-icon"]}>arrow_right_alt</Icon>
+                            {(typeof step.onConditionPass === 'object') ? step.onConditionPass.label : workflowStepsMap[step.onConditionPass]}
                           </>
                         }
                           className={styles["tree-item-chip"]}
@@ -331,11 +333,13 @@ export default function WorkflowStepTree({ workflowSteps, onStepSave }: Workflow
                             p: 1,
                             m: 1
                           }} />
-                      )}                      
+                      )}
                       {step.onConditionFail && (
                         <Chip label={
                           <>
-                            On Fail: {(typeof step.onConditionFail === 'object') ? step.onConditionFail.label : workflowStepsMap[step.onConditionFail]}
+                            <Icon className={styles["tree-item-chip-icon"]}>close</Icon>
+                            Otherwise: <Icon className={styles["tree-item-chip-icon"]}>arrow_right_alt</Icon>
+                            {(typeof step.onConditionFail === 'object') ? step.onConditionFail.label : workflowStepsMap[step.onConditionFail]}
                           </>
                         }
                           className={styles["tree-item-chip"]}
@@ -391,7 +395,7 @@ export default function WorkflowStepTree({ workflowSteps, onStepSave }: Workflow
                             p: 1,
                             m: 1
                           }} />
-                      ))} 
+                      ))}
                     </Box>
                   </>
                 )}

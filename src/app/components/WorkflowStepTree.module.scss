@@ -1,5 +1,5 @@
 .tree-item {
-  border-radius: 8px;
+  border-radius: 16px;
   background-color: #F6F5FF;
   border-color: #EBE7FE;
   border-width: 2px;
@@ -7,5 +7,11 @@
   .tree-item-chip {
     margin: 4px;
     background-color: #fefefe;
+    border: 1px solid #E6EAF0;
+    .tree-item-chip-icon {
+      font-size: 15px !important;
+      line-height: 1.5 !important;
+      margin-right: 2px;
+    }
   }
 }
