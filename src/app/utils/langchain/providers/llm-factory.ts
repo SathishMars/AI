@@ -3,6 +3,13 @@ import { ChatOpenAI, type OpenAIInput } from "@langchain/openai";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { BaseChatModel } from "@langchain/core/language_models/chat_models";
 
+// Enable detailed LLM logging by default during development when not explicitly set.
+// This helps with debugging agent/tool behavior. If you want to disable it, set
+// LLM_DETAILED_LOGGING=false in your environment.
+// if (typeof process.env.LLM_DETAILED_LOGGING === 'undefined') {
+//   process.env.LLM_DETAILED_LOGGING = 'true';
+// }
+
 export type LLMProvider = 'openai' | 'anthropic' | 'lmstudio';
 
 export interface LLMConfig {
@@ -15,6 +22,8 @@ export interface LLMConfig {
   // LM Studio specific config
   baseURL?: string;
   endpoint?: string;
+  // provider-specific model kwargs (passed through to OpenAI/LM Studio clients)
+  modelKwargs?: Record<string, unknown>;
 }
 
 export interface LLMModelConfig {
@@ -220,20 +229,20 @@ export class LLMFactory {
       // when set, temperature must be this exact value (override any supplied temperature)
       tempEnforceExact?: number;
     }[] = [
-      // OpenAI GPT-5 family (need max_completion_tokens)
-      // NOTE: some GPT-5 variants only accept the default temperature (1). Enforce exact 1 to avoid API errors.
-      { id: 'openai:gpt-5-family', pattern: /(^|\W)gpt-5(\b|\W)|gpt-5-mini|gpt-5-nano|gpt-5-chat/i, provider: 'openai', useMaxCompletionTokens: true, tempEnforceExact: 1 },
-      // OpenAI modern chat variants
-      { id: 'openai:gpt-4-family', pattern: /gpt-(4(\.|\d)|4\.|4o|4\.1|4\.5|4o-mini|gpt-4o)/i, provider: 'openai', tempRange: [0, 2] },
-      // OpenAI older/turbo family
-      { id: 'openai:gpt-3.5-family', pattern: /gpt-3\.5|turbo/i, provider: 'openai', tempRange: [0, 2] },
-      // Anthropic Claude 4 / Opus family
-      { id: 'anthropic:claude-opus-4', pattern: /opus-4|claude-4|sonnet-4|opus-4-1/i, provider: 'anthropic', tempRange: [0, 1] },
-      // Anthropic Claude 3 / Sonnet/Opus family
-      { id: 'anthropic:claude-3-family', pattern: /claude-3|sonnet|opus|haiku|claude-3-5/i, provider: 'anthropic', tempRange: [0, 1] },
-      // Fallback Anthropic rule
-      { id: 'anthropic:default', pattern: /claude|anthropic/i, provider: 'anthropic', tempRange: [0, 1] }
-    ];
+        // OpenAI GPT-5 family (need max_completion_tokens)
+        // NOTE: some GPT-5 variants only accept the default temperature (1). Enforce exact 1 to avoid API errors.
+        { id: 'openai:gpt-5-family', pattern: /(^|\W)gpt-5(\b|\W)|gpt-5-mini|gpt-5-nano|gpt-5-chat/i, provider: 'openai', useMaxCompletionTokens: true, tempEnforceExact: 1 },
+        // OpenAI modern chat variants
+        { id: 'openai:gpt-4-family', pattern: /gpt-(4(\.|\d)|4\.|4o|4\.1|4\.5|4o-mini|gpt-4o)/i, provider: 'openai', tempRange: [0, 2] },
+        // OpenAI older/turbo family
+        { id: 'openai:gpt-3.5-family', pattern: /gpt-3\.5|turbo/i, provider: 'openai', tempRange: [0, 2] },
+        // Anthropic Claude 4 / Opus family
+        { id: 'anthropic:claude-opus-4', pattern: /opus-4|claude-4|sonnet-4|opus-4-1/i, provider: 'anthropic', tempRange: [0, 1] },
+        // Anthropic Claude 3 / Sonnet/Opus family
+        { id: 'anthropic:claude-3-family', pattern: /claude-3|sonnet|opus|haiku|claude-3-5/i, provider: 'anthropic', tempRange: [0, 1] },
+        // Fallback Anthropic rule
+        { id: 'anthropic:default', pattern: /claude|anthropic/i, provider: 'anthropic', tempRange: [0, 1] }
+      ];
 
     const findRulesFor = (prov: LLMProvider, modelName?: string) => {
       if (!modelName) return null;
@@ -254,26 +263,32 @@ export class LLMFactory {
       extra: { baseURL?: string; apiKey?: string; timeout?: number; maxRetries?: number } = {},
       optsHints: { useMaxCompletionTokens?: boolean; matchedRuleId?: string } = {}
     ): OpenAIInput => {
+      // start with an object so we can merge provider-specific modelKwargs later
       const opts: Record<string, unknown> = {
         apiKey: (extra.apiKey || process.env.OPENAI_API_KEY) as string | undefined,
         model: cfg.model ?? modelConfig.model,
         temperature: cfg.temperature ?? modelConfig.temperature,
         streaming: cfg.streaming ?? modelConfig.streaming,
         timeout: extra.timeout ?? 30000,
-        maxRetries: extra.maxRetries ?? 3
+        maxRetries: extra.maxRetries ?? 3,
+        // CRITICAL: Force content to always be in array format for OpenAI v5 API compatibility
+        // This ensures messages use [{type: 'text', text: '...'}] instead of plain strings
+        modelKwargs: {}
       };
 
       // Newer OpenAI "gpt-5" family models expect 'max_completion_tokens' instead of 'max_tokens'.
       // LangChain's ChatOpenAI maps `maxTokens` -> `max_tokens` by default which will be rejected by those models.
       // To handle that, pass the value via `modelKwargs` using the API key expected param name.
       if (optsHints.useMaxCompletionTokens || (cfg.model && cfg.model.toLowerCase().includes('gpt-5'))) {
-        opts.modelKwargs = {
-          // use snake_case key to match OpenAI API expectation
-          max_completion_tokens: cfg.maxTokens
-        };
+        (opts.modelKwargs as Record<string, unknown>).max_completion_tokens = cfg.maxTokens;
       } else {
         // Keep backwards-compatible top-level `maxTokens` for models that support it
         opts.maxTokens = cfg.maxTokens;
+      }
+
+      // Merge any provided modelKwargs from caller (do not overwrite keys already set above)
+      if (cfg.modelKwargs && typeof cfg.modelKwargs === 'object') {
+        Object.assign(opts.modelKwargs as Record<string, unknown>, cfg.modelKwargs);
       }
 
       // Attach custom base URL if provided (used by LM Studio)
@@ -358,8 +373,8 @@ export class LLMFactory {
             - Local Server: ${process.env.LMSTUDIO_ENABLED === 'true' ? 'Enabled' : 'Auto-detected'}`);
         }
 
-  if (isDetailedLogging) console.log(`LLM Factory: matched rule=${effectiveRule?.id ?? 'none'} for model=${config.model}`);
-  return new ChatOpenAI(buildOpenAIOptions(config, { baseURL, apiKey, timeout: 60000, maxRetries: 2 }, { useMaxCompletionTokens: !!effectiveRule?.useMaxCompletionTokens, matchedRuleId: effectiveRule?.id }));
+        if (isDetailedLogging) console.log(`LLM Factory: matched rule=${effectiveRule?.id ?? 'none'} for model=${config.model}`);
+        return new ChatOpenAI(buildOpenAIOptions(config, { baseURL, apiKey, timeout: 60000, maxRetries: 2 }, { useMaxCompletionTokens: !!effectiveRule?.useMaxCompletionTokens, matchedRuleId: effectiveRule?.id }));
 
       default:
         throw new Error(`Unsupported LLM provider: ${selectedProvider}`);
@@ -371,6 +386,7 @@ export class LLMFactory {
    * Create a chat model for workflow editing
    */
   public createWorkflowEditModel(provider?: LLMProvider): BaseChatModel {
+    // Use plain chat model so LangChain handles tool execution at the agent level
     return this.createChatModel(provider, 'workflow_edit');
   }
 
@@ -378,6 +394,7 @@ export class LLMFactory {
    * Create a chat model for Mermaid diagram generation
    */
   public createMermaidModel(provider?: LLMProvider): BaseChatModel {
+    // Use plain chat model so LangChain handles tool execution at the agent level
     return this.createChatModel(provider, 'mermaid_generate');
   }
 
@@ -386,6 +403,30 @@ export class LLMFactory {
    */
   public createConversationModel(provider?: LLMProvider): BaseChatModel {
     return this.createChatModel(provider, 'conversation');
+  }
+
+  /**
+   * Create a chat model configured for tool/function calling (where supported).
+   * This will merge any provided modelKwargs and set function calling defaults (e.g. function_call: 'auto')
+   */
+  public createToolEnabledChatModel(
+    provider?: LLMProvider,
+    taskType: keyof LLMModelConfig = 'conversation',
+    customConfig?: Partial<LLMConfig>
+  ): BaseChatModel {
+    const cfg: Partial<LLMConfig> = { ...(customConfig || {}) };
+    // Ensure function calling is enabled by default when supported by the model
+    const incomingKwargs = (cfg.modelKwargs || {}) as Record<string, unknown>;
+    // Only set function_call if functions are provided (OpenAI requires functions when using function_call)
+    const hasFunctions = Array.isArray(incomingKwargs.functions) && (incomingKwargs.functions as unknown[]).length > 0;
+    if (hasFunctions) {
+      const functionCallSetting = typeof incomingKwargs.function_call === 'string' ? incomingKwargs.function_call : 'auto';
+      cfg.modelKwargs = { ...incomingKwargs, function_call: functionCallSetting } as Record<string, unknown>;
+    } else {
+      // Do not include function_call if no functions provided
+      cfg.modelKwargs = { ...incomingKwargs } as Record<string, unknown>;
+    }
+    return this.createChatModel(provider, taskType, cfg);
   }
 
   /**

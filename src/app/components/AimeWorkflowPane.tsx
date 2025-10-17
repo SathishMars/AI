@@ -2,7 +2,7 @@ import { Alert, Avatar, Box, Chip, LinearProgress, List, ListItem, ListItemAvata
 import { WorkflowDefinition } from "../types/workflowTemplate";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { FollowUpOption, WorkflowMessage } from "../types/aimeWorkflowMessages";
-import styles from "./AimeWorkflowPane.module.css";
+import styles from "./AimeWorkflowPane.module.scss";
 import SmartAutocomplete from "./SmartAutocomplete";
 
 

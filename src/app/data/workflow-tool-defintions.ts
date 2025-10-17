@@ -288,7 +288,7 @@ export const workflowFunctionDefinitions: Array<WorkflowStepFunction> = [
             Example usage:
       \`\`\` json
         {
-            id: '3klmop4567',  // replace with a generated unique step ID used as refernce in other steps where needed to chain the steps
+            id: '3klmop4567',  // replace with a generated unique short UUID used as refernce in other steps where needed to chain the steps
             label: 'Request approval from manager', // human readable name for the step based on context of what the step does
             type: 'decision',
             stepFunction: 'requestApproval',
@@ -296,9 +296,9 @@ export const workflowFunctionDefinitions: Array<WorkflowStepFunction> = [
                 approver: '\${manager}', // use the userId as per the org format or use workflow variables like \${manager} to dynamically set the approver based on the request context
                 reason: 'Budget exceeds department threshold' // optional reason for the approval request
             },
-            onConditionPass: '7c8aScds7e', // The next step object (preferred) or step ID to execute after this step
-            onConditionFail: '87snjhsw76', // The next step object (preferred) or step ID to execute if rejected. could be the terminate step or another task step
-            onTimeout: 'jds7bbsq7n', // The next step object (preferred) or step ID to execute if no response within timeout period. could be the terminate step or another task step
+            onConditionPass: '7c8aScds7e', // The next step object (preferred) or step unique short UUID to execute after this step
+            onConditionFail: '87snjhsw76', // The next step object (preferred) or step unique short UUID to execute if rejected. could be the terminate step or another task step
+            onTimeout: 'jds7bbsq7n', // The next step object (preferred) or step unique short UUID to execute if no response within timeout period. could be the terminate step or another task step
             timeout: 86400, // optional timeout in seconds (e.g., 86400 seconds = 24 hours)
             retryCount: 2, // optional retry count on failure
             retryDelay: 3600 // optional delay between retries in seconds (e.g., 3600 seconds = 1 hour)

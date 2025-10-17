@@ -23,6 +23,7 @@ export class MrfTemplateDBUtil {
     { id: 'tpl0000003', name: 'Conference Request', organization: 'main-org', account: 'groupize-demos', ownerUserId: 'user1' },
     { id: 'tpl0000004', name: 'Annual Event', organization: 'main-org', account: 'groupize-demos', ownerUserId: 'user3' },
     { id: 'tpl0000005', name: 'Team Lunch', organization: 'main-org', account: 'groupize-demos', ownerUserId: 'user1' },
+    { id: 'tpl0000006', name: 'Meeting Approval Form', organization: 'main-org', account: 'groupize-demos', ownerUserId: 'user1' },
   ];
 
   /**

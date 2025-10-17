@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import "./globals.css";
+import "./globals.scss";
 import ThemeRegistry from './components/ThemeRegistry';
 import TopNavigation from './components/TopNavigation';
 import { UnifiedUserProvider } from './contexts/UnifiedUserContext';

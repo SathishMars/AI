@@ -15,6 +15,7 @@ import WorkflowStepGeneric from './WorkflowStepGeneric';
 import { getReferredSteps, getStepsLabelsMap } from '../utils/WorkflowStepUtils';
 import WorkflowStepSwitchCase from './WorkflowStepSwitchCase';
 import WorkflowStepNotify from './WorkflowStepNotify';
+import styles from "./WorkflowStepTree.module.scss"
 
 const MOCK_DATA: WorkflowStep[] = [
   {
@@ -264,7 +265,7 @@ export default function WorkflowStepTree({ workflowSteps, onStepSave }: Workflow
         key={step.id}
         itemId={step.id}
         label={(
-          <Paper sx={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', width: '100%', p: 1 }}>
+          <Paper sx={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', width: '100%', p: 1 }} className={styles["tree-item"]}>
             {(step.id !== editingStepId) ? (
               <>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -299,7 +300,7 @@ export default function WorkflowStepTree({ workflowSteps, onStepSave }: Workflow
                 {((referredNextSteps && referredNextSteps.length > 0) || step.onConditionFail || step.onError || step.onTimeout || (step.conditions && step.conditions.length > 0)) && (
                   <>
                     <Divider sx={{ m: 1 }} />
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', ml: 1 }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', ml: 1 }}>
                       {(referredNextSteps && referredNextSteps.length > 0) && (
                         <Chip label={
                           <>
