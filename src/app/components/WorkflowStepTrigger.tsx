@@ -14,7 +14,7 @@ interface WorkflowStepTriggerProps {
 interface triggerFormData {
     id: string;
     label: string;
-    mrfTemplateName: string;
+    mrfTemplateId: string;
 }
 
 
@@ -28,7 +28,7 @@ export default function WorkflowStepTrigger({
       ? {
           id: step.id,
           label: step.label,
-          mrfTemplateName: step.functionParams?.mrfTemplateName as string || '',
+          mrfTemplateId: step.functionParams?.mrfTemplateId as string || '',
         }
       : null
   );
@@ -42,7 +42,7 @@ export default function WorkflowStepTrigger({
     setFormData({
         id: step.id,
         label: step.label,
-        mrfTemplateName: step.functionParams?.mrfTemplateName as string || ''
+        mrfTemplateId: step.functionParams?.mrfTemplateId as string || ''
     });
   }, [step]);
 
@@ -54,7 +54,7 @@ export default function WorkflowStepTrigger({
       const updated: WorkflowStep = {
         ...step!,
         label: (formData.label as string) || "",
-        functionParams: { mrfTemplateName: formData.mrfTemplateName || ''}
+        functionParams: { mrfTemplateId: formData.mrfTemplateId || ''}
       }
       setError(null);
       if (onSave) onSave(updated);
@@ -70,7 +70,7 @@ export default function WorkflowStepTrigger({
     setFormData({
         id: step?.id || "",
         label: step?.label || "",
-        mrfTemplateName: step?.functionParams?.mrfTemplateName as string || ""
+        mrfTemplateId: step?.functionParams?.mrfTemplateId as string || ""
     });
     if (onCancel) onCancel();
   };
@@ -87,8 +87,8 @@ export default function WorkflowStepTrigger({
 
       <TextField
         label="MRF Template Name"
-        value={formData.mrfTemplateName}
-        onChange={(e) => setFormData((prev) => (prev ? { ...prev, mrfTemplateName: e.target.value } : null))}
+        value={formData.mrfTemplateId}
+        onChange={(e) => setFormData((prev) => (prev ? { ...prev, mrfTemplateId: e.target.value } : null))}
         helperText="Edit JSON params for the trigger."
       />
 
