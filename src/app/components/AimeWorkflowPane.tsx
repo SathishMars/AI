@@ -51,7 +51,7 @@ function formatRelativeTime(date: Date | string): string {
 
 
 // Memoized message item component to prevent unnecessary re-renders
-const MessageItem = memo(({ message, isFirst }: { message: WorkflowMessage, isFirst: boolean }) => {
+const MessageItem = memo(({ message, isFirst, onOptionSelected }: { message: WorkflowMessage, isFirst: boolean, onOptionSelected?: (option: FollowUpOption, forKey: string) => void  }) => {
     const listItemClassName = message.sender === 'aime' ? styles['aime-message'] : styles['user-message'];
     let timestampSX: Record<string, unknown> = { opacity: 0.7, whiteSpace: 'nowrap', position: 'absolute', top: 3 };
     timestampSX = (message.sender === 'aime') ? { ...timestampSX, right: 8 } : { ...timestampSX, left: 8 };
@@ -59,6 +59,9 @@ const MessageItem = memo(({ message, isFirst }: { message: WorkflowMessage, isFi
     const handleFollowUpOptionClick = (option: FollowUpOption, forKey: string) => {
         // Handle follow-up option click
         console.log(`The option for ${forKey} selected:`, option);
+        if (onOptionSelected) {
+            onOptionSelected(option, forKey);
+        }
     };
 
     console.log('Rendering MessageItem:', message.id, 'isFirst:', isFirst);
@@ -95,27 +98,28 @@ const MessageItem = memo(({ message, isFirst }: { message: WorkflowMessage, isFi
                     secondary={
                         <>
                             {message.content.followUpQuestions && message.content.followUpQuestions.length > 0 && (
-                                <div key={message.id + '-questions'}>
+                                <Box key={message.id + '-questions'}>
                                     {message.content.followUpQuestions.map((question, index) => (
                                         <Typography key={index} variant="subtitle2" color="text.info">
                                             Q. {question}
                                         </Typography>
                                     ))}
-                                </div>
+                                </Box>
                             )}
                             {message.content.followUpOptions && Object.keys(message.content.followUpOptions).length > 0 && (
-                                <div key={message.id + '-options-parent'}>
+                                <Box key={message.id + '-options-parent'}>
                                     Select one:
                                     {Object.entries(message.content.followUpOptions).map(([forKey, options]) => (
-                                        <div key={forKey + '-options'}>
+                                        <Box key={forKey + '-options'}>
+                                            <Box sx={{ fontWeight: 'bold' }}>{forKey}:</Box>
                                             {options.map((option, index) => (
-                                                <div key={forKey + index}>
+                                                <Box key={forKey + index}>
                                                     <Chip size="small" color="info" label={option.label} sx={{ m: 0.5 }} onClick={() => handleFollowUpOptionClick(option, forKey)} />
-                                                </div>
+                                                </Box>
                                             ))}
-                                        </div>
+                                        </Box>
                                     ))}
-                                </div>
+                                </Box>
                             )}
                         </>
                     }
@@ -168,6 +172,11 @@ export default function AimeWorkflowPane({
             });
         }
     }
+
+    const onOptionSelected = useCallback(async (option: FollowUpOption, forKey: string) => {
+        setUserInput(`${userInput} ${userInput??'\n'} Use ${option.label}(${option.value}) for ${forKey}`);
+        autocompleteRef.current?.focus();
+    }, [userInput]);
 
     const handleSendToAime = useCallback(async (userMessage: string) => {
         if (!userMessage.trim()) return;
@@ -227,7 +236,7 @@ export default function AimeWorkflowPane({
                                 </Box>
                             ) : (
                                 messages?.map((message, index) => (
-                                    <MessageItem key={message.id} message={message} isFirst={(index === 0)} />
+                                    <MessageItem key={message.id} message={message} isFirst={(index === 0)} onOptionSelected={onOptionSelected} />
                                 ))
                             )}
                         </List>

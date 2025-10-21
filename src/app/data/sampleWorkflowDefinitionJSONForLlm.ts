@@ -11,7 +11,7 @@ export const sampleWorkflowDefinitionJSONForLlm: WorkflowDefinition = {
       "type": "trigger",
       "stepFunction": "onMRF",
       "functionParams": {
-        "mrfTemplateName": "all"
+        "mrfTemplateId": "tpll001067"
       },
       "next": [
         {

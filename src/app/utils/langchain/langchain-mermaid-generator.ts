@@ -60,8 +60,8 @@ export function generateMermaidFromWorkflow(workflow: WorkflowDefinition): strin
             }
 
             // condition branches
-            if (step.onConditionPass) addEdgeTo(step.onConditionPass, 'pass');
-            if (step.onConditionFail) addEdgeTo(step.onConditionFail, 'fail');
+            if (step.onConditionPass) addEdgeTo(step.onConditionPass, 'Criteria Met');
+            if (step.onConditionFail) addEdgeTo(step.onConditionFail, 'Otherwise');
 
             // Support for decision-style conditions where a 'conditions' array
             // contains value->next mappings (e.g. multiCheckCondition)

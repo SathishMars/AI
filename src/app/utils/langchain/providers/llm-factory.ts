@@ -10,6 +10,12 @@ import { BaseChatModel } from "@langchain/core/language_models/chat_models";
 //   process.env.LLM_DETAILED_LOGGING = 'true';
 // }
 
+// Logging control:
+// - LLM_LOGGING: when 'true' enables basic informational logs from the LLM factory
+// - LLM_DETAILED_LOGGING: when 'true' enables verbose debugging logs (implies LLM_LOGGING)
+const LLM_DETAILED_LOGGING = (process.env.LLM_DETAILED_LOGGING ?? 'false') === 'true';
+const LLM_LOGGING = (process.env.LLM_LOGGING ?? 'false') === 'true' || LLM_DETAILED_LOGGING;
+
 export type LLMProvider = 'openai' | 'anthropic' | 'lmstudio';
 
 export interface LLMConfig {
@@ -56,7 +62,7 @@ export const DEFAULT_MODEL_CONFIGS: Record<LLMProvider, LLMModelConfig> = {
       model: process.env.OPENAI_MODEL_WORKFLOW || 'gpt-5-mini',
       temperature: 0.6,
       maxTokens: 4000,
-      streaming: true
+      streaming: false
     },
     mermaid_generate: {
       model: process.env.OPENAI_MODEL_MERMAID || 'gpt-4',
@@ -68,7 +74,7 @@ export const DEFAULT_MODEL_CONFIGS: Record<LLMProvider, LLMModelConfig> = {
       model: process.env.OPENAI_MODEL_CONVERSATION || 'gpt-4-turbo-preview',
       temperature: 0.6,
       maxTokens: 3000,
-      streaming: true
+      streaming: false
     }
   },
   anthropic: {
@@ -76,7 +82,7 @@ export const DEFAULT_MODEL_CONFIGS: Record<LLMProvider, LLMModelConfig> = {
       model: process.env.ANTHROPIC_MODEL_WORKFLOW || 'claude-3-5-sonnet-20240620',
       temperature: 0.6,
       maxTokens: 4000,
-      streaming: true
+      streaming: false
     },
     mermaid_generate: {
       model: process.env.ANTHROPIC_MODEL_MERMAID || 'claude-3-haiku-20240307',
@@ -88,7 +94,7 @@ export const DEFAULT_MODEL_CONFIGS: Record<LLMProvider, LLMModelConfig> = {
       model: process.env.ANTHROPIC_MODEL_CONVERSATION || 'claude-3-5-sonnet-20240620',
       temperature: 0.6,
       maxTokens: 3000,
-      streaming: true
+      streaming: false
     }
   },
   lmstudio: {
@@ -96,7 +102,7 @@ export const DEFAULT_MODEL_CONFIGS: Record<LLMProvider, LLMModelConfig> = {
       model: process.env.LMSTUDIO_MODEL || 'llama-3.1-8b-instruct',
       temperature: 0.6,
       maxTokens: 4000,
-      streaming: true
+      streaming: false
     },
     mermaid_generate: {
       model: process.env.LMSTUDIO_MODEL || 'llama-3.1-8b-instruct',
@@ -108,7 +114,7 @@ export const DEFAULT_MODEL_CONFIGS: Record<LLMProvider, LLMModelConfig> = {
       model: process.env.LMSTUDIO_MODEL || 'llama-3.1-8b-instruct',
       temperature: 0.6,
       maxTokens: 3000,
-      streaming: true
+      streaming: false
     }
   }
 };
@@ -164,9 +170,9 @@ export class LLMFactory {
     const explicitDefaultProvider = process.env.DEFAULT_LLM_PROVIDER as LLMProvider;
     if (explicitDefaultProvider && this.availableProviders.has(explicitDefaultProvider)) {
       this.defaultProvider = explicitDefaultProvider;
-      console.log(`Explicit default provider configured: ${explicitDefaultProvider}`);
+      if (LLM_LOGGING) console.log(`Explicit default provider configured: ${explicitDefaultProvider}`);
     } else if (explicitDefaultProvider) {
-      console.warn(`⚠️ Configured default provider '${explicitDefaultProvider}' is not available. Available providers: ${Array.from(this.availableProviders).join(', ')}`);
+      if (LLM_LOGGING) console.warn(`⚠️ Configured default provider '${explicitDefaultProvider}' is not available. Available providers: ${Array.from(this.availableProviders).join(', ')}`);
     }
 
     if (this.availableProviders.size === 0) {
@@ -175,8 +181,8 @@ export class LLMFactory {
       );
     }
 
-    console.log(`LLM Factory initialized with providers: ${Array.from(this.availableProviders).join(', ')}`);
-    console.log(`Default provider: ${this.defaultProvider}`);
+    if (LLM_LOGGING) console.log(`LLM Factory initialized with providers: ${Array.from(this.availableProviders).join(', ')}`);
+    if (LLM_LOGGING) console.log(`Default provider: ${this.defaultProvider}`);
   }
 
   /**
@@ -299,7 +305,7 @@ export class LLMFactory {
       }
 
       // When detailed logging is enabled, show the matched rule id (if any) and final options
-      if (process.env.LLM_DETAILED_LOGGING === 'true') {
+      if (LLM_DETAILED_LOGGING) {
         console.log(`LLM Factory - OpenAI options (rule=${optsHints.matchedRuleId ?? 'none'}):`, opts);
       }
 
@@ -307,8 +313,7 @@ export class LLMFactory {
     };
 
     // Enhanced logging when detailed logging is enabled
-    const isDetailedLogging = process.env.LLM_DETAILED_LOGGING === 'true';
-    if (isDetailedLogging) {
+    if (LLM_DETAILED_LOGGING) {
       console.log(`Creating LLM model:
         - Provider: ${selectedProvider}
         - Task Type: ${taskType}
@@ -317,7 +322,7 @@ export class LLMFactory {
         - Max Tokens: ${config.maxTokens}
         - Streaming: ${config.streaming}
         - Timestamp: ${new Date().toISOString()}`);
-    } else {
+    } else if (LLM_LOGGING) {
       console.log(`Using ${selectedProvider} (${config.model}) for ${taskType}`);
     }
 
@@ -326,7 +331,7 @@ export class LLMFactory {
     // Apply temperature rules. If a rule enforces an exact temperature, override the provided value.
     if (effectiveRule?.tempEnforceExact !== undefined) {
       if (config.temperature !== effectiveRule.tempEnforceExact) {
-        if (isDetailedLogging) {
+        if (LLM_DETAILED_LOGGING) {
           console.log(`LLM Factory: Overriding temperature ${config.temperature} -> ${effectiveRule.tempEnforceExact} for model=${config.model} due to rule=${effectiveRule.id}`);
         }
         config.temperature = effectiveRule.tempEnforceExact;
@@ -339,13 +344,13 @@ export class LLMFactory {
       case 'openai': {
         // Translate parameters for specific OpenAI models when necessary
         const useMaxCompletion = !!effectiveRule?.useMaxCompletionTokens;
-        if (isDetailedLogging) console.log(`LLM Factory: matched rule=${effectiveRule?.id ?? 'none'} for model=${config.model}`);
+        if (LLM_DETAILED_LOGGING) console.log(`LLM Factory: matched rule=${effectiveRule?.id ?? 'none'} for model=${config.model}`);
         return new ChatOpenAI(buildOpenAIOptions(config, {}, { useMaxCompletionTokens: useMaxCompletion, matchedRuleId: effectiveRule?.id }));
       }
 
       case 'anthropic': {
         // Anthropic expects temperature in 0..1 (for many models); we applied clamp earlier if rule present
-        if (isDetailedLogging) console.log(`LLM Factory: matched rule=${effectiveRule?.id ?? 'none'} for model=${config.model}`);
+        if (LLM_DETAILED_LOGGING) console.log(`LLM Factory: matched rule=${effectiveRule?.id ?? 'none'} for model=${config.model}`);
         return new ChatAnthropic({
           apiKey: process.env.ANTHROPIC_API_KEY,
           model: config.model,
@@ -365,7 +370,7 @@ export class LLMFactory {
         const baseURL = process.env.LMSTUDIO_BASE_URL || 'http://localhost:1234/v1';
         const apiKey = process.env.LMSTUDIO_API_KEY || 'lm-studio'; // LM Studio doesn't require real API key
 
-        if (isDetailedLogging) {
+        if (LLM_DETAILED_LOGGING) {
           console.log(`🏠 LM Studio Configuration:
             - Endpoint: ${baseURL}
             - API Key: ${apiKey}
@@ -373,7 +378,7 @@ export class LLMFactory {
             - Local Server: ${process.env.LMSTUDIO_ENABLED === 'true' ? 'Enabled' : 'Auto-detected'}`);
         }
 
-        if (isDetailedLogging) console.log(`LLM Factory: matched rule=${effectiveRule?.id ?? 'none'} for model=${config.model}`);
+        if (LLM_DETAILED_LOGGING) console.log(`LLM Factory: matched rule=${effectiveRule?.id ?? 'none'} for model=${config.model}`);
         return new ChatOpenAI(buildOpenAIOptions(config, { baseURL, apiKey, timeout: 60000, maxRetries: 2 }, { useMaxCompletionTokens: !!effectiveRule?.useMaxCompletionTokens, matchedRuleId: effectiveRule?.id }));
 
       default:
@@ -458,7 +463,7 @@ export class LLMFactory {
         await model.invoke("Hi");
         health[provider] = true;
       } catch (error) {
-        console.warn(`Provider ${provider} health check failed:`, error);
+        if (LLM_LOGGING) console.warn(`Provider ${provider} health check failed:`, error);
         health[provider] = false;
       }
     }

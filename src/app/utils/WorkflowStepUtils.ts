@@ -3,6 +3,9 @@ import { WorkflowStep } from "../types/workflowTemplate";
 
 export function getStepsLabelsMap(steps: Array<WorkflowStep | string>): Record<string, string> {
     const map: Record<string, string> = {};
+    if (!Array.isArray(steps) || steps.length === 0) {
+        return map;
+    }
     steps.forEach(step => {
         if (typeof step === "string") return;
 

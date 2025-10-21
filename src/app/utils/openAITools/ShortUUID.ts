@@ -1,15 +1,15 @@
-import { tool } from "@langchain/core/tools";
+import { tool } from '@openai/agents';
 import ShortUniqueId from "short-unique-id";
 import { z } from "zod";
 
 
 type ShortUUIDArgs = {
-    length?: number; // length of each id (default 10)
-    count?: number; // number of ids to generate (default 1)
+    length?: number|null; // length of each id (default 10)
+    count?: number|null; // number of ids to generate (default 1)
 };
 
 const generateShortUUID = async ({ length = 10, count = 1 }: ShortUUIDArgs): Promise<string> => {
-    const uid = new ShortUniqueId({ length, dictionary: 'alphanum' });
+    const uid = new ShortUniqueId({ length: length ?? 10, dictionary: 'alphanum' });
     if (!count || count <= 1) {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore -- uid.rnd exists on this version
@@ -21,6 +21,7 @@ const generateShortUUID = async ({ length = 10, count = 1 }: ShortUUIDArgs): Pro
         // @ts-ignore
         ids.push(uid.rnd());
     }
+    console.log(`Generated ${count} shortUUIDs:`, ids);
     return ids.join(', ');
 };
 
@@ -29,8 +30,9 @@ const shortUUIDSchema = z.object({
     count: z.number().min(1).optional().nullable().describe('Number of UUIDs to generate. When >1 returns a comma-separated list'),
 });
 
-export const shortUUIDTool = tool(generateShortUUID, {
+export const shortUUIDTool = tool({
     name: 'shortUUID',
     description: 'Generates one or more short unique identifiers. Call with {"count":40} to get 40 comma-separated ids.',
-    schema: shortUUIDSchema,
+    parameters: shortUUIDSchema,
+    execute: generateShortUUID,
 });

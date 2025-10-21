@@ -5,6 +5,7 @@ import { runLangChainGenerator } from '@/app/utils/langchain/langchain-workflow-
 import { generateMermaidFromWorkflow } from '@/app/utils/langchain/langchain-mermaid-generator';
 import ShortUniqueId from 'short-unique-id';
 import AimeWorkflowMessagesDBUtil from '@/app/utils/aimeWorkflowMessagesDBUtil';
+import { runAgentToGenerateWorkflow } from '@/app/utils/openAIAgent';
 // 10-char alphanumeric short id generator (reusable instance)
 const uid = new ShortUniqueId({ length: 10, dictionary: 'alphanum' });
 
@@ -137,8 +138,8 @@ export async function POST(req: NextRequest) {
     }
 
     const orgForCall: string | undefined = organization === null ? undefined : organization;
-    const result = await runLangChainGenerator(messages, parsedWorkflowDef, { sessionId: sessionId ?? generateShortId(), templateId }, account ?? undefined, orgForCall, resolvedUserId);
-
+    // const result = await runLangChainGenerator(messages, parsedWorkflowDef, { sessionId: sessionId ?? generateShortId(), templateId, account , organization: orgForCall, userId:resolvedUserId});
+    const result = await runAgentToGenerateWorkflow(messages, parsedWorkflowDef, sessionId ?? generateShortId(), templateId, account, orgForCall, resolvedUserId);
     //stored the "aime" messages 
     if (result.messages && result.messages.length > 0) {
       const upsertPromises = result.messages.map(async (m) => {
@@ -168,7 +169,7 @@ export async function POST(req: NextRequest) {
     // Build response
 
     const mermaidDiagram: string | undefined = receivedWorkflowDefinition ? generateMermaidFromWorkflow(receivedWorkflowDefinition) : undefined;
-    console.log('[route] generated mermaid diagram', mermaidDiagram);
+    // console.log('[route] generated mermaid diagram', mermaidDiagram);
 
     const responseBody: GenerateResponseBody = {
       messages: result.messages,

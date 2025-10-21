@@ -4,9 +4,9 @@ import type { AimeWorkflowConversationsRecord, WorkflowMessage } from '@/app/typ
 
 export async function GET(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
-    const {id:templateId} = await params;
+    const { id: templateId } = await params;
     const account = req.headers.get('x-account') || 'groupize-demos';
     const organizationHeader = req.headers.get('x-organization');
     const organization = organizationHeader === null ? null : organizationHeader;
@@ -30,7 +30,7 @@ export async function GET(
 
 export async function POST(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     const { id: templateId } = await params;
     const account = req.headers.get('x-account') || 'groupize-demos';
@@ -56,7 +56,7 @@ export async function POST(
 
 export async function PUT(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     const { id: templateId } = await params;
     const account = req.headers.get('x-account') || 'groupize-demos';
@@ -84,7 +84,7 @@ export async function PUT(
 
 export async function DELETE(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     const { id: templateId } = await params;
     const account = req.headers.get('x-account') || 'groupize-demos';

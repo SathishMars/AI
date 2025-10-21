@@ -12,28 +12,28 @@ export interface LLMInstructions {
 export interface api {
     endpoint: string;                                           // API endpoint URL
     method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';        // HTTP method
-    headers?: Record<string, string>;                           // Optional headers
-    params?: Record<string, string|number|boolean|object>;      // Optional query parameters
-    responseMapping?: Record<string, string>;                   // Optional response mapping
+    headers?: Record<string, string> | null;                           // Optional headers
+    params?: Record<string, string|number|boolean|object> | null;      // Optional query parameters
+    responseMapping?: Record<string, string> | null;                   // Optional response mapping
 }
 
 export interface FunctionParam {
     name: string;                                               // Parameter name to be passed to the tool
     label: string;                                              // Human-readable parameter label
     required: boolean;                                          // Is the parameter required
-    description?: string;                                       // Optional description
+    description?: string | null;                                       // Optional description
     type: 'string' | 'number' | 'boolean' | 'object' | 'select' | 'list' | 'api'; // Parameter type
-    options?: Array<{ value: string|number|boolean|object; label: string; } | api>; // Options for 'select' type or API to fetch options
-    value?: string|number|boolean|object|api;                       // Optional value
-    defaultValue?: string|number|boolean|object|api;                // Optional default value
+    options?: Array<{ value: string|number|boolean|object; label: string; } | api> | null; // Options for 'select' type or API to fetch options
+    value?: string|number|boolean|object|api | null;                       // Optional value
+    defaultValue?: string|number|boolean|object|api | null;                // Optional default value
 }
 
 export interface FunctionOutput {
     type: 'result' | 'pass' | 'fail' | 'error' | 'timeout' | 'condition';     // Output type
-    label?: string;                                              // Human-readable output label
+    label?: string | null;                                              // Human-readable output label
     required: boolean;                                          // Is the output required
-    value?: string|number|boolean;                                             // Optional value to be returned
-    next?: string;                                              // Optional next step ID
+    value?: string|number|boolean | null;                                             // Optional value to be returned
+    next?: string | null;                                              // Optional next step ID
 }
 
 
@@ -70,14 +70,14 @@ export const LLMInstructionsSchema = z.object({
 export const apiSchema = z.object({
     endpoint: z.string(),
     method: z.enum(['GET', 'POST', 'PUT', 'DELETE', 'PATCH']),
-    headers: z.record(z.string()).optional(),
+    headers: z.record(z.string()).optional().nullable(),
     params: z.record(z.union([
         z.string(),
         z.number(),
         z.boolean(),
         z.object({}).passthrough(),
-    ])).optional(),
-    responseMapping: z.record(z.string()).optional(),
+    ])).optional().nullable(),
+    responseMapping: z.record(z.string()).optional().nullable(),
 });
 
 // FunctionParam schema
@@ -85,7 +85,7 @@ export const FunctionParamSchema = z.object({
     name: z.string(),
     label: z.string(),
     required: z.boolean(),
-    description: z.string().optional(),
+    description: z.string().optional().nullable(),
     type: z.enum(['string', 'number', 'boolean', 'object', 'select', 'list', 'api']),
     options: z.array(
         z.union([
@@ -100,27 +100,27 @@ export const FunctionParamSchema = z.object({
             }),
             apiSchema,
         ])
-    ).optional(),
+    ).optional().nullable(),
     value: z.union([
         z.string(),
         z.number(),
         z.boolean(),
         z.object({}).passthrough(),
         apiSchema,
-    ]).optional(),
+    ]).optional().nullable(),
     defaultValue: z.union([
         z.string(),
         z.number(),
         z.boolean(),
         z.object({}).passthrough(),
         apiSchema,
-    ]).optional(),
+    ]).optional().nullable(),
 });
 
 // FunctionOutput schema
 export const FunctionOutputSchema = z.object({
     type: z.enum(['result', 'pass', 'fail', 'error', 'timeout']),
-    label: z.string(),
+    label: z.string().optional().nullable(),
     required: z.boolean(),
 });
 
@@ -130,8 +130,8 @@ export const WorkflowStepFunctionSchema = z.object({
     label: z.string(),
     name: z.string(),
     type: ToolTypeSchema,
-    description: z.string().optional(),
-    params: z.array(FunctionParamSchema).optional(),
+    description: z.string().optional().nullable(),
+    params: z.array(FunctionParamSchema).optional().nullable(),
     outputs: z.array(FunctionOutputSchema),
     llmInstructions: LLMInstructionsSchema,
 });

@@ -13,12 +13,12 @@ export interface AimeWorkflowConversationsRecord extends WorkflowMessage {
 export interface WorkflowMessage {
     id: string; // Unique message ID (use UUID or similar)
     sender: 'system' | 'user' | 'aime';
-    userId?: string; // ID of the user who sent the message
-    userName?: string; // Name of the user who sent the message
+    userId?: string|null; // ID of the user who sent the message
+    userName?: string|null; // Name of the user who sent the message
     content: WorkflowMessageContent; // Message content or structured content
     timestamp: string; // ISO 8601 format
     type?: 'text' | 'image' | 'file'; // Optional message type
-    metadata?: Record<string, unknown>; // Optional additional metadata
+    metadata?: Record<string, string|number|boolean|object>; // Optional additional metadata
 }
 
 export interface WorkflowMessageContent {
@@ -26,59 +26,72 @@ export interface WorkflowMessageContent {
     actions?: Array<{
         type: 'api_call' | 'workflow_step' | 'external_tool';
         name: string;
-        params?: Record<string, unknown>;
-    }>;
-    followUpQuestions?: Array<string>;
-    followUpOptions?: Record<string, Array<FollowUpOption>>;
-    workflowDefinition?: WorkflowDefinition; // Optional updated workflow definition
+        params?: Record<string, string | number | boolean | object>;
+    }>|null;
+    followUpQuestions?: Array<string>|null;
+    followUpOptions?: Record<string, Array<FollowUpOption>>|null;
+    workflowDefinition?: WorkflowDefinition|null; // Optional updated workflow definition
 }
 export interface FollowUpOption {
     label: string;
-    value: unknown;
+    value: string | number | boolean ; // Value associated with the option
 }
 
 
 // FollowUpOption schema
 export const FollowUpOptionSchema = z.object({
     label: z.string(),
-    value: z.unknown(),
+    value: z.union([z.string(), z.number(), z.boolean()]),
 });
 
 // WorkflowMessageContent schema
 export const WorkflowMessageContentSchema = z.object({
-    text: z.string(),
+    text: z.string().regex(/^[^{}`]*$/, {
+        message: 'Text must not contain {, }, or ` characters.',
+    }),
     actions: z
         .array(
             z.object({
                 type: z.enum(["api_call", "workflow_step", "external_tool"]),
                 name: z.string(),
-                params: z.record(z.unknown()).optional(),
+                params: z.record(z.union([
+                    z.string(),
+                    z.number(),
+                    z.boolean(),
+                    z.object({}).strict(),
+                ])).optional().nullable(),
             })
         )
-        .optional(),
-    followUpQuestions: z.array(z.string()).optional(),
+        .optional().nullable(),
+    followUpQuestions: z.array(z.string()).optional().nullable(),
     followUpOptions: z
         .record(z.array(FollowUpOptionSchema))
-        .optional(),
-    workflowDefinition: WorkflowDefinitionSchema.optional(),
+        .optional().nullable(),
+    workflowDefinition: WorkflowDefinitionSchema.optional().nullable(),
 });
+
 
 // WorkflowMessage schema
 export const WorkflowMessageSchema = z.object({
     id: z.string(),
     sender: z.enum(["system", "user", "aime"]),
-    userId: z.string().optional(),
-    userName: z.string().optional(),
+    userId: z.string().optional().nullable(),
+    userName: z.string().optional().nullable(),
     content: WorkflowMessageContentSchema,
     timestamp: z.string(),
-    type: z.enum(["text", "image", "file"]).optional(),
-    metadata: z.record(z.unknown()).optional(),
+    type: z.enum(["text", "image", "file"]).optional().nullable(),
+    metadata: z.record(z.union([
+        z.string(),
+        z.number(),
+        z.boolean(),
+        z.object({}).strict(),
+    ])).optional().nullable(),
 });
 
 // AimeWorkflowConversationsRecord schema
 export const AimeWorkflowConversationsRecordSchema = WorkflowMessageSchema.extend({
     account: z.string(),
-    organization: z.string().nullable().optional(),
+    organization: z.string().optional().nullable(),
     templateId: z.string(),
 });
 

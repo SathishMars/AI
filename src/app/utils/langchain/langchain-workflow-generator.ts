@@ -2,21 +2,27 @@
 import { getLLMFactory, type LLMProvider } from './providers/llm-factory';
 import { createToolCallingAgent, AgentExecutor } from "langchain/agents";
 import { WorkflowDefinition, WorkflowDefinitionSchema } from '@/app/types/workflowTemplate';
-import { WorkflowMessage, WorkflowMessageSchema } from '@/app/types/aimeWorkflowMessages';
+import { WorkflowMessage, WorkflowMessageContent, WorkflowMessageSchema } from '@/app/types/aimeWorkflowMessages';
 import { ChatPromptTemplate, MessagesPlaceholder } from "@langchain/core/prompts";
 import { ChatMessageHistory } from 'langchain/memory';
 import { AIMessage, HumanMessage } from '@langchain/core/messages';
-import { JsonOutputParser } from '@langchain/core/output_parsers';
 import { workflowFunctionInstructions } from '@/app/data/workflow-tool-defintions';
 import { workflowVariableLLMInstructions } from '@/app/data/workflow-variable-definitions';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import ShortUniqueId from 'short-unique-id';
 import { sampleWorkflowDefinitionJSONForLlm } from '@/app/data/sampleWorkflowDefinitionJSONForLlm';
-import MrfTemplateDBUtil from '../mrfTemplateDBUtil';
 import { shortUUIDTool } from './tools/ShortUUID';
 import { RunnableWithMessageHistory } from '@langchain/core/runnables';
 import { StructuredTool } from '@langchain/core/tools';
 import { workflowDefinitionValidatorTool } from './tools/WorkflowValidator';
+import { GetListOfWorkflowTemplatesTool } from './tools/GetListOfWorkflowTemplates';
+import { GetListOfMRFTemplatesTool } from './tools/GetListOfMRFTemplates';
+import { readFileSync, writeFileSync } from 'fs';
+import path from 'path';
+import ShortUniqueId from 'short-unique-id';
+import { sanitizeAimeMessage } from './sanitizeResponse';
+import aimeInstructions from './instructions/aimeWorkflowGeneralInstructions.md';
+import aimeToolInstructions from './instructions/aimeWorkflowToolUsageInstructions.md';
+
 // 10-char alphanumeric short id generator (reusable instance)
 const uid = new ShortUniqueId({ length: 10, dictionary: 'alphanum' });
 
@@ -30,6 +36,13 @@ function generateShortId(): string {
 }
 
 
+// Control whether LangChain internals should print verbose chain logs.
+// Set LANGCHAIN_VERBOSE=true to enable; otherwise defaults to false.
+const LANGCHAIN_VERBOSE = (process.env.LANGCHAIN_VERBOSE ?? 'false') === 'true' || (process.env.LLM_LOGGING === 'true') || (process.env.LLM_DETAILED_LOGGING === 'true');
+// Enable per-iteration logging (each agent action / iteration). Set to 'true' to enable.
+const LANGCHAIN_ITERATION_LOGS = (process.env.LANGCHAIN_ITERATION_LOGS ?? 'false') === 'true';
+
+
 /**
  * Types exported for route usage
  */
@@ -38,122 +51,36 @@ export type LangChainWorkflowConfig = {
   templateId?: string;
   provider?: LLMProvider;
   userId?: string;
-  account?: string;
+  account: string;
   organization?: string;
   conversationalMode?: boolean;
 };
 
 
 
-const WORKFLOW_DEFINITION_SCHEMA = JSON.stringify(zodToJsonSchema(WorkflowDefinitionSchema), null, 2);
-const WORKFLOW_MESSAGE_SCHEMA = JSON.stringify(zodToJsonSchema(WorkflowMessageSchema), null, 2);
-const STEP_FUNCTION_INSTRUCTIONS = `A step function is a reusable function that can be called from multiple workflow steps. 
-It has a unique id, a name, and a definition that describes its behavior. The definition follows the same schema as a workflow definition. 
-Step functions can be used to encapsulate common logic or actions that can be shared across different workflows. 
-When defining a step function, ensure that its id is unique within the workflow and that it does not conflict with any step ids. 
-Step functions can be referenced in workflow steps by their id.
-When creating or modifying step functions, ensure that:
-- Each step function has a unique id that does not conflict with step ids.
-- The definition of the step function adheres to the workflow definition schema.
-- Step functions are used to encapsulate common logic or actions that can be reused across different workflows.
-- When referencing a step function in a workflow step, use its id to ensure clarity and consistency.
 
-Available step functions are as follows:
-${workflowFunctionInstructions.join('\n')}
-`;
-
-const listOfShortUUIDs = Array.from({ length: 40 }, () => generateShortId()).join(', ');
-
-const RESPONSE_INSTRUCTIONS = `##Response Instructions
-Respond with a JSON object that matches the following schema:
-\`\`\`json
-${WORKFLOW_MESSAGE_SCHEMA}
-\`\`\`
-IMPORTANT: 
-1. The text property should have your conversational response.
-2. The sender should be "aime"
-3. If there is a workflowDefinition, it should be in the workflowDefinition field.
-4. If you are asking follow-up questions, include them in the followUpQuestions array. Do not assume any values unless specified by the user sometime during the conversation.
-5. If you are providing follow-up options, include them in the followUpOptions field as a map of question to array of options.
-6. The userId and userName fields don't make sense for you. so ignore them.
-
-Validation rules for the LLM output:
-- Step ids must be short, alphanumeric with dashes or underscores and unique within the workflow.IMPORTANT: They should be 10 characters long.
-- Generate human readable labels for each step describing the action to be taken.
-- If steps need to refer to other steps that are not directly included in the next, onConditionPass, onConditionFail, onError, or onTimeout fields to reference them by id.
-- Even if the response is general conversational and not workflow-related, always respond with a valid JSON object that conforms to the schema above.
-CRITICAL: Please note that the response will be parsed and validated against this schema.
-If you cannot provide a valid JSON response, return an object with an "error" field explaining the issue.
-`;
-
-const TOOL_USAGE_INSTRUCTIONS = `##Tool Usage Instructions
-When generating or editing workflows you MUST use the following tools to ensure id uniqueness and schema validation:
-
-- workflowDefinitionValidator: Call this tool with the full workflowDefinition JSON string as its single argument. The tool will return a JSON-stringified validation result. Example call syntax (emit an agent action that the LangChain agent will execute):
-
-  workflowDefinitionValidator('{"steps": [...]}')
-
-  After the tool returns, parse the returned string as JSON, fix any reported validation errors, and then re-run validation until there are no errors.
-
-- shortUUID: Call this tool with an optional {"count": N} argument to generate N short ids in one call. When count > 1 the tool returns a comma-separated list (CSV) of ids. Example:
-
-  idsCsv = shortUUID({"count":40})
-
-  // idsCsv will be a string like: "aB3k9ZpQ1x, bC4l8YtR2z, ..."
-
-Agent behavior requirements:
-- Before returning any workflowDefinition, call workflowDefinitionValidator and fix all reported errors.
-- When creating or replacing step ids, obtain ids by calling shortUUID() or shortUUID({"count":N}); do not fabricate ids.
-- Do not return workflow JSON that has not been validated by workflowDefinitionValidator.
-`;
-
-const GENERATION_INSTRUCTIONS = `##Workflow Generation Instructions
-The user will input a message describing the workflow they want to create or modify. 
-**System rule (hard requirement)**
-- ID Uniqueness: Every step object in the workflow must have an id that is globally unique within the entire workflowDefinition.
-- No Reuse for Different Objects: An id that has already been used for one step object must never be used again for a different step object.
-- Reference vs. Definition:
-- When defining a step (an object with type, properties, etc.), you must assign a new, unique id (unless you’re editing that same object).
-- When reusing an existing step, do not redefine it—reference it by its existing id (e.g., in next, onConditionPass, onConditionFail).
-- Use the workflowDefinitionValidator to validate the workflow before returning it. Fix any issues found by workflowDefinitionValidator. You can use the shortUUID tool to generate new IDs as needed.
-
-Any workflowDefinition (passed by the user or generated by you) will be provided as JSON and will follow the following schema: 
-\`\`\`json
-${WORKFLOW_DEFINITION_SCHEMA}
-\`\`\`
-Your task is to generate a new or modified workflow definition that meets the user's requirements.
-When given conversation history, use it to decide whether to ask clarifying questions or to modify the workflow. When provided with an existing workflow, prefer editing or annotating that workflow rather than creating an entirely new one unless explicitly requested.
-**CRITICAL SYSTEM GUIDELINES — Follow exactly as written**
-1. **id is unique shortUUID of length 10**. Use from the supplied list of UUIDs. CRITICAL! **Do not make up your own IDs.**
-2. **CRITICAL NO 2 IDs CAN BE THE SAME. Every ID is distinct.DO NOT REUSE IDs**
-3. CHECK YOUR WORKFLOW FOR DUPLICATE IDS. IF YOU FIND ANY, FIX THEM BY CREATING NEW ONES USING THE shortUUID TOOL.
-4. If the user message is a request to create or modify a workflow, respond with a JSON object containing the updated workflowDefinition field.
-5. If the user message is ambiguous or seems to require clarification, respond with a JSON object with the followup questions populated. If a partial workflow can be generated from the conversation history, include it in the response.
-6. If the user message is purely conversational and does not relate to workflow creation or modification, you do not need to respond with a workflowDefinition, just respond to the conversation.
-7. Do not include sensitive tokens or environment variables in the output.
-8. Ensure a workflow always begins with a trigger step and ends with a terminate step.
-9. Step Reuse Rule
-- Do **not** create new step objects that duplicate existing functionality.
-- Reuse existing steps by **referencing their step IDs**.
-- Only create new step objects when:
-  - They perform a **different function**, or
-  - They are used in **parallel branches**.
-9. Workflow Readability Rule  
-- Wherever possible, **embed** step objects using these fields:  
-  - \`next\`, \`onConditionPass\`, or \`onConditionFail\`.  
-- Use **ID references** (instead of nested steps) **only when necessary** for clarity or structure.
-
-### list of short UUIDs (length 10) to use for step ids:
-${listOfShortUUIDs}
-
-### Example
-An example of a good step definition is as follows. This does the nesting properly and uses references only when needed.It does not duplicate steps unnecessarily.:
-\`\`\`json
-${JSON.stringify(sampleWorkflowDefinitionJSONForLlm, null, 2)}
-\`\`\`
+const loadMarkdownInstructionsFromFile = (content: string, replace?: Record<string, string>): string => {
+  try {
+    if (replace) {
+      content = content.replace(/\${(\w+)}/g, (match, key) => {
+        return replace[key] ?? '';
+      });
+    }
+    return content;
+  } catch (err) {
+      console.error(`Error loading instructions from content:`, err);
+      return '';
+  }
+};
 
 
-`;
+
+const TOOL_USAGE_INSTRUCTIONS = loadMarkdownInstructionsFromFile(aimeToolInstructions) || ''; 
+
+const GENERATION_INSTRUCTIONS = loadMarkdownInstructionsFromFile(aimeInstructions, { 
+  WORKFLOW_DEFINITION_SCHEMA: JSON.stringify(WorkflowDefinitionSchema), 
+  SAMPLE_WORKFLOW_DEFINITION: JSON.stringify(sampleWorkflowDefinitionJSONForLlm), 
+  WORKFLOW_MESSAGE_SCHEMA: JSON.stringify(WorkflowMessageSchema) || ''});
 
 const JSON_RULES_ENGINE_INSTRUCTIONS = `in the decison step, the condition field should contain a rules engine JSON object that defines the conditions for branching.
 This follows the syntax used by the "json-rules-engine" library.
@@ -200,19 +127,31 @@ Here is an example of a rules engine JSON object:
  * Human-readable instructions that guide the LLM to produce workflow JSON
  * Keep this strict and explicit so downstream parsing is easier.
  */
-const INSTRUCTIONS = `##INSTRUCTIONS
-You are "aime" an assistant that generates and edits workflow JSON structures. You are helpful, precise, and concise. You do not make up information.
-${RESPONSE_INSTRUCTIONS}
+const INSTRUCTIONS = `# 🧩 Condensed System Instructions for “aime” (with Step Function Catalog)
+
+## Role
+You are **"aime"**, an assistant that creates, edits, and validates **workflow definition JSON structures**.  
+Be **precise**, **concise**, and **deterministic**. Never fabricate data.
+
+---
 
 ${GENERATION_INSTRUCTIONS}
 
-Guidance on the step functions to be used to generate the steps:
-${STEP_FUNCTION_INSTRUCTIONS}
+---
+
+${workflowFunctionInstructions}
 
 ${JSON_RULES_ENGINE_INSTRUCTIONS}
+
+---
+
 ${TOOL_USAGE_INSTRUCTIONS}
 
+---
+
 ${workflowVariableLLMInstructions}
+
+---
 `;
 
 
@@ -221,10 +160,7 @@ ${workflowVariableLLMInstructions}
 export async function runLangChainGenerator(
   messages: WorkflowMessage[],
   existingWorkflow: WorkflowDefinition | null,
-  config: LangChainWorkflowConfig,
-  accountId?: string,
-  organizationId?: string,
-  userId?: string
+  config: LangChainWorkflowConfig
 ): Promise<{
   messages: WorkflowMessage[];
   modifiedStepIds: string[];
@@ -255,20 +191,29 @@ export async function runLangChainGenerator(
 
 
 
-    const availableMRFTemplates = accountId ? await MrfTemplateDBUtil.getTemplatesForAccount(accountId, organizationId, userId) : [];
 
 
     // Step 2: Create the system instructions
-    const systemInstructions = INSTRUCTIONS + (existingWorkflow ? `\nThe existing workflow is: 
+    const systemInstructions = INSTRUCTIONS + (existingWorkflow ? `\n
+## Current workflow definition (\`content.workflowDefinition\`) is: 
 \`\`\`json
-${JSON.stringify(existingWorkflow, null, 2)} 
+{ 
+  "id": "87dhas76bgt"
+  "sender": "aime"
+  "content": {
+    "text": "/* aime respponse here */"
+    "workflowDefinition": $${JSON.stringify(existingWorkflow, null, 2)} 
+  } 
+  "timestamp": "2025-10-17T00:00:00Z"
+}
 \`\`\`
 ` : '\nNo existing workflow provided.\n') + `
-**Use from one of the following** list of available MRF templates for onMRF trigger steps as the params when the user requests an MRF-based trigger.:
-${availableMRFTemplates.map(t => `- label: ${t.name}, value: ${t.id}`).join('\n')}
-
+## Other important information that you may need for response or generation or for tool calls
+- Current Account ID: ${config.account}
+- Current Organization ID: ${config.organization ?? 'N/A'}
+- Current User ID: ${config.userId ?? 'N/A'}
+- Current Time in ISOformat: ${new Date().toISOString()}
 `;
-
 
 
 
@@ -283,6 +228,9 @@ ${availableMRFTemplates.map(t => `- label: ${t.name}, value: ${t.id}`).join('\n'
     };
 
     console.log('[langchain] system instructions', systemInstructions);
+
+    writeFileSync('/tmp/systemInstructions.txt', systemInstructions);
+
 
     const escapedSystemInstructions = escapeTemplateBraces(systemInstructions);
     console.debug('[langchain] systemInstructions length', systemInstructions.length, 'escaped length', escapedSystemInstructions.length);
@@ -301,17 +249,24 @@ ${availableMRFTemplates.map(t => `- label: ${t.name}, value: ${t.id}`).join('\n'
 
 
     // Step 4: Create the agent and the agent executor with tools
-    const tools: StructuredTool[] = [workflowDefinitionValidatorTool, shortUUIDTool];
+    // const tools: StructuredTool[] = [workflowDefinitionValidatorTool, shortUUIDTool, GetListOfWorkflowTemplatesTool, GetListOfMRFTemplatesTool];
+    const tools: StructuredTool[] = [workflowDefinitionValidatorTool, shortUUIDTool, GetListOfMRFTemplatesTool];
+
+
+
     const agent = await createToolCallingAgent({
       llm: chatModel, // Use your BaseChatModel instance here
       tools,
       prompt: prompt,
     });
 
+
+    // If iteration logging is enabled, also force the agent executor to be
+    // verbose so langchain internals print useful server-side logs.
     const agentExecutor = new AgentExecutor({
       agent,
       tools,
-      verbose: true,
+      verbose: LANGCHAIN_VERBOSE || LANGCHAIN_ITERATION_LOGS,
     });
 
     // Step 5: Set up the memory with existing messages
@@ -325,18 +280,15 @@ ${availableMRFTemplates.map(t => `- label: ${t.name}, value: ${t.id}`).join('\n'
     // LangChain / OpenAI v5 expects message content to be properly formatted.
     // For @langchain/core 0.3.x, content can be a string OR an array of content objects.
     // However, when it's an array, each element must be a proper content object (not a nested array).
+    // Defensive serialization: ensure we only add string message content to
+    // the ChatMessageHistory. If the message content is missing or not a
+    // string, fallback to JSON.stringify of the content object.
     messageHistory.addMessages(historyMessages.map((m: WorkflowMessage) => {
-      if (m.sender === 'aime') {
-        // const aimeMessage = m.content.text + (m.content.followUpQuestions ? `\n**Questions for user:** \n${m.content.followUpQuestions.join('\n')}` : '') + (m.content.followUpOptions ? `\n**Options for user:** \n${JSON.stringify(m.content.followUpOptions)}` : '');
-        const aimeMessage = m.content.text + (m.content.followUpQuestions ? `\n**Questions for user:** \n${m.content.followUpQuestions.join('\n')}` : '');
-        // Use plain string content - LangChain will convert it appropriately for the API
-        return new AIMessage(aimeMessage);
-      } else {
-        // Use plain string content - LangChain will convert it appropriately for the API
-        return new HumanMessage(m.content.text);
-      }
+      return m.sender === 'aime' ? new AIMessage(JSON.stringify(m)) : new HumanMessage(JSON.stringify(m));
     }));
-    console.log(`[langchain] Populated message history with ${messages.length} messages`);
+    if (process.env.LLM_LOGGING === 'true' || process.env.LLM_DETAILED_LOGGING === 'true') {
+      console.log(`[langchain] Populated message history with ${messages.length} messages`);
+    }
 
     // Step 6: Create the conversational chain with the pre-populated history
     // We will invoke the agentExecutor directly after preparing normalized inputs
@@ -344,6 +296,7 @@ ${availableMRFTemplates.map(t => `- label: ${t.name}, value: ${t.id}`).join('\n'
 
 
     const invokeInput = { input: lastMessage.content.text };
+    
 
     // Replace your old chain with the agentExecutor
     const conversationalChain = new RunnableWithMessageHistory({
@@ -365,48 +318,20 @@ ${availableMRFTemplates.map(t => `- label: ${t.name}, value: ${t.id}`).join('\n'
       lastMessagePreview: typeof lastMessage.content.text === 'string' ? lastMessage.content.text.slice(0, 300) : undefined,
     });
 
-    // DEBUG: Log the message history to see what's being sent
-    const histMsgs = await messageHistory.getMessages();
-    console.log('[langchain] Message history before invoke:', histMsgs.map((msg, idx) => ({
-      index: idx,
-      type: msg._getType(),
-      contentType: typeof msg.content,
-      contentIsArray: Array.isArray(msg.content),
-      contentPreview: typeof msg.content === 'string' ? msg.content.slice(0, 100) : Array.isArray(msg.content) ? JSON.stringify(msg.content).slice(0, 200) : 'unknown'
-    })));
 
-    // agentExecutor.invoke expects ChainValues; the runtime shape is dynamic so bypass strict typing here
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
     const response = await conversationalChain.invoke(invokeInput, {
       configurable: {
-        sessionId: config.sessionId,
-        response_format: { type: 'json_object' },
-        output_parser: new JsonOutputParser(),
+        sessionId: config.sessionId
       },
     });
-    // console.info('[langchain] conversationalChain invoke completed', response.output);
-    // Log all tool_calls and invalid_tool_calls across the chat history for easier debugging
-    const allToolCalls = (response.chat_history || []).flatMap((h: unknown) => {
-      if (h && typeof h === 'object') {
-        const rec = h as Record<string, unknown>;
-        return (rec.tool_calls as unknown[]) ?? [];
-      }
-      return [];
-    });
-    const allInvalidToolCalls = (response.chat_history || []).flatMap((h: unknown) => {
-      if (h && typeof h === 'object') {
-        const rec = h as Record<string, unknown>;
-        return (rec.invalid_tool_calls as unknown[]) ?? [];
-      }
-      return [];
-    });
-    console.log('[langchain] conversationalChain tools used', JSON.stringify(allToolCalls, null, 2));
-    console.log('[langchain] conversationalChain tools failed', JSON.stringify(allInvalidToolCalls, null, 2));
+    
+    console.info('[langchain] conversationalChain invoke completed', response.output);
+
+    const sanitizedMessage = sanitizeAimeMessage(response.output);
 
     // Strip the ``````json` and ``` fences
     // if the model added them around the JSON
-    const jsonString = typeof response.output === 'string' ? response.output : JSON.stringify(response.output);
+    const jsonString = typeof sanitizedMessage === 'string' ? sanitizedMessage : JSON.stringify(sanitizedMessage);
     // if the content is of type string and does not have the ```json` or ``` fences, we will read this as the text and construct a valid JSON response with just the text field
     if (typeof response.output === 'string' && !response.output.trim().startsWith('\`\`\`json') && !response.output.trim().startsWith('{')) {
       const textResponse: WorkflowMessage = {
@@ -420,11 +345,9 @@ ${availableMRFTemplates.map(t => `- label: ${t.name}, value: ${t.id}`).join('\n'
       return { messages: [textResponse], modifiedStepIds: [] };
     }
 
-    const strippedJson = jsonString.replace(/```json/g, '').replace(/```/g, '').trim();
-    // console.log('[langchain] LLM response (stripped):', strippedJson);
 
     // Parse the JSON and return it
-    const parsed: WorkflowMessage = JSON.parse(strippedJson);
+    const parsed: WorkflowMessage = JSON.parse(jsonString);
     parsed.timestamp = new Date().toISOString();
     parsed.id = generateShortId();
     return { messages: [parsed], modifiedStepIds: [] };
