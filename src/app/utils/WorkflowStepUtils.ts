@@ -193,10 +193,10 @@ export const stepFunctionValidators: Record<string, (step: WorkflowStep) => stri
         if (!params.evaluate) {
             return `multiCheckCondition step "${step.id}" must have a valid evaluate parameter.`;
         }       
-        if (!params.conditions || Array.isArray(params.conditions) || Object.keys(params.conditions).length === 0) {
+        if (!params.conditions || (Array.isArray(params.conditions) && Object.keys(params.conditions).length === 0)) {
             return `multiCheckCondition step "${step.id}" must have a valid conditions parameter.`;
         }
-        params.conditions.map((condition: {value:string, next:string}) => {
+        (params.conditions as Array<{value:string, next:string}>).map((condition: {value:string, next:string}) => {
             if (!condition.value || typeof condition.value !== 'string') {
                 return `multiCheckCondition step "${step.id}" has a condition with invalid value parameter.`;
             }
