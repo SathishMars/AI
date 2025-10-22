@@ -4,6 +4,7 @@ import WorkflowTemplateDbUtil from '@/app/utils/workflowTemplateDbUtil';
 import { workflowTemplateStarter } from '@/app/data/workflow-template-starter';
 import { WorkflowTemplateSchema, WorkflowTemplate } from '@/app/types/workflowTemplate';
 import ShortUniqueId from 'short-unique-id';
+import AimeWorkflowMessagesDBUtil from '@/app/utils/aimeWorkflowMessagesDBUtil';
 
 // Reusable ShortUniqueId instance (10 chars, alphanum) — follow repo policy
 const uid = new ShortUniqueId({ length: 10, dictionary: 'alphanum' });
@@ -257,6 +258,10 @@ export async function DELETE(
         { status: 404 }
       );
     }
+
+    const deletedChats = await AimeWorkflowMessagesDBUtil.deleteMessagesForTemplate(account, decodedTemplateName);
+    console.log(`[WorkflowTemplatesRoute] Deleted ${deletedChats.deletedCount} associated conversation messages.`); 
+
 
     return NextResponse.json({
       success: true,
