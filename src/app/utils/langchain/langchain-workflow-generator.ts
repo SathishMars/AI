@@ -17,11 +17,10 @@ import { workflowDefinitionValidatorTool } from './tools/WorkflowValidator';
 import { GetListOfWorkflowTemplatesTool } from './tools/GetListOfWorkflowTemplates';
 import { GetListOfMRFTemplatesTool } from './tools/GetListOfMRFTemplates';
 import { readFileSync, writeFileSync } from 'fs';
-import path from 'path';
 import ShortUniqueId from 'short-unique-id';
 import { sanitizeAimeMessage } from './sanitizeResponse';
-import aimeInstructions from './instructions/aimeWorkflowGeneralInstructions.md';
-import aimeToolInstructions from './instructions/aimeWorkflowToolUsageInstructions.md';
+import aimeInstructions from '@/app/utils/aiInstructions/aimeWorkflowGeneralInstructions.md';
+import aimeToolInstructions from '@/app/utils/aiInstructions/aimeWorkflowToolUsageInstructions.md';
 
 // 10-char alphanumeric short id generator (reusable instance)
 const uid = new ShortUniqueId({ length: 10, dictionary: 'alphanum' });

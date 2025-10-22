@@ -2,8 +2,8 @@ import { Agent, AgentInputItem, run, setDefaultOpenAIKey } from '@openai/agents'
 import z from 'zod';
 import { WorkflowMessage, WorkflowMessageSchema } from '../types/aimeWorkflowMessages';
 import { WorkflowDefinition, WorkflowDefinitionSchema } from '../types/workflowTemplate';
-import aimeInstructions from './langchain/instructions/aimeWorkflowGeneralInstructions.md';
-import aimeToolInstructions from './langchain/instructions/aimeWorkflowToolUsageInstructions.md';
+import aimeInstructions from '@/app/utils/aiInstructions/aimeWorkflowGeneralInstructions.md';
+import aimeToolInstructions from '@/app/utils/aiInstructions/aimeWorkflowToolUsageInstructions.md';
 import { sampleWorkflowDefinitionJSONForLlm } from '../data/sampleWorkflowDefinitionJSONForLlm';
 import { workflowFunctionInstructions } from '../data/workflow-tool-defintions';
 import { workflowVariableLLMInstructions } from '../data/workflow-variable-definitions';
