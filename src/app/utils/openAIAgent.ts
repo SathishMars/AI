@@ -5,7 +5,7 @@ import { WorkflowDefinition, WorkflowDefinitionSchema } from '../types/workflowT
 import aimeInstructions from '@/app/utils/aiInstructions/aimeWorkflowGeneralInstructions.md';
 import aimeToolInstructions from '@/app/utils/aiInstructions/aimeWorkflowToolUsageInstructions.md';
 import { sampleWorkflowDefinitionJSONForLlm } from '../data/sampleWorkflowDefinitionJSONForLlm';
-import { workflowFunctionInstructions } from '../data/workflow-tool-defintions';
+import { workflowFunctionInstructions } from '../data/workflow-step-definitions';
 import { workflowVariableLLMInstructions } from '../data/workflow-variable-definitions';
 import { shortUUIDTool } from './openAITools/ShortUUID';
 import { GetListOfWorkflowTemplatesTool } from './openAITools/GetListOfWorkflowTemplates';

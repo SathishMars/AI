@@ -6,7 +6,7 @@ import { WorkflowMessage, WorkflowMessageContent, WorkflowMessageSchema } from '
 import { ChatPromptTemplate, MessagesPlaceholder } from "@langchain/core/prompts";
 import { ChatMessageHistory } from 'langchain/memory';
 import { AIMessage, HumanMessage } from '@langchain/core/messages';
-import { workflowFunctionInstructions } from '@/app/data/workflow-tool-defintions';
+import { workflowFunctionInstructions } from '@/app/data/workflow-step-definitions';
 import { workflowVariableLLMInstructions } from '@/app/data/workflow-variable-definitions';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { sampleWorkflowDefinitionJSONForLlm } from '@/app/data/sampleWorkflowDefinitionJSONForLlm';

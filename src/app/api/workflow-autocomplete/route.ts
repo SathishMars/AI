@@ -1,7 +1,7 @@
 // src/app/api/workflow-autocomplete/route.ts
 
 import { NextResponse } from 'next/server';
-import { workflowFunctionDefinitions } from '@/app/data/workflow-tool-defintions';
+import { workflowFunctionDefinitions } from '@/app/data/workflow-step-definitions';
 import { workflowVariableDefinitions } from '@/app/data/workflow-variable-definitions';
 import { WorkflowAutocompleteItem } from '@/app/types/workflowAutocomplete';
 

@@ -56,7 +56,7 @@ When given conversation history, use it to decide whether to ask clarifying ques
 - Use **ID references** (instead of nested steps) **only when necessary** for clarity or structure.
 
 ### Example
-An example of a good step definition is as follows. This does the nesting properly and uses references only when needed.It does not duplicate steps unnecessarily.:
+An example of a good step definition is in the following response message's `content.workflowDefinition`. This does the nesting properly and uses references only when needed.It does not duplicate steps unnecessarily.:
 ```json
 { 
   "id": "87dhas76bgt",

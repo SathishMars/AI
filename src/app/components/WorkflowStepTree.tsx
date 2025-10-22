@@ -6,7 +6,7 @@ import { Box, IconButton, Typography, Chip, Paper, Divider, Icon } from '@mui/ma
 import { SimpleTreeView } from '@mui/x-tree-view/SimpleTreeView';
 import { TreeItem } from '@mui/x-tree-view/TreeItem';
 import { WorkflowStep } from '@/app/types/workflowTemplate';
-import { workflowFunctionTypeConfig } from '../data/workflow-tool-defintions';
+import { workflowFunctionTypeConfig } from '../data/workflow-step-definitions';
 import WorkflowStepTrigger from './WorkflowStepTrigger';
 import WorkflowStepDecision from './WorkflowStepDecision';
 import WorkflowStepApproval from './WorkflowStepApproval';
