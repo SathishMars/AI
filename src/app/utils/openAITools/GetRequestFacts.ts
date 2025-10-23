@@ -24,7 +24,7 @@ export const getListOfRequestFacts = async (
     input: ListOfRequestFactsInput
 ): Promise<ListOfRequestFactsOutput> => {
     const { account, organization, requestTemplateId } = input;
-
+    console.log('[GetListOfRequestFacts] Fetching request facts for account:', account, 'organization:', organization, 'requestTemplateId:', requestTemplateId);
     // Defensive: ensure account present
     if (!account || typeof account !== 'string') {
         throw new Error('account is required and must be a string');
@@ -46,7 +46,7 @@ export const getListOfRequestFacts = async (
         { id: 'requestorUserId', label: 'Requestor User ID', description: 'The user ID of the person requesting the MRF' },
         { id: 'isUrgent', label: 'Urgent', description: 'If this is an expedited request' },
     ];
-
+    console.log('[GetListOfRequestFacts] returning the list of request facts.', facts.length);
     return { facts };
 };
 

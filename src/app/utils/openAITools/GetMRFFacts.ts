@@ -24,7 +24,7 @@ export const getListOfMRFFacts = async (
     input: ListOfMRFFactsInput
 ): Promise<ListOfMRFFactsOutput> => {
     const { account, organization, mrfTemplateId } = input;
-
+    console.log('[GetMRFFacts] Fetching MRF facts for account:', account, 'organization:', organization, 'mrfTemplateId:', mrfTemplateId);
     // Defensive: ensure account present
     if (!account || typeof account !== 'string') {
         throw new Error('account is required and must be a string');
@@ -50,7 +50,7 @@ export const getListOfMRFFacts = async (
         { id: 'requestorUserId', label: 'Requestor User ID', description: 'The user ID of the person requesting the MRF' },
         { id: 'isUrgent', label: 'Urgent', description: 'If this is an expedited request' },
     ];
-
+    console.log('[GetMRFFacts] returning the list of MRF facts.', facts.length);
     return { facts };
 };
 

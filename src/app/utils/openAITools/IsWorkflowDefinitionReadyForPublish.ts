@@ -13,6 +13,7 @@ const isWorkflowDefinitionReadyForPublishTool = async (
     input: IsWorkflowDefinitionReadyForPublishInput
 ): Promise<string> => {
     const { workflowDefinition, account, organization } = input;
+    console.log('[isWorkflowDefinitionReadyForPublishTool] called with account:', account, 'organization:', organization);
     if (!workflowDefinition || typeof workflowDefinition !== 'object') {
         throw new Error('workflowDefinition is required and must be an object');
     }
@@ -36,7 +37,7 @@ const isWorkflowDefinitionReadyForPublishTool = async (
     };
 
     const validationResult = await isWorkflowTemplateReadyForPublish(passedWorkflowTemplate);
-
+    console.log('[isWorkflowDefinitionReadyForPublishTool] validation result:', validationResult);
     if (validationResult.valid) {
         return 'The workflow definition is ready for publish.';
     } else {
@@ -69,7 +70,7 @@ export const IsWorkflowDefinitionReadyForPublishTool = tool({
     // A clear description for LLMs: explain inputs, behaviour, and output schema.
     description:
         'Validates whether a given workflow definition is ready to be published. IMPORTANT: this tool expects an OBJECT input (not a raw string) and returns a STRING indicating readiness and any issues.\n' +
-        'Input (OBJECT): { workflowDefinition: the workflow definition object to validate for publish readiness (required) }\n' +
+        'Input (OBJECT): { workflowDefinition: the workflow definition object to validate for publish readiness (required), account: string (required), organization?: string | null (required) }\n' +
         'Output (STRING): A message indicating if the workflow is ready for publish or listing issues preventing publish.\n' +
         'Error behaviour: If the input is invalid the tool will throw a validation error. The error message will include "isWorkflowDefinitionReadyForPublish: invalid input" and a validationIssues field describing what failed.',
     parameters: isWorkflowDefinitionReadyForPublishSchema,

@@ -19,7 +19,6 @@ export const getListOfMrfTemplates = async ( input: ListOfMrfTemplatesInput): Pr
     if (!account || typeof account !== 'string') {
         throw new Error('account is required and must be a string');
     }
-
     const results = await MrfTemplateDBUtil.getTemplatesForAccount(account, organization ?? undefined, undefined);
     console.info('Fetched MRF templates:', Array.isArray(results) ? results.length : typeof results);
     const templates: string[] = (results || []).map((t: { id: unknown; name: unknown; organization?: unknown }) => (`- id: ${String(t.id)},  name: ${String(t.name)}, organization: ${t.organization ?? null}`));

@@ -23,6 +23,7 @@ interface UseWorkflowTemplateReturn {
   isContextLoading: boolean;  // True while user context is loading
   error: string | null;
   isSaving: boolean;
+  isPublishReady: boolean;
 
   // Template state info
   isNewTemplate: boolean;
@@ -56,6 +57,7 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isPublishReady, setIsPublishReady] = useState<boolean>(false);
   const [isNewTemplate, setIsNewTemplate] = useState(false);
   const templateRef = useRef<WorkflowTemplate | null>(null);
   const prevTemplatesRef = useRef<Array<WorkflowTemplate>>([]);
@@ -309,6 +311,41 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
   }, [prevTemplatesRef]);
 
 
+  const checkPublishReadiness = useCallback(async () => { 
+    const currentTemplate = templateRef.current;
+    if (!currentTemplate) {
+      setIsPublishReady(false);
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/workflow-templates/validate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-account': accountId || '',
+          'x-organization': organizationId || ''
+        },
+        body: JSON.stringify(currentTemplate)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to validate template: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      setIsPublishReady(result.valid);
+    } catch (err) {
+      console.error('Publish readiness check error:', err);
+      setIsPublishReady(false);
+    }
+  }, [accountId, organizationId]);
+
+  // Check publish readiness whenever the template changes
+  useEffect(() => {
+    checkPublishReadiness();
+  }, [template, checkPublishReadiness]);
+
   /**
    * Auto-load template on mount if specified
    */
@@ -328,6 +365,7 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
     isContextLoading: contextLoading,
     error,
     isSaving,
+    isPublishReady,
 
     // Template state info
     isNewTemplate,

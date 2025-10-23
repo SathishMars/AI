@@ -24,7 +24,7 @@ export const getListOfRequestTemplates = async (
     input: ListOfRequestTemplatesInput
 ): Promise<ListOfRequestTemplatesOutput> => {
     const { account, organization } = input;
-
+    console.log('[GetListOfRequestTemplates] Fetching request templates for account:', account, 'organization:', organization);
     // Defensive: ensure account present
     if (!account || typeof account !== 'string') {
         throw new Error('account is required and must be a string');
@@ -37,7 +37,7 @@ export const getListOfRequestTemplates = async (
         { id: 'req1003', version: '1.0.0', label: 'Hotel Request', description: 'Request for hotel approval' }
     ];
 
-
+    console.log('[GetListOfRequestTemplates] returning the list of request templates.', templates.length);
     return { templates };
 };
 

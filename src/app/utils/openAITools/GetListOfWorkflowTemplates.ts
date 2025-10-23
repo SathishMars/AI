@@ -26,7 +26,7 @@ export const getListOfWorkflowTemplates = async (
     input: ListOfWorkflowTemplatesInput
 ): Promise<ListOfWorkflowTemplatesOutput> => {
     const { account, organization } = input;
-
+    console.log('[GetListOfWorkflowTemplates] Fetching workflow templates for account:', account, 'organization:', organization);
     // Defensive: ensure account present
     if (!account || typeof account !== 'string') {
         throw new Error('account is required and must be a string');
@@ -50,7 +50,7 @@ export const getListOfWorkflowTemplates = async (
             };
         }
     );
-
+    console.log('[GetListOfWorkflowTemplates] returning the list of workflow templates.', templates.length);
     return { templates };
 };
 

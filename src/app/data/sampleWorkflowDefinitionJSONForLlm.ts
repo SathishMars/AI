@@ -25,7 +25,7 @@ export const sampleWorkflowDefinitionJSONForLlm: WorkflowDefinition = {
           "onConditionPass": {
             "id": "mThKCURvwG",
             "label": "Request approval from manager",
-            "type": "decision",
+            "type": "approval",
             "stepFunction": "requestApproval",
             "functionParams": {
               "approver": "${manager}",
@@ -40,7 +40,7 @@ export const sampleWorkflowDefinitionJSONForLlm: WorkflowDefinition = {
       },
       {
         "id": "ynNcWEhTHe",
-        "label": "Create calendar event",
+        "label": "Create event",
         "type": "task",
         "stepFunction": "createEvent",
         "functionParams": {},

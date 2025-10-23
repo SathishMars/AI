@@ -16,7 +16,7 @@ const validateWorkflowDefinition = async ({ workflowDefinition }: WorkflowValida
     const errors: string[] = [];
 
     // Early guard: workflowDefinition must be provided (object or JSON string)
-    console.log('Validating workflowDefinition:', workflowDefinition);
+    console.log('[WorkflowValidator] Validating workflowDefinition:', workflowDefinition);
     if (workflowDefinition === undefined || workflowDefinition === null) {
         const result = { isValid: false, errors: ['workflowDefinition parameter is required'] };
         return JSON.stringify(result);
@@ -138,7 +138,7 @@ const validateWorkflowDefinition = async ({ workflowDefinition }: WorkflowValida
         isValid: errors.length === 0,
         errors: errors.length > 0 ? errors : undefined,
     };
-    console.log('After Validating the supplied workflowDefinition the result:', result);
+    console.log('[WorkflowValidator] After Validating the supplied workflowDefinition the result:', result);
     return JSON.stringify(result);
 };
 

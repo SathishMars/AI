@@ -24,7 +24,7 @@ export const getListOfApprovalTemplates = async (
     input: ListOfApprovalTemplatesInput
 ): Promise<ListOfApprovalTemplatesOutput> => {
     const { account, organization } = input;
-
+    console.log('[GetListOfTemplates] Fetching approval templates for account:', account, 'organization:', organization);
     // Defensive: ensure account present
     if (!account || typeof account !== 'string') {
         throw new Error('account is required and must be a string');
@@ -37,6 +37,7 @@ export const getListOfApprovalTemplates = async (
         { id: 'approve003', version: '1.0.0', label: 'Executive Approval Request', description: 'Template to notify executive team for approval' },
         { id: 'approve004', version: '1.0.0', label: 'Manager Approval Request', description: 'Template to notify manager for approval' },
     ];
+    console.log('[GetListOfTemplates] returning the list of approval templates.', templates.length);
     return { templates };
 };
 

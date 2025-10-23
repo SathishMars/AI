@@ -24,7 +24,7 @@ export const getListOfNotificationTemplates = async (
     input: ListOfNotificationTemplatesInput
 ): Promise<ListOfNotificationTemplatesOutput> => {
     const { account, organization } = input;
-
+    console.log('[GetListOfNotificationTemplates] Fetching notification templates for account:', account, 'organization:', organization);
     // Defensive: ensure account present
     if (!account || typeof account !== 'string') {
         throw new Error('account is required and must be a string');
@@ -39,7 +39,7 @@ export const getListOfNotificationTemplates = async (
         { id: 'notify005', version: '1.0.0', label: 'Request Denial Notification', description: 'Template to notify users about request denials' }
     ];
 
-
+    console.log('[GetListOfNotificationTemplates] returning the list of notification templates.', templates.length);
     return { templates };
 };
 

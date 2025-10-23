@@ -134,8 +134,8 @@ export const stepFunctionValidators: Record<string, (step: WorkflowStep) => stri
         if (!params.subject || typeof params.subject !== 'string') {
             return `notify step "${step.id}" must have a valid subject parameter.`;
         }
-        if (!params.notificationTemplateName || typeof params.notificationTemplateName !== 'string') {
-            return `notify step "${step.id}" must have a valid notificationTemplateName parameter.`;
+        if (!params.notificationTemplateId || typeof params.notificationTemplateId !== 'string') {
+            return `notify step "${step.id}" must have a valid notificationTemplateId parameter.`;
         }
         if (!step.next || (Array.isArray(step.next) && step.next.length === 0))
             return `notify step "${step.id}" must have a next step defined.`;        
