@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateWorkflowDefinition, WorkflowDefinition } from '@/app/types/workflowTemplate';
 import { AimeWorkflowConversationsRecord, WorkflowMessage } from '@/app/types/aimeWorkflowMessages';
-import { runLangChainGenerator } from '@/app/utils/langchain/langchain-workflow-generator';
-import { generateMermaidFromWorkflow } from '@/app/utils/langchain/langchain-mermaid-generator';
+import { generateMermaidFromWorkflow } from '@/app/utils/MermaidGenerator';
 import ShortUniqueId from 'short-unique-id';
 import AimeWorkflowMessagesDBUtil from '@/app/utils/aimeWorkflowMessagesDBUtil';
 import { runAgentToGenerateWorkflow } from '@/app/utils/openAIAgent';
@@ -138,7 +137,6 @@ export async function POST(req: NextRequest) {
     }
 
     const orgForCall: string | undefined = organization === null ? undefined : organization;
-    // const result = await runLangChainGenerator(messages, parsedWorkflowDef, { sessionId: sessionId ?? generateShortId(), templateId, account , organization: orgForCall, userId:resolvedUserId});
     const result = await runAgentToGenerateWorkflow(messages, parsedWorkflowDef, sessionId ?? generateShortId(), templateId, account, orgForCall, resolvedUserId);
     //stored the "aime" messages 
     if (result.messages && result.messages.length > 0) {

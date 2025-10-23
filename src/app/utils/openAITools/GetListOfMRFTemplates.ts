@@ -1,6 +1,5 @@
-// Tool: GetListOfMRFTemplates
-// Purpose: Provide a LangChain-compatible tool that returns a concise list of MRF templates
-// for a given account and optional organization.
+// Tool: getListOfMRFTemplates
+
 
 import { tool } from '@openai/agents';
 import { z } from "zod";
@@ -45,19 +44,19 @@ const listToolFunc = async (input: unknown) => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const zerr: any = err;
             const details = zerr.issues ? JSON.stringify(zerr.issues) : String(err);
-            throw new Error(`GetListOfMRFTemplates: invalid input - ${zerr.message || String(err)}; validationIssues=${details}`);
+            throw new Error(`getListOfMRFTemplates: invalid input - ${zerr.message || String(err)}; validationIssues=${details}`);
         }
         throw err;
     }
 };
 
 export const GetListOfMRFTemplatesTool = tool({
-    name: 'GetListOfMRFTemplates',
+    name: 'getListOfMRFTemplates',
     description:
         'Returns a list of available MRF templates for a given account and optional organization. IMPORTANT: this tool expects an OBJECT input (not a raw string) and returns an OBJECT (not a JSON-string).\n' +
         'Input (OBJECT): { account: string, organization?: string | null }\n' +
         'Output (STRING): id: string, name: string, organization?: string \n' +
-        'Error behaviour: If the input is invalid the tool will throw a validation error. The error message will include "GetListOfMRFTemplates: invalid input" and a validationIssues field describing what failed.\n' +
+        'Error behaviour: If the input is invalid the tool will throw a validation error. The error message will include "getListOfMRFTemplates: invalid input" and a validationIssues field describing what failed.\n' +
         'Notes: organization is optional; when provided it filters templates to that organization.',
     parameters: getListOfMrfTemplatesSchema,
     execute: listToolFunc,

@@ -11,6 +11,12 @@ import { shortUUIDTool } from './openAITools/ShortUUID';
 import { GetListOfWorkflowTemplatesTool } from './openAITools/GetListOfWorkflowTemplates';
 import { workflowDefinitionValidatorTool } from './openAITools/WorkflowValidator';
 import { GetListOfMRFTemplatesTool } from './openAITools/GetListOfMRFTemplates';
+import { GetListOfRequestTemplatesTool } from './openAITools/GetListOfRequestTemplates';
+import { GetListOfNotificationTemplatesTool } from './openAITools/GetListOfNotificationTemplates';
+import { GetListOfApprovalTemplatesTool } from './openAITools/GetListOfApprovalTemplates';
+import { GetMRFFactsTool } from './openAITools/GetMRFFacts';
+import { GetRequestFactsTool } from './openAITools/GetRequestFacts';
+import { IsWorkflowDefinitionReadyForPublishTool } from './openAITools/IsWorkflowDefinitionReadyForPublish';
 
 
 
@@ -101,10 +107,6 @@ const INSTRUCTIONS = `# 🧩 Condensed System Instructions for “aime” (with 
   
   ---
   
-  ${TOOL_USAGE_INSTRUCTIONS}
-  
-  ---
-  
   ${workflowVariableLLMInstructions}
   
   ---
@@ -164,7 +166,18 @@ export async function runAgentToGenerateWorkflow(
             name: 'aime',
             instructions: systemInstructions,
             model: process.env.OPENAI_MODEL_WORKFLOW || 'gpt-4o-mini',
-            tools: [shortUUIDTool, GetListOfWorkflowTemplatesTool, workflowDefinitionValidatorTool, GetListOfMRFTemplatesTool], // Tools would be added here as needed
+            tools: [
+                shortUUIDTool, 
+                GetListOfWorkflowTemplatesTool, 
+                workflowDefinitionValidatorTool, 
+                GetListOfMRFTemplatesTool, 
+                GetListOfRequestTemplatesTool, 
+                GetListOfNotificationTemplatesTool,
+                GetListOfApprovalTemplatesTool,
+                GetMRFFactsTool,
+                GetRequestFactsTool,
+                IsWorkflowDefinitionReadyForPublishTool,
+            ], // Tools would be added here as needed
             outputType: WorkflowMessageSchema,
         });
 

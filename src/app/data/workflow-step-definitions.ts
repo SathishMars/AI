@@ -315,7 +315,7 @@ const workflowOnMRFStepSchema =
 
 const workflowOnMRFStepLLMInstructions: string = `### This step function is to be used when we want to trigger the workflow on receiving a meeting request form (MRF).
 ** \`functionParams\`:**
-- \`mrfTemplateId\` *(string, required)* — Must be one of the **valid MRF types** available from the GetListOfMRFTemplates tool.  
+- \`mrfTemplateId\` *(string, required)* — Must be one of the **valid MRF types** available from the getListOfMRFTemplates tool.  
 **Rules:**
 - \`mrfTemplateId\` is **mandatory**; match based on user input or ask via \`followUpOptions\`. Never invent new MRF template ids.  
 **Minimal Example:**
@@ -372,7 +372,7 @@ const workflowNotifyStepLLMInstructions: string = `### This step function is to 
 ** \`functionParams\`:**
 - \`to\` *(string, required)* — Recipient of the notification (e.g., user ID or email address or variable).
 - \`subject\` *(string, required)* — Subject line for the notification.
-- \`notificationTemplateId\` *(string, required)* — Must be one of the **valid notification templates** available from the GetListOfNotificationTemplates tool.  
+- \`notificationTemplateId\` *(string, required)* — Must be one of the **valid notification templates** available from the getListOfNotificationTemplates tool.  
 **Rules:**
 - All \`functionParams\` are **mandatory**; populate based on workflow context or ask via \`followUpOptions\`. Never invent new notification template ids.  
 **Minimal Example:**
@@ -483,7 +483,7 @@ const workflowRequestApprovalStepLLMInstructions: string = `### This step functi
 ** \`functionParams\`:**
 - \`approver\` *(string, required)* — User ID or email address of the approver.
 - \`reason\` *(string, required)* — Reason for the approval request.
-- \`approvalTemplateId\` *(string, required)* — Must be one of the **valid approval templates** available from the GetListOfApprovalTemplates tool.  
+- \`approvalTemplateId\` *(string, required)* — Must be one of the **valid approval templates** available from the getListOfApprovalTemplates tool.  
 **Rules:**
 - All \`functionParams\` are **mandatory**; populate based on workflow context or ask via \`followUpOptions\`. Never invent new approval template ids.  
 **Minimal Example:**

@@ -45,7 +45,7 @@ idsCsv = shortUUID({ "count": 40 })
 
 ---
 
-## 🧩 `GetListOfWorkflowTemplates`
+## 🧩 `getListOfWorkflowTemplates`
 
 **Purpose:** Retrieve available **workflow templates** for a given account or organization.  
 **When to Call:**
@@ -91,7 +91,7 @@ GetListOfWorkflowTemplates({ "account": "company123", "organization": "dept456" 
 
 ---
 
-## 🧾 `GetListOfMRFTemplates`
+## 🧾 `getListOfMRFTemplates`
 
 **Purpose:** Retrieve available **Meeting Request Form (MRF) templates** for a given account or organization.  
 **When to Call:**
@@ -123,7 +123,7 @@ GetListOfWorkflowTemplates({ "account": "company123", "organization": "dept456" 
 
 **Example Call:**
 ```js
-GetListOfMRFTemplates({ "account": "groupize-demos", "organization": "main-org" })
+getListOfMRFTemplates({ "account": "groupize-demos", "organization": "main-org" })
 ```
 
 ---
@@ -131,6 +131,6 @@ GetListOfMRFTemplates({ "account": "groupize-demos", "organization": "main-org" 
 ## ✅ Summary of Agent Responsibilities
 - Always **validate** workflows using `workflowDefinitionValidator`.  
 - Always **generate IDs** using `shortUUID`.  
-- Use `GetListOfWorkflowTemplates` or `GetListOfMRFTemplates` to fetch valid templates when required.  
+- Use `getListOfWorkflowTemplates` or `GetListOfMRFTemplates` to fetch valid templates when required.  
 - Never return unvalidated or fabricated data.  
 - Ask clarifying questions if multiple or missing template matches are found.  
