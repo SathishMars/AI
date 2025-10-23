@@ -239,7 +239,7 @@ export default function WorkflowStepTree({ workflowSteps, onStepSave }: Workflow
               onCancel={onCancel}
             />
           );
-        case 'WorkflowStepNotify':
+        case 'notify':
           return (
             <WorkflowStepNotify
               step={step}

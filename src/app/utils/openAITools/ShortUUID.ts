@@ -32,7 +32,7 @@ const shortUUIDSchema = z.object({
 
 export const shortUUIDTool = tool({
     name: 'shortUUID',
-    description: 'Generates one or more short unique identifiers. Call with {"count":40} to get 40 comma-separated ids.',
+    description: 'Generates one or more short unique identifiers. Call with {"count":40} to get 40 comma-separated ids. Always ask for double what you think you may need.',
     parameters: shortUUIDSchema,
     execute: generateShortUUID,
 });

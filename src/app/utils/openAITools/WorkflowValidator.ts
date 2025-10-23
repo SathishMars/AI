@@ -138,6 +138,7 @@ const validateWorkflowDefinition = async ({ workflowDefinition }: WorkflowValida
         isValid: errors.length === 0,
         errors: errors.length > 0 ? errors : undefined,
     };
+    console.log('After Validating the supplied workflowDefinition the result:', result);
     return JSON.stringify(result);
 };
 
@@ -151,7 +152,7 @@ const workflowValidatorSchema = z.object({
 
 export const workflowDefinitionValidatorTool = tool({
     name: "workflowDefinitionValidator",
-    description: "Validates a workflow definition JSON to ensure all step ids are unique and all references are valid.",
+    description: "Validates a workflow definition JSON to ensure all step ids are unique and all references are valid. The response is a JSON Object with a isValid flag and an errors array if any.",
     parameters: workflowValidatorSchema,
     execute: validateWorkflowDefinition
 });
