@@ -60,7 +60,7 @@ export default function WorkflowStepNotify({
             const updated: WorkflowStep = {
                 ...step!,
                 label: (formData.label as string) || "",
-                functionParams: { to: formData.to || '', subject: formData.subject || '', notificationTemplateName: formData.notificationTemplateName || '' }
+                functionParams: { to: formData.to || '', subject: formData.subject || '', notificationTemplateId: formData.notificationTemplateId || '' }
             }
             setError(null);
             if (onSave) onSave(updated);
