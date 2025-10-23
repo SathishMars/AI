@@ -119,27 +119,34 @@ export const WorkflowStepMetadataSchema = z.object({
 
 // Recursive step schema - use z.lazy for self-reference
 export const WorkflowStepSchema: z.ZodType<WorkflowStep> = z.lazy(() =>
-    z.object({
-        id: z.string(),
-        label: z.string(),
-        type: z.string(),
-        stepFunction: z.string().optional().nullable(),
-        functionParams: z.record(z.union([
-            z.string(),
-            z.number(),
-            z.boolean(),
-            z.object({}).strict(),
-        ])).optional().nullable(),
-    next: z.array(z.union([z.string(), WorkflowStepSchema])).optional().nullable(),
-    // The interface uses a single step reference (string id or nested step) for these handlers
-    onConditionPass: z.union([z.string(), WorkflowStepSchema]).optional().nullable(),
-    onConditionFail: z.union([z.string(), WorkflowStepSchema]).optional().nullable(),
-    onError: z.union([z.string(), WorkflowStepSchema]).optional().nullable(),
-    onTimeout: z.union([z.string(), WorkflowStepSchema]).optional().nullable(),
-        timeout: z.number().optional().nullable(),
-        retryCount: z.number().int().optional().nullable(),
-        retryDelay: z.number().optional().nullable(),
-    })
+    // Define a recursive value schema for functionParams so objects become explicit records
+    (() => {
+        const ParamValue: z.ZodTypeAny = z.lazy(() =>
+            z.union([
+                z.string(),
+                z.number(),
+                z.boolean(),
+                z.record(ParamValue),
+            ])
+        );
+
+        return z.object({
+            id: z.string(),
+            label: z.string(),
+            type: z.string(),
+            stepFunction: z.string().optional().nullable(),
+            functionParams: z.record(ParamValue).optional().nullable(),
+        next: z.array(z.union([z.string(), WorkflowStepSchema])).optional().nullable(),
+        // The interface uses a single step reference (string id or nested step) for these handlers
+        onConditionPass: z.union([z.string(), WorkflowStepSchema]).optional().nullable(),
+        onConditionFail: z.union([z.string(), WorkflowStepSchema]).optional().nullable(),
+        onError: z.union([z.string(), WorkflowStepSchema]).optional().nullable(),
+        onTimeout: z.union([z.string(), WorkflowStepSchema]).optional().nullable(),
+            timeout: z.number().optional().nullable(),
+            retryCount: z.number().int().optional().nullable(),
+            retryDelay: z.number().optional().nullable(),
+        })
+    })()
 );
 
 export const WorkflowDefinitionSchema = z.object({

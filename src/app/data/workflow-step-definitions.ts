@@ -1,538 +1,874 @@
-import { WorkflowStepFunction } from "@/app/types/workflowStepFunction";
 
 interface WorkflowFunctionTypeConfig {
-  color: string;
-  label: string;
-  icon: string;
+    color: string;
+    label: string;
+    icon: string;
 }
 
 export const workflowFunctionTypeConfig: Record<string, WorkflowFunctionTypeConfig> = {
-  trigger: {
-    color: '#16A249',
-    label: 'Trigger',
-    icon: 'start' // Material UI stylesheet icon name
-  },
-  decision: {
-    color: '#7C3BED',
-    label: 'Decision',
-    icon: 'help_center' // Material UI stylesheet icon name
-  },
-  approval: {
-    color: '#7C3BED',
-    label: 'Approval',
-    icon: 'person_check' // Material UI stylesheet icon name
-  },
-  task: {
-    color: '#7C3BED',
-    label: 'Task',
-    icon: 'task_alt' // Material UI stylesheet icon name
-  },
-  terminate: {
-    color: '#090909',
-    label: 'End',
-    icon: 'stop_circle' // Material UI stylesheet icon name
-  },
-  branch: {
-    color: '#FFA000',
-    label: 'Branch',
-    icon: 'graph_2' // Material UI stylesheet icon name
-  },
-  merge: {
-    color: '#0288D1',
-    label: 'Merge',
-    icon: 'family_history' // Material UI stylesheet icon name
-  },
-  workflow: {
-    color: '#7B1FA2',
-    label: 'Workflow',
-    icon: 'flowchart' // Material UI stylesheet icon name
-  }
+    trigger: {
+        color: '#16A249',
+        label: 'Trigger',
+        icon: 'start' // Material UI stylesheet icon name
+    },
+    decision: {
+        color: '#7C3BED',
+        label: 'Decision',
+        icon: 'help_center' // Material UI stylesheet icon name
+    },
+    approval: {
+        color: '#7C3BED',
+        label: 'Approval',
+        icon: 'person_check' // Material UI stylesheet icon name
+    },
+    task: {
+        color: '#7C3BED',
+        label: 'Task',
+        icon: 'task_alt' // Material UI stylesheet icon name
+    },
+    terminate: {
+        color: '#090909',
+        label: 'End',
+        icon: 'stop_circle' // Material UI stylesheet icon name
+    },
+    branch: {
+        color: '#FFA000',
+        label: 'Branch',
+        icon: 'graph_2' // Material UI stylesheet icon name
+    },
+    merge: {
+        color: '#0288D1',
+        label: 'Merge',
+        icon: 'family_history' // Material UI stylesheet icon name
+    },
+    workflow: {
+        color: '#7B1FA2',
+        label: 'Workflow',
+        icon: 'flowchart' // Material UI stylesheet icon name
+    }
 }
 
-export const workflowFunctionDefinitions: Array<WorkflowStepFunction> = [
-    // TRIGGER FUNCTIONS
-    {
-        id: 'trigger_on_request',
-        label: 'On receiving the request',
-        type: 'trigger',
-        name: 'onRequest',
-        description: 'Trigger workflow when a request is submitted',
-        params: [
-            {
-                name: 'requestType',
-                label: 'Type of request',
-                type: 'select',
-                description: 'Type of request to trigger on (optional - defaults to all)',
-                required: true,
-                defaultValue: 'all',
-                options: [
-                    { value: 'all', label: 'All Requests' },
-                    { endpoint: '/api/request-types', method: 'GET', responseMapping: { valueField: 'id', labelField: 'name' } },
+
+const workflowTemplateStepFunctionsDefinitionsSchema = {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "definitions": {
+        "stepId": { "$ref": "#/definitions/stepId" },
+        "stepObject": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "label", "type", "stepFunction", "functionParams"],
+            "properties": {
+                "id": { "$ref": "#/definitions/stepId" },
+                "label": { "type": "string", "minLength": 1 },
+                "type": {
+                    "type": "string",
+                    "enum": ["trigger", "task", "approval", "decision", "branch", "merge", "terminate"]
+                },
+                "stepFunction": {
+                    "type": "string",
+                    "enum": ["onRequest", "onMRF", "requestApproval", "checkCondition", "notify", "createEvent", "multiCheckCondition", "branch", "merge", "terminate"]
+                },
+                "functionParams": { "type": "object" },
+                "next": {
+                    "type": "array",
+                    "items": {
+                        "oneOf": [
+                            { "$ref": "#/definitions/stepId", "description": "Step to execute after the current step" },
+                            { "$ref": "#/definitions/stepObject" }
+                        ]
+                    },
+                    "default": []
+                },
+                "onConditionPass": {
+                    "oneOf": [
+                        { "$ref": "#/definitions/stepId", "description": "Step to execute if the condition passes" },
+                        { "$ref": "#/definitions/stepObject" }
+                    ]
+                },
+                "onConditionFail": {
+                    "oneOf": [
+                        { "$ref": "#/definitions/stepId", "description": "Step to execute if the condition fails" },
+                        { "$ref": "#/definitions/stepObject" }
+                    ]
+                },
+                "conditions": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "value": { "type": "string" },
+                            "step": {
+                                "oneOf": [
+                                    { "$ref": "#/definitions/stepId", "description": "Step to execute if the condition matches the value" },
+                                    { "$ref": "#/definitions/stepObject" }
+                                ]
+                            }
+                        },
+                        "required": ["conditionType", "value"]
+                    }
+                },
+                "onTimeout": {
+                    "oneOf": [
+                        { "$ref": "#/definitions/stepId", "description": "Step to execute on timeout" },
+                        { "$ref": "#/definitions/stepObject" }
+                    ]
+                },
+                "onError": {
+                    "oneOf": [
+                        { "$ref": "#/definitions/stepId", "description": "Step to execute on error" },
+                        { "$ref": "#/definitions/stepObject" }
+                    ]
+                },
+                "timeout": { "type": "number", "minimum": 1 },
+                "retryCount": { "type": "number", "minimum": 0 },
+                "retryDelay": { "type": "number", "minimum": 0 }
+            }
+        }
+    }
+};
+
+
+export const jsonRulesEngineConditionSchema = {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "json-rules-engine Condition",
+    "description": "Validates a condition node (either a leaf condition or a nested all/any group).",
+    "oneOf": [
+        { "$ref": "#/definitions/conditionLeaf" },
+        { "$ref": "#/definitions/conditionGroup" }
+    ],
+    "definitions": {
+        "jsonValue": {
+            "description": "Any JSON-compatible value.",
+            "oneOf": [
+                { "type": "string" },
+                { "type": "number" },
+                { "type": "boolean" },
+                { "type": "null" },
+                {
+                    "type": "array",
+                    "items": { "$ref": "#/definitions/jsonValue" }
+                },
+                {
+                    "type": "object",
+                    "additionalProperties": { "$ref": "#/definitions/jsonValue" }
+                }
+            ]
+        },
+
+        "valueFact": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["fact"],
+            "properties": {
+                "fact": { "type": "string", "minLength": 1 },
+                "path": { "type": "string", "minLength": 1 },
+                "params": { "type": "object" }
+            },
+            "description": "Represents another fact reference for comparison."
+        },
+
+        "conditionLeaf": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["fact", "operator"],
+            "properties": {
+                "fact": { "type": "string", "minLength": 1 },
+                "operator": { "type": "string", "minLength": 1 },
+                "value": { "$ref": "#/definitions/jsonValue" },
+                "valueFact": { "$ref": "#/definitions/valueFact" },
+                "path": { "type": "string", "minLength": 1 },
+                "params": { "type": "object" }
+            },
+            "allOf": [
+                {
+                    "description": "At most one of value or valueFact may appear.",
+                    "not": {
+                        "allOf": [
+                            { "required": ["value"] },
+                            { "required": ["valueFact"] }
+                        ]
+                    }
+                }
+            ]
+        },
+
+        "conditionGroup": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Boolean condition group; either 'all' or 'any'.",
+            "oneOf": [
+                {
+                    "required": ["all"],
+                    "properties": {
+                        "all": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": { "$ref": "#" }
+                        }
+                    }
+                },
+                {
+                    "required": ["any"],
+                    "properties": {
+                        "any": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": { "$ref": "#" }
+                        }
+                    }
+                }
+            ]
+        }
+    }
+}
+
+
+
+const workflowOnRequestStepSchema =
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "onRequest Trigger Step",
+    "allOf": [
+        { "$ref": workflowTemplateStepFunctionsDefinitionsSchema.definitions.stepObject as unknown as string },
+        {
+            "type": "object",
+            "properties": {
+                "type": { "const": "trigger" },
+                "stepFunction": { "const": "onRequest" },
+                "functionParams": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["requestTemplateId"],
+                    "properties": {
+                        "additionalProperties": false,
+                        "requestTemplateId": { "type": "string", "minLength": 1, "maxLength": 40 }
+                    }
+                }
+            },
+            "required": ["type", "stepFunction", "functionParams", "next"],
+            "not": {
+                "anyOf": [
+                    { "required": ["onConditionPass"] },
+                    { "required": ["onConditionFail"] },
+                    { "required": ["conditions"] },
+                    { "required": ["onError"] },
+                    { "required": ["onTimeout"] }
                 ]
             }
-        ],
-        outputs: [{
-            type: 'result', label: 'The request form information', required: true
-        }],
-        llmInstructions: {
-            usageInstruction: `
-### \`onRequest\` (Trigger)
-**Purpose:** Trigger when a **request** is submitted.  
-**Params (\`functionParams\`):**
-- \`requestType\` *(string, required)* — Must be one of the **valid request types** available in context or via API.  
-**Outputs:** Emits request payload into workflow context.  
+        }
+    ]
+};
+
+const workflowOnRequestStepLLMInstructions: string = `### This step function is to be used when we want to trigger the workflow on receiving a request.
+** \`functionParams\`:**
+- \`requestTemplateId\` *(string, required)* — Must be one of the **valid request types** available from the getListOfRequestTemplates tool.  
 **Rules:**
-- \`requestType\` is **mandatory**; use exact match or ask via \`followUpOptions\`. Never invent new types.  
-- Prefer using \`GetListOfWorkflowTemplates\` if templates are referenced by the user.  
+- \`requestTemplateId\` is **mandatory**; match based on user input or ask via \`followUpOptions\`. Never invent new request template ids.  
 **Minimal Example:**
 \`\`\`json
 {
   "id": "AAAAAAAAAA",
-  "label": "On receiving the request",
+  "label": "On receiving the air travel request",
   "type": "trigger",
   "stepFunction": "onRequest",
-  "functionParams": { "requestType": "Meeting Request (MRF)" },
-  "next": []
+  "functionParams": { "requestTemplateId": "Travel Request Form" },
+  "next": [/* next steps as per schema Embed the step where possible */]
 }
 \`\`\`
-    `
-        },
-    },
-    {
-        id: 'trigger_on_mrf',
-        label: 'On receiving a meeting request form (MRF)',
-        type: 'trigger',
-        name: 'onMRF',
-        description: 'Trigger workflow when an MRF (Meeting Request Form) is submitted',
-        params: [
-            {
-                name: 'mrfTemplateId',
-                label: 'MRF Template Name',
-                type: 'select',
-                description: 'Specific MRF template to trigger on (optional - defaults to all)',
-                required: false,
-                defaultValue: 'all',
-                options: [
-                    { value: 'all', label: 'All MRF Templates' },
-                    { endpoint: '/api/mrf-templates', method: 'GET', responseMapping: { valueField: 'id', labelField: 'name' } },
+`
+
+
+const workflowOnMRFStepSchema =
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "onMRF Trigger Step",
+    "allOf": [
+        { "$ref": workflowTemplateStepFunctionsDefinitionsSchema.definitions.stepObject as unknown as string },
+        {
+            "type": "object",
+            "properties": {
+                "type": { "const": "trigger" },
+                "stepFunction": { "const": "onMRF" },
+                "functionParams": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["mrfTemplateId"],
+                    "properties": {
+                        "additionalProperties": false,
+                        "mrfTemplateId": { "type": "string", "minLength": 1, "maxLength": 40 }
+                    }
+                }
+            },
+            "required": ["type", "stepFunction", "functionParams", "next"],
+            "not": {
+                "anyOf": [
+                    { "required": ["onConditionPass"] },
+                    { "required": ["onConditionFail"] },
+                    { "required": ["conditions"] },
+                    { "required": ["onError"] },
+                    { "required": ["onTimeout"] }
                 ]
             }
-        ],
-        outputs: [{
-            type: 'result', label: 'The request form information', required: true
-        }],
-        llmInstructions: {
-            usageInstruction: `
-### \`onMRF\` (Trigger)
-**Purpose:** Trigger when an **MRF** (Meeting Request Form) is submitted.  
-**Params:**
-- \`mrfTemplateId\` *(string, optional; default "all")* — Specific MRF template to trigger on.  
-**Outputs:** Emits MRF payload into workflow context.  
+        }
+    ]
+};
+
+const workflowOnMRFStepLLMInstructions: string = `### This step function is to be used when we want to trigger the workflow on receiving a meeting request form (MRF).
+** \`functionParams\`:**
+- \`mrfTemplateId\` *(string, required)* — Must be one of the **valid MRF types** available from the GetListOfMRFTemplates tool.  
 **Rules:**
-- Use \`GetListOfMRFTemplates\` for template discovery when user names a template.  
+- \`mrfTemplateId\` is **mandatory**; match based on user input or ask via \`followUpOptions\`. Never invent new MRF template ids.  
 **Minimal Example:**
 \`\`\`json
 {
   "id": "BBBBBBBBBB",
-  "label": "On receiving MRF",
+  "label": "On receiving Annual Executive Conference MRF",
   "type": "trigger",
   "stepFunction": "onMRF",
   "functionParams": { "mrfTemplateId": "hga787h7asy87" }, // the MRF template ID
-  "next": []
+  "next": [/* next steps as per schema Embed the step where possible */]
 }
 \`\`\`
 `
-        },
-    },
-    // TASK FUNCTIONS
-    {
-        id: 'notify',
-        label: 'Notify',
-        type: 'task',
-        name: 'notify',
-        description: 'Send notification based on user settings',
-        params: [
-            {
-                name: 'to',
-                label: 'To',
-                type: 'string',
-                description: 'Primary recipient',
-                required: true,
+
+
+const workflowNotifyStepSchema =
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Notify task step",
+    "allOf": [
+        { "$ref": workflowTemplateStepFunctionsDefinitionsSchema.definitions.stepObject as unknown as string },
+        {
+            "type": "object",
+            "properties": {
+                "type": { "const": "task" },
+                "stepFunction": { "const": "notify" },
+                "functionParams": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["to", "subject", "notificationTemplateId"],
+                    "properties": {
+                        "to": { "type": "string", "minLength": 1, "maxLength": 200 },
+                        "subject": { "type": "string", "minLength": 2, "maxLength": 500 },
+                        "notificationTemplateId": { "type": "string", "minLength": 1, "maxLength": 40 }
+                    }
+                }
             },
-            {
-                name: 'subject',
-                label: 'Subject',
-                type: 'string',
-                description: 'Notification subject line',
-                required: true,
-            },
-            {
-                name: 'notificationTemplateName',
-                label: 'Notification template Name',
-                type: 'select',
-                description: 'Notification template to use',
-                required: true,
-                options: [{ endpoint: '/api/notification-templates', method: 'GET', responseMapping: { valueField: 'id', labelField: 'name' } }]
+            "required": ["type", "stepFunction", "functionParams", "next"],
+            "not": {
+                "anyOf": [
+                    { "required": ["onConditionPass"] },
+                    { "required": ["onConditionFail"] },
+                    { "required": ["conditions"] },
+                    { "required": ["onError"] },
+                    { "required": ["onTimeout"] }
+                ]
             }
-        ],
-        outputs: [{ type: 'result', label: 'The request form information', required: false }],
-        llmInstructions: {
-            usageInstruction: `
-### \`notify\` (Task)
-**Purpose:** Send a notification (email/message) to users/teams.  
-**Params:**
-- \`to\` *(string, required)* — Recipient spec (userId, group, or template var).  
-- \`subject\` *(string, required)* — Subject line.  
-- \`notificationTemplateName\` *(string, required)* — Must resolve via \`/api/notification-templates\`.  
-**Outputs:** Result payload of notification send.  
-**Rules:** Avoid PII leakage; use org identifiers or workflow variables (e.g., \`$\{manager}\`).  
+        }
+    ]
+};
+
+const workflowNotifyStepLLMInstructions: string = `### This step function is to be used when we want to send a notification (e.g., email) as part of the workflow.
+** \`functionParams\`:**
+- \`to\` *(string, required)* — Recipient of the notification (e.g., user ID or email address or variable).
+- \`subject\` *(string, required)* — Subject line for the notification.
+- \`notificationTemplateId\` *(string, required)* — Must be one of the **valid notification templates** available from the GetListOfNotificationTemplates tool.  
+**Rules:**
+- All \`functionParams\` are **mandatory**; populate based on workflow context or ask via \`followUpOptions\`. Never invent new notification template ids.  
 **Minimal Example:**
 \`\`\`json
 {
   "id": "CCCCCCCCCC",
-  "label": "Notify the manager",
+  "label": "Notify requester of approval",
   "type": "task",
   "stepFunction": "notify",
   "functionParams": {
-    "to": "\${userManager}",
-    "subject": "New meeting request submitted",
-    "notificationTemplateName": "request-submitted"
+    "to": "\${requesterUserId}",
+    "subject": "Your request has been approved",
+    "notificationTemplateId": "Approval Notification Template"
   },
-  "next": []
+  "next": [/* next steps as per schema Embed the step where possible */]
 }
-\`\`\`   
-    `
-        },
-    },
-    {
-        id: 'fn_create_event',
-        label: 'Create event',
-        type: 'task',
-        name: 'createEvent',
-        description: 'Create an event for a meeting',
-        params: [],
-        outputs: [{ type: 'result', label: 'The event that was created', required: false }],
-        llmInstructions: {
-            usageInstruction: `
-### \`createEvent\` (Task)
-**Purpose:** Create a calendar event.  
-**Params:** *(none required; include event details if available)*  
-**Outputs:** Created event object.  
-**Rules:** If user specifies calendar system or details, include them in \`functionParams\`.  
+\`\`\`
+`
+
+
+const workflowCreateEventStepSchema =
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "CreateEvent task step",
+    "allOf": [
+        { "$ref": workflowTemplateStepFunctionsDefinitionsSchema.definitions.stepObject as unknown as string },
+        {
+            "type": "object",
+            "properties": {
+                "type": { "const": "task" },
+                "stepFunction": { "const": "createEvent" },
+                "functionParams": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [],
+                    "properties": {
+                    }
+                }
+            },
+            "required": ["type", "stepFunction", "functionParams", "next"],
+            "not": {
+                "anyOf": [
+                    { "required": ["onConditionPass"] },
+                    { "required": ["onConditionFail"] },
+                    { "required": ["conditions"] },
+                    { "required": ["onError"] },
+                    { "required": ["onTimeout"] }
+                ]
+            }
+        }
+    ]
+};
+
+const workflowCreateEventStepLLMInstructions: string = `### This step function is to be used when we want to create an event (e.g., calendar event) as part of the workflow.
+** \`functionParams\`:**
+- No parameters required for this step function.  
+**Rules:**
+- No \`functionParams\` are needed; the event details will be derived from the workflow context.  
 **Minimal Example:**
 \`\`\`json
 {
   "id": "DDDDDDDDDD",
-  "label": "Create calendar event",
+  "label": "Create event for approved request",
   "type": "task",
   "stepFunction": "createEvent",
-  "functionParams": {},
-  "next": []
+  "functionParams": { },
+  "next": [/* next steps as per schema Embed the step where possible, most probbaly a terminate step*/]
 }
 \`\`\`
-    `
-        },
-    },
-    // DECISION FUNCTIONS
-    {
-        id: 'fn_request_approval',
-        label: 'Request for approval',
-        type: 'approval',
-        name: 'requestApproval',
-        description: 'Request approval from designated approvers',
-        params: [
-            {
-                name: 'approver',
-                label: 'Approver',
-                type: 'api',
-                description: 'Select approver from directory',
-                required: true,
-                options: [{ endpoint: '/api/users/approvers', method: 'GET', responseMapping: { valueField: 'id', labelField: 'displayName' } }]
+`
+
+
+const workflowRequestApprovalStepSchema =
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "RequestApproval approval step",
+    "allOf": [
+        { "$ref": workflowTemplateStepFunctionsDefinitionsSchema.definitions.stepObject as unknown as string },
+        {
+            "type": "object",
+            "properties": {
+                "type": { "const": "approval" },
+                "stepFunction": { "const": "requestApproval" },
+                "functionParams": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["approver", "reason", "approvalTemplateId"],
+                    "properties": {
+                        "approver": { "type": "string", "minLength": 1, "maxLength": 200 },
+                        "reason": { "type": "string", "minLength": 2, "maxLength": 500 },
+                        "approvalTemplateId": { "type": "string", "minLength": 1, "maxLength": 40 }
+                    }
+                }
             },
-            {
-                name: 'reason',
-                label: 'Reason',
-                type: 'string',
-                description: 'Reason for approval request',
-                required: false,
-                defaultValue: 'Please review and approve'
+            "required": ["type", "stepFunction", "functionParams", "onConditionPass", "onConditionFail"],
+            "not": {
+                "anyOf": [
+                    { "required": ["next"] },
+                    { "required": ["conditions"] },
+                    { "required": ["onError"] },
+                ]
             }
-        ],
-        outputs: [{
-            type: 'pass', label: 'Approved', required: true
-        }, {
-            type: 'fail', label: 'Rejected', required: true
-        }, {
-            type: 'timeout', label: 'No response', required: false
-        }],
-        llmInstructions: {
-            usageInstruction: `
-### \`requestApproval\` (Decision)
-**Purpose:** Request approval from a designated approver; branches on result.  
-**Params:**
-- \`approver\` *(string, required)* — Use directory id or \`\${manager}\`.  
-- \`reason\` *(string, optional; default "Please review and approve")*  
-**Outputs:** \`pass\` (approved), \`fail\` (rejected), \`timeout\` (no response).  
+        }
+    ]
+};
+
+const workflowRequestApprovalStepLLMInstructions: string = `### This step function is to be used when we want to request approval from a user as part of the workflow.
+** \`functionParams\`:**
+- \`approver\` *(string, required)* — User ID or email address of the approver.
+- \`reason\` *(string, required)* — Reason for the approval request.
+- \`approvalTemplateId\` *(string, required)* — Must be one of the **valid approval templates** available from the GetListOfApprovalTemplates tool.  
 **Rules:**
-- Support aliases: \`onConditionPass\` ↔ \`on Approval|Yes\`; \`onConditionFail\` ↔ \`on Reject|No\`.  
-- May include \`timeout\`, \`retryCount\`, \`retryDelay\`.  
+- All \`functionParams\` are **mandatory**; populate based on workflow context or ask via \`followUpOptions\`. Never invent new approval template ids.  
 **Minimal Example:**
 \`\`\`json
 {
   "id": "EEEEEEEEEE",
   "label": "Request approval from manager",
-  "type": "decision",
+  "type": "approval",
   "stepFunction": "requestApproval",
-  "functionParams": { "approver": "\${manager}", "reason": "Budget exceeds threshold" },
-  "onConditionPass": "FFFFFFFFFF",
-  "onConditionFail": "GGGGGGGGGG",
-  "onTimeout": "HHHHHHHHHH",
-  "timeout": 86400,
-  "retryCount": 2,
-  "retryDelay": 3600
+  "functionParams": {
+    "approver": "\${managerUserId}",
+    "reason": "Approval needed for travel request",
+    "approvalTemplateId": "Manager Approval Template"
+  },
+  "onConditionPass": [/* next steps as per schema Embed the step where possible */],
+  "onConditionFail": [/* next steps as per schema Embed the step where possible */]
 }
 \`\`\`
 `
-        },
+
+
+const workflowCheckConditionStepSchema =
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "CheckCondition decision step",
+    "allOf": [
+        { "$ref": workflowTemplateStepFunctionsDefinitionsSchema.definitions.stepObject as unknown as string },
+        {
+            "type": "object",
+            "properties": {
+                "type": { "const": "decision" },
+                "stepFunction": { "const": "checkCondition" },
+                "functionParams": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["evaluate"],
+                    "properties": {
+                        "evaluate": { "$ref": jsonRulesEngineConditionSchema },
+                    }
+                }
+            },
+            "required": ["type", "stepFunction", "functionParams", "onConditionPass", "onConditionFail"],
+            "not": {
+                "anyOf": [
+                    { "required": ["next"] },
+                    { "required": ["conditions"] },
+                    { "required": ["onError"] },
+                ]
+            }
+        }
+    ]
+};
+
+const workflowCheckConditionStepLLMInstructions: string = `### This step function is to be used when we want to evaluate a condition and branch the workflow based on the result.
+** \`functionParams\`:**
+- \`evaluate\` *(object, required)* — A condition object following the json-rules-engine format to evaluate.  
+**Rules:**
+- \`evaluate\` is **mandatory**; construct based on workflow context. Use facts available in the workflow or mrf or request data.  Use the tool getMRFFacts or getRequestFacts to get a list of available facts based on what triggered the workflow.
+**Minimal Example:**
+\`\`\`json
+{
+  "id": "FFFFFFFFFF",
+  "label": "Check if amount exceeds threshold",
+  "type": "decision",
+  "stepFunction": "checkCondition",
+  "functionParams": {
+    "evaluate": {
+        all: [
+            {
+                "fact": "\${amount}",
+                "operator": "greaterThan",
+                "value": 10000
+            },
+            any: [
+                {
+                    "fact": "\${requiredAttendees}",
+                    "operator": "greaterThanInclusive",
+                    "value": 500
+                },
+                {
+                    "fact": "\${department}",
+                    "operator": "equal",
+                    "value": "executive"
+                }
+            ]
+        ]
+    }
+  },
+  "onConditionPass": [/* next steps as per schema Embed the step where possible */],
+  "onConditionFail": [/* next steps as per schema Embed the step where possible */]
+}
+\`\`\`
+`
+
+
+const workflowSwitchConditionStepSchema =
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Switch/Case decision task step",
+    "allOf": [
+        { "$ref": workflowTemplateStepFunctionsDefinitionsSchema.definitions.stepObject as unknown as string },
+        {
+            "type": "object",
+            "properties": {
+                "type": { "const": "decision" },
+                "stepFunction": { "const": "multiCheckCondition" },
+                "functionParams": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["evaluate"],
+                    "properties": {
+                        "evaluate": { "type": "string", "minLength": 1, "maxLength": 200 }
+                    }
+                },
+                "required": ["type", "stepFunction", "functionParams", "conditions"],
+                "not": {
+                    "anyOf": [
+                        { "required": ["next"] },
+                        { "required": ["onConditionPass"] },
+                        { "required": ["onConditionFail"] },
+                        { "required": ["onError"] },
+                    ]
+                }
+            }
+        }
+    ]
+};
+
+const workflowSwitchConditionStepLLMInstructions: string = `### This step function is to be used when we want to evaluate a value and branch the workflow based on multiple possible cases.
+** \`functionParams\`:**
+- \`evaluate\` *(string, required)* — A value or variable in the workflow context or mrf or request data to evaluate against multiple cases.  
+**Rules:**
+- \`evaluate\` is **mandatory**; construct based on workflow context. Use facts available in the workflow or mrf or request data. Use the tool getMRFFacts or getRequestFacts to get a list of available facts based on what triggered the workflow.
+**Minimal Example:**
+\`\`\`json
+{
+  "id": "GGGGGGGGGG",
+  "label": "Switch on department",
+  "type": "decision",
+  "stepFunction": "multiCheckCondition",
+  "functionParams": {
+    "evaluate": "\${department}"
+  },
+  "conditions": [
+    {
+      "value": "sales",
+      "step": [/* next steps for sales department as per schema Embed the step where possible */]
     },
     {
-        id: 'fn_condition',
-        label: 'Decision Point',
-        type: 'decision',
-        name: 'checkCondition',
-        description: 'Evaluate a condition to determine workflow path',
-        params: [
-            {
-                name: 'evaluate',
-                label: 'Condition',
-                type: 'string',
-                description: 'json-rules-engine condition as JSON string',
-                required: true,
+      "value": "engineering",
+      "step": [/* next steps for engineering department as per schema Embed the step where possible */]
+    }
+  ]
+}
+\`\`\`
+`
+
+
+const workflowBranchStepSchema =
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Branch step for parallel execution paths",
+    "allOf": [
+        { "$ref": workflowTemplateStepFunctionsDefinitionsSchema.definitions.stepObject as unknown as string },
+        {
+            "type": "object",
+            "properties": {
+                "type": { "const": "branch" },
+                "stepFunction": { "const": "branch" },
+                "functionParams": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [],
+                    "properties": {
+                    }
+                }
             },
-        ],
-        outputs: [{
-            type: 'pass', label: 'Approved', required: true
-        }, {
-            type: 'fail', label: 'Rejected', required: true
-        }],
-        llmInstructions: {
-            usageInstruction: `
-### \`checkCondition\` (Decision)
-**Purpose:** Evaluate a **json-rules-engine** condition to choose pass/fail.  
-**Params:**
-- \`evaluate\` *(string, required)* — JSON **string** of rules (json-rules-engine format).  
-**Outputs:** \`pass\`/ \`fail\`.  
-**Rules:** Use only valid operators/structure per json-rules-engine; embed as JSON string.  
+            "required": ["type", "stepFunction", "functionParams", "next"],
+            "not": {
+                "anyOf": [
+                    { "required": ["onConditionPass"] },
+                    { "required": ["onConditionFail"] },
+                    { "required": ["conditions"] },
+                    { "required": ["onError"] },
+                    { "required": ["onTimeout"] }
+                ]
+            }
+        }
+    ]
+};
+
+const workflowBranchStepLLMInstructions: string = `### This step function is to be used when we want to branch the workflow into multiple parallel execution paths.
+** \`functionParams\`:**
+- No parameters required for this step function.  
+**Rules:**
+- No \`functionParams\` are needed; the branching will be handled by the workflow engine.  
+**Minimal Example:**
+\`\`\`json
+{
+  "id": "HHHHHHHHHH",
+  "label": "Branch into parallel paths",
+  "type": "branch",
+  "stepFunction": "branch",
+  "functionParams": { },
+  "next": [
+    /* first parallel path steps as per schema Embed the step where possible */,
+    /* second parallel path steps as per schema Embed the step where possible */
+  ]
+}
+\`\`\`
+`
+
+
+const workflowMergeStepSchema =
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Merge step from parallel execution paths back to one",
+    "allOf": [
+        { "$ref": workflowTemplateStepFunctionsDefinitionsSchema.definitions.stepObject as unknown as string },
+        {
+            "type": "object",
+            "properties": {
+                "type": { "const": "merge" },
+                "stepFunction": { "const": "merge" },
+                "functionParams": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["waitForSteps", "waitForAll", "timeout"],
+                    "properties": {
+                        "waitForSteps": {
+                            "additionalProperties": false,
+                            "type": "array",
+                            "items": { "$ref": "#/definitions/stepId" }
+                        },
+                        "waitForAll": { "type": "boolean" },
+                        "timeout": { "type": "number", "minimum": -1 }
+                    }
+                }
+            },
+            "required": ["type", "stepFunction", "functionParams", "next"],
+            "not": {
+                "anyOf": [
+                    { "required": ["onConditionPass"] },
+                    { "required": ["onConditionFail"] },
+                    { "required": ["conditions"] },
+                    { "required": ["onError"] },
+                    { "required": ["onTimeout"] }
+                ]
+            }
+        }
+    ]
+};
+
+const workflowMergeStepLLMInstructions: string = `### This step function is to be used when we want to merge multiple parallel execution paths back into a single path.
+** \`functionParams\`:**
+- \`waitForSteps\` *(array of step IDs, required)* — List of step IDs to wait for before proceeding.
+- \`waitForAll\` *(boolean, required)* — Whether to wait for all specified steps or just any one of them.
+- \`timeout\` *(number, required)* — Timeout in minutes to wait for the specified steps (-1 for no timeout).  
+**Rules:**
+- All \`functionParams\` are **mandatory**; configure based on the parallel paths in the workflow.  
 **Minimal Example:**
 \`\`\`json
 {
   "id": "IIIIIIIIII",
-  "label": "Check budget and role",
-  "type": "decision",
-  "stepFunction": "checkCondition",
-  "functionParams": {
-    "evaluate": "{"any":[{"fact":"budget","operator":"greaterThan","value":5000},{"all":[{"fact":"role","operator":"notEqual","value":"manager"}]}]}"
-  },
-  "onConditionPass": "JJJJJJJJJJ",
-  "onConditionFail": "KKKKKKKKKK"
-}
-\`\`\`
-`
-        },
-    },
-    {
-        id: 'fn_switch_condition',
-        label: 'Multi Decision Point',
-        type: 'decision',
-        name: 'multiCheckCondition',
-        description: 'Evaluate a variable to determine workflow path with multiple outcomes based on its value',
-        params: [
-            {
-                name: 'evaluate',
-                label: 'Variable to evaluate',
-                type: 'string',
-                description: 'A variable value to check against multiple possible values',
-                required: true,
-            },
-        ],
-        outputs: [{
-            type: 'condition', label: 'Passed', required: true, value: 'value of the matched condition', next: 'next step id for the matched condition'
-        }],
-        llmInstructions: {
-            usageInstruction: `
-### \`multiCheckCondition\` (Decision: Switch/Case)
-**Purpose:** Multi-branch routing on a single variable’s value.  
-**Params:**
-- \`evaluate\` *(string, required)* — A variable name or expression (e.g., \`\${department}\`).
-- \`conditions\` *(array, required)* — Items: \`{ "value": "<match>", "next": "<stepId>" }\`.  
-- \`defaultNext\` *(string, optional)* — Fallback step id. 
-**Outputs:** Branch to matching \`next\`.  
-**Rules:** **Prefer embedding the steps** for \`next\`; use step IDs only if necessary.
-**Minimal Example:**  
-\`\`\`json
-{
-  "id": "LLLLLLLLLL",
-  "label": "Branch by department",
-  "type": "decision",
-  "stepFunction": "multiCheckCondition",
-  "functionParams": {
-    "evaluate": "\${department}",
-    "conditions": [
-      { "value": "Finance", "next": "MMMMMMMMMM" },
-      { "value": "HR", "next": "NNNNNNNNNN" }
-    ],
-    "defaultNext": "OOOOOOOOOO"
-  }
-}
-\`\`\`    
-    `
-        },
-    },
-
-    // Branch / Merge functions
-    {
-        id: 'fn_branch_workflow',
-        label: 'Branch/Split Workflow',
-        type: 'branch',
-        name: 'branch',
-        description: 'Branch workflow into multiple parallel execution paths',
-        params: [],
-        outputs: [],
-        llmInstructions: {
-            usageInstruction: `
-### \`branch\` (Branch)
-**Purpose:** Execute multiple paths in **parallel**.  
-**Params:** *(none)*  
-**Outputs:** Parallel execution of all \`next\` steps.  
-**Rules:** \`next\` can list **step objects or ids**. If referencing, ensure those steps are defined elsewhere.  
-**Minimal Example:**
-\`\`\`json
-{
-  "id": "PPPPPPPPPP",
-  "label": "Start parallel tasks",
-  "type": "branch",
-  "stepFunction": "branch",
-  "functionParams": {},
-  "next": ["QQQQQQQQQQ", "RRRRRRRRRR"]
-}
-\`\`\`
-    `
-        },
-    },
-    {
-        id: 'fn_merge_workflow',
-        label: 'Merge/Join Workflow',
-        type: 'merge',
-        name: 'merge',
-        description: 'Wait for multiple workflow steps to complete before proceeding',
-        params: [
-            {
-                name: 'waitForSteps',
-                label: 'Wait For Steps',
-                type: 'list',
-                description: 'Comma-separated list of step names to wait for completion',
-                required: true,
-            },
-            {
-                name: 'waitForAll',
-                label: 'Require all to complete',
-                type: 'select',
-                description: 'Require all steps to succeed or accept partial success',
-                required: true,
-                defaultValue: 'true',
-                options: [
-                    { value: 'true', label: 'All Must Succeed' },
-                    { value: 'false', label: 'Partial Success OK' }
-                ]
-            },
-            {
-                name: 'timeout',
-                label: 'Timeout',
-                type: 'string',  // will be a number followed by either m (minutes) or h (hours) or d (days)
-                description: 'Maximum wait time before proceeding (e.g., 30m, 2h, 1d)',
-                required: true,
-                defaultValue: "48h" // default to 48 hours
-            }
-        ],
-        outputs: [{
-            type: 'result', label: 'the set of task that successfully completed', required: true
-        }],
-        llmInstructions: {
-            usageInstruction: `
-### \`merge\` (Merge/Join)
-**Purpose:** Wait for multiple branches to complete before continuing.  
-**Params:**
-- \`waitForSteps\` *(array<string>, required)* — Step IDs to wait for.  
-- \`waitForAll\` *(boolean, required; default true)* — Whether all must succeed.  
-- \`timeout\` *(number or string, optional)* — Max wait.  
-**Outputs:** Result set of completed tasks.  
-**Rules:** Ensure \`waitForSteps\` match previously defined ids.  
-**Minimal Example:**
-\`\`\`json
-{
-  "id": "SSSSSSSSSS",
-  "label": "Merge parallel branches",
+  "label": "Merge parallel paths",
   "type": "merge",
   "stepFunction": "merge",
   "functionParams": {
-    "waitForSteps": ["QQQQQQQQQQ", "RRRRRRRRRR"],
+    "waitForSteps": ["stepId1", "stepId2"],
     "waitForAll": true,
-    "timeout": 120
+    "timeout": 300
   },
-  "next": ["TTTTTTTTTT"]
+  "next": [/* next steps as per schema Embed the step where possible */]
 }
 \`\`\`
-    `
-        },
-    },
-    // TERMINATE FUNCTION
-    {
-        id: 'fn_terminate',
-        label: 'Terminate',
-        type: 'terminate',
-        name: 'terminate',
-        description: 'Terminate the workflow',
-        params: [],
-        outputs: [],
-        llmInstructions: {
-            usageInstruction: `
-### \`terminate\` (Terminate)
-**Purpose:** End the workflow.  
-**Params:** *(none)*  
-**Outputs:** None; workflow ends.  
-**Rules:** Must be the **final** step in any path.  
+`   
+
+
+const workflowTerminateStepSchema =
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "The terminate step. This is always the last step in the workflow or the branch.",
+    "allOf": [
+        { "$ref": workflowTemplateStepFunctionsDefinitionsSchema.definitions.stepObject as unknown as string },
+        {
+            "type": "object",
+            "properties": {
+                "type": { "const": "terminate" },
+                "stepFunction": { "const": "terminate" },
+                "functionParams": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [],
+                    "properties": {
+                    }
+                }
+            },
+            "required": ["type", "stepFunction", "functionParams"],
+            "not": {
+                "anyOf": [
+                    { 'required': ['next'] },
+                    { "required": ["onConditionPass"] },
+                    { "required": ["onConditionFail"] },
+                    { "required": ["conditions"] },
+                    { "required": ["onError"] },
+                    { "required": ["onTimeout"] }
+                ]
+            }
+        }
+    ]
+};
+
+const workflowTerminateStepLLMInstructions: string = `### This step function is to be used when we want to terminate/end the workflow path. There is always atleast 1 per workflow template
+** \`functionParams\`:**
+- No parameters required for this step function.  
+**Rules:**
+- No \`functionParams\` are needed; this step simply ends the workflow.  
 **Minimal Example:**
 \`\`\`json
 {
-  "id": "UUUUUUUUUU",
-  "label": "Terminate workflow",
+  "id": "JJJJJJJJJJ",
+  "label": "Finish line!!",
   "type": "terminate",
   "stepFunction": "terminate",
-  "functionParams": {},
-  "next": []
+  "functionParams": { }
 }
 \`\`\`
-    `
-        },
+`
+
+
+export const workflowStepFunctions: Array<{ schema: unknown, llmInstructions: string }> = [
+    // TRIGGER FUNCTIONS
+    {
+        schema: workflowOnRequestStepSchema,
+        llmInstructions: workflowOnRequestStepLLMInstructions
+    },
+    {
+        schema: workflowOnMRFStepSchema,
+        llmInstructions: workflowOnMRFStepLLMInstructions
+    },
+    // TASK FUNCTIONS
+    {
+        schema: workflowNotifyStepSchema,
+        llmInstructions: workflowNotifyStepLLMInstructions
+    },
+    {
+        schema: workflowCreateEventStepSchema,
+        llmInstructions: workflowCreateEventStepLLMInstructions
+    },
+    // DECISION FUNCTIONS
+    {
+        schema: workflowRequestApprovalStepSchema,
+        llmInstructions: workflowRequestApprovalStepLLMInstructions
+    },
+    {
+        schema: workflowCheckConditionStepSchema,
+        llmInstructions: workflowCheckConditionStepLLMInstructions
+    },
+    {
+        schema: workflowSwitchConditionStepSchema,
+        llmInstructions: workflowSwitchConditionStepLLMInstructions
+    },
+    // Branch / Merge functions
+    {
+        schema: workflowBranchStepSchema,
+        llmInstructions: workflowBranchStepLLMInstructions
+    },
+    {
+        schema: workflowMergeStepSchema,
+        llmInstructions: workflowMergeStepLLMInstructions   
+    },
+    // TERMINATE FUNCTION
+    {
+        schema: workflowTerminateStepSchema,
+        llmInstructions: workflowTerminateStepLLMInstructions
     },
 ]
 
 
-const INSTRUCTIONS_HEADER = `## 🧩 Core Step Functions (Catalog)
-
-Each function block includes **Purpose**, **Params**, **Outputs**, **Rules**, and a **Minimal Example**.  
-Unless specified, \`functionParams\` object fields are optional; required fields are marked **required**.
+const INSTRUCTIONS_HEADER = `## 🧩 Step Functions (Catalog)
+The following are the available step functions that can be used to build workflow definition. 
+Each step function includes its purpose, parameters, rules for usage, and a minimal example of how to structure it within a workflow definition.
 `;
 
 const INSTRUCTIONS_FOOTER = `---
-
-## 🔄 RequestType Handling
-- \`requestType\` is **mandatory** for triggers like \`onRequest\`.
-- Map user intent → closest valid type; if ambiguous, ask via \`followUpOptions\`.
-- Never invent new request types.
-- Echo the resolved \`requestType\` exactly.
-
----
 
 ## 🧪 Validation Checklist
 - [x] Unique 10-char IDs only (from provided shortUUID list).  
@@ -545,13 +881,13 @@ const INSTRUCTIONS_FOOTER = `---
 ---
 
 ## ✳️ Reserved Variables
-\`\${userId}\`, \`\${userEmail}\`, \`\${userName}\`, \`\${userManager}\`, \`\${userDepartment}\`, \`\${today}\`, \`\${now}\`
+\`\${requestorUserId}\`, \`\${requestorEmail}\`, \`\${requestorName}\`, \`\${requestorManager}\`, \`\${requestorDepartment}\`, \`\${today}\`, \`\${now}\`
 
 ---
 `
 
-export const workflowFunctionInstructions:string = INSTRUCTIONS_HEADER + workflowFunctionDefinitions.map(def => {
+export const workflowFunctionInstructions: string = INSTRUCTIONS_HEADER + workflowStepFunctions.map(def => {
     // Create a shallow copy and remove llmInstructions
     const { llmInstructions } = def;
-    return `${llmInstructions.usageInstruction}`;
+    return `${llmInstructions} \n**Use the following step schema:** \`\`\`json\n${JSON.stringify(def.schema, null, 2)}\n\`\`\``;
 }).join("\n") + INSTRUCTIONS_FOOTER;

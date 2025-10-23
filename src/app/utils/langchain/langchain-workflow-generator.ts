@@ -6,7 +6,6 @@ import { WorkflowMessage, WorkflowMessageContent, WorkflowMessageSchema } from '
 import { ChatPromptTemplate, MessagesPlaceholder } from "@langchain/core/prompts";
 import { ChatMessageHistory } from 'langchain/memory';
 import { AIMessage, HumanMessage } from '@langchain/core/messages';
-import { workflowFunctionInstructions } from '@/app/data/workflow-step-definitions';
 import { workflowVariableLLMInstructions } from '@/app/data/workflow-variable-definitions';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { sampleWorkflowDefinitionJSONForLlm } from '@/app/data/sampleWorkflowDefinitionJSONForLlm';
@@ -21,6 +20,7 @@ import ShortUniqueId from 'short-unique-id';
 import { sanitizeAimeMessage } from './sanitizeResponse';
 import aimeInstructions from '@/app/utils/aiInstructions/aimeWorkflowGeneralInstructions.md';
 import aimeToolInstructions from '@/app/utils/aiInstructions/aimeWorkflowToolUsageInstructions.md';
+import { workflowFunctionInstructions } from '@/app/data/workflow-step-definitions';
 
 // 10-char alphanumeric short id generator (reusable instance)
 const uid = new ShortUniqueId({ length: 10, dictionary: 'alphanum' });

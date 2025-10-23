@@ -1,6 +1,6 @@
 import { validateWorkflowTemplate, WorkflowStep, WorkflowTemplate } from "../types/workflowTemplate";
 
-
+// This function generated a record that maps the sped ids to their labels
 export function getStepsLabelsMap(steps: Array<WorkflowStep | string>): Record<string, string> {
     const map: Record<string, string> = {};
     if (!Array.isArray(steps) || steps.length === 0) {
@@ -34,6 +34,7 @@ export function getStepsLabelsMap(steps: Array<WorkflowStep | string>): Record<s
     return map;
 }
 
+//.This function returns all embedded steps (steps that are objects) recursively
 export function getEmbeddedChildren(steps: Array<WorkflowStep | string>): WorkflowStep[] {
     let embedded: WorkflowStep[] = [];
     steps.forEach(step => {
@@ -68,6 +69,7 @@ export function getEmbeddedChildren(steps: Array<WorkflowStep | string>): Workfl
     return embedded;
 }
 
+//This function returns all referred steps (steps that are strings)
 export function getReferredSteps(steps: Array<WorkflowStep | string>): string[] {
     // return steps filtered by the typeof string
     return steps.filter((step): step is string => typeof step === "string");
@@ -238,9 +240,7 @@ export const stepFunctionValidators: Record<string, (step: WorkflowStep) => stri
 };
 
 
-
-
-
+// This function validates if a workflow template is ready for publish
 export async function isWorkflowTemplateReadyForPublish(
     workflowTemplate: WorkflowTemplate
 ): Promise<{ valid: boolean; errors: string[] }> {
