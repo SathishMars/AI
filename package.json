@@ -10,7 +10,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "postinstall": "npm rebuild lightningcss --silent || true"
+    "postinstall": "npm rebuild lightningcss --silent || true",
+    "docker-build": "docker build -t groupize-workflows ."
   },
   "dependencies": {
     "@emotion/cache": "^11.14.0",
