@@ -1,63 +1,52 @@
-# Stage 1: Build the Next.js application
-FROM node:22-alpine AS builder
-
+# ---- Stage 1: Base ----
+FROM node:22-alpine AS base
 WORKDIR /app
+ENV NODE_ENV=development
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies using npm
-RUN npm ci --ignore-scripts && \
-    npm cache clean --force
+# Install dependencies for dev & build
+RUN npm install
 
-# Copy application source (includes .env.local if it exists)
+# Copy all project files
 COPY . .
 
-# Validate that .env.local exists (required for build)
-RUN if [ ! -f .env.local ]; then \
-      echo "ERROR: .env.local file not found!"; \
-      echo "Please ensure .env.local exists in your project root before building."; \
-      exit 1; \
-    fi
-
-# Build the Next.js application
-RUN npm run build
-
-# Stage 2: Create the final production image
-FROM node:22-alpine AS runner
-
-WORKDIR /app
-
-# Set production environment
+# ---- Stage 2: Build for Production ----
+FROM base AS builder
 ENV NODE_ENV=production
 
-# Create a non-root user for security
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
+# Ensure standalone output is enabled in next.config.js
+RUN npm run build
 
-# Copy the standalone output from the builder stage
+# ---- Stage 3: Production Runtime ----
+FROM node:22-alpine AS runner
+WORKDIR /app
+
+# Set production env
+ENV NODE_ENV=production
+ENV PORT=3000
+
+# Create non-root user
+RUN addgroup --system --gid 1001 nodejs \
+  && adduser --system --uid 1001 nextjs
+
+# Copy only the build output for production
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/static ./.next/static
 
-# Copy the .env.local file to the runner stage
-COPY --from=builder /app/.env.local ./.env.local
+# Healthcheck (optional)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# Change ownership to the nextjs user
-RUN chown -R nextjs:nodejs /app
+# Default command: if NODE_ENV=production → start server.js; else → start dev mode
+CMD if [ "$NODE_ENV" = "production" ]; then \
+      node server.js; \
+    else \
+      npm run dev -- --hostname 0.0.0.0; \
+    fi
 
-# Switch to non-root user
-USER nextjs
-
-# Expose the application port
 EXPOSE 3000
 
-# Set the port environment variable
-ENV PORT=3000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
-
-# Start the Next.js application
-CMD ["npm", "run", "dev", "--", "--hostname", "0.0.0.0"]
+USER nextjs
