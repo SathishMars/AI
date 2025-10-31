@@ -142,4 +142,13 @@ export default class AimeWorkflowMessagesDBUtil {
         const res = await coll.deleteOne(filter);
         return { deletedCount: res.deletedCount ?? 0 };
     }
+
+    static async deleteMessagesForTemplate(account: string, templateId: string, organization?: string | null): Promise<{ deletedCount: number }> {
+        const db = await getMongoDatabase();
+        const coll = db.collection(COLLECTION_NAME);
+        const filter: Record<string, unknown> = { templateId, account };
+        if (organization !== undefined) filter.organization = organization;
+        const res = await coll.deleteMany(filter);
+        return { deletedCount: res.deletedCount ?? 0 };
+    }
 }

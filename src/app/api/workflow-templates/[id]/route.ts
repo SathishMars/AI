@@ -1,9 +1,10 @@
-// src/app/api/workflow-templates/[templateName]/route.ts
+// src/app/api/workflow-templates/[templateId]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import WorkflowTemplateDbUtil from '@/app/utils/workflowTemplateDbUtil';
 import { workflowTemplateStarter } from '@/app/data/workflow-template-starter';
 import { WorkflowTemplateSchema, WorkflowTemplate } from '@/app/types/workflowTemplate';
 import ShortUniqueId from 'short-unique-id';
+import AimeWorkflowMessagesDBUtil from '@/app/utils/aimeWorkflowMessagesDBUtil';
 
 // Reusable ShortUniqueId instance (10 chars, alphanum) — follow repo policy
 const uid = new ShortUniqueId({ length: 10, dictionary: 'alphanum' });
@@ -17,10 +18,10 @@ function generateShortUniqueId(): string {
 /**
  * Workflow Template API Routes
  * 
- * GET    /api/workflow-templates/[templateName] - Get template details
- * PUT    /api/workflow-templates/[templateName] - Update template
- * DELETE /api/workflow-templates/[templateName] - Delete template
- * POST   /api/workflow-templates/[templateName] - Create draft from published template
+ * GET    /api/workflow-templates/[templateId] - Get template details
+ * PUT    /api/workflow-templates/[templateId] - Update template
+ * DELETE /api/workflow-templates/[templateId] - Delete template
+ * POST   /api/workflow-templates/[templateId] - Create draft from published template
  */
 
 interface RouteParams {
@@ -30,7 +31,7 @@ interface RouteParams {
 }
 
 /**
- * GET /api/workflow-templates/[templateName]
+ * GET /api/workflow-templates/[templateId]
  * Retrieve a workflow template with conversation history
  */
 export async function GET(
@@ -97,7 +98,7 @@ export async function GET(
 }
 
 /**
- * PUT /api/workflow-templates/[templateName]
+ * PUT /api/workflow-templates/[templateId]
  * Update an existing workflow template
  */
 export async function PUT(
@@ -105,16 +106,15 @@ export async function PUT(
   { params }: RouteParams
 ): Promise<NextResponse> {
   try {
-    const { id: templateName } = await params;
+    const { id: templateId } = await params;
     const body = await request.text();
 
-    if (!templateName) {
-      return NextResponse.json({ error: 'Template name is required' }, { status: 400 });
+    if (!templateId) {
+      return NextResponse.json({ error: 'Template ID is required' }, { status: 400 });
     }
 
-    // Decode URL-encoded template name
-    const decodedTemplateName = decodeURIComponent(templateName);
-
+    // Decode URL-encoded template ID
+    const decodedTemplateId = decodeURIComponent(templateId);
     // Parse body as full WorkflowTemplate (client should send JSON)
     let parsedBody: unknown;
     try {
@@ -143,7 +143,7 @@ export async function PUT(
     }
 
     // Upsert using composite key
-    const upserted = await WorkflowTemplateDbUtil.upsert(account, organization, decodedTemplateName, version, template);
+    const upserted = await WorkflowTemplateDbUtil.upsert(account, organization, decodedTemplateId, version, template);
     return NextResponse.json({ success: true, data: upserted });
 
   } catch (error) {
@@ -154,7 +154,7 @@ export async function PUT(
 }
 
 /**
- * POST /api/workflow-templates/[templateName]
+ * POST /api/workflow-templates/[templateId]
  * Create a draft from a published template
  */
 export async function POST(
@@ -162,18 +162,18 @@ export async function POST(
   { params }: RouteParams
 ): Promise<NextResponse> {
   try {
-    const { id: templateName } = await params;
+    const { id: templateId } = await params;
     const bodyText = await request.text();
 
-    if (!templateName) {
+    if (!templateId) {
       return NextResponse.json({ error: 'Template name is required' }, { status: 400 });
     }
 
     // Decode URL-encoded template name
-    // [POST /api/workflow-templates/[templateName]] Decoding template name
-    console.log('[POST /api/workflow-templates/[templateName]] Received templateName:', templateName);
-    const decodedTemplateName = decodeURIComponent(templateName);
-    console.log('[POST /api/workflow-templates/[templateName]] Decoded templateName:', decodedTemplateName);
+    // [POST /api/workflow-templates/[templateId]] Decoding template name
+    console.log('[POST /api/workflow-templates/[templateId]] Received templateId:', templateId);
+    const decodedTemplateId = decodeURIComponent(templateId);
+    console.log('[POST /api/workflow-templates/[templateId]] Decoded templateId:', decodedTemplateId);
 
     // Parse body as full WorkflowTemplate (client should send JSON)
     let parsedBody: unknown;
@@ -182,7 +182,7 @@ export async function POST(
     } catch {
       return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
     }
-    console.log('[POST /api/workflow-templates/[templateName]] Parsed the request body:', parsedBody);
+    console.log('[POST /api/workflow-templates/[templateId]] Parsed the request body:', parsedBody);
 
     // Validate against schema
     try {
@@ -191,7 +191,7 @@ export async function POST(
       const msg = err instanceof Error ? err.message : 'Invalid template data';
       return NextResponse.json({ error: 'Invalid template data', details: msg }, { status: 400 });
     }
-    console.log('[POST /api/workflow-templates/[templateName]] validated against workflowTemplateSchema');
+    console.log('[POST /api/workflow-templates/[templateId]] validated against workflowTemplateSchema');
 
     const template = parsedBody as WorkflowTemplate;
     const account = template.account || request.headers.get('x-account') || 'default-account';
@@ -202,10 +202,10 @@ export async function POST(
       return NextResponse.json({ error: 'Template version is required' }, { status: 400 });
     }
 
-    console.log('[POST /api/workflow-templates/[templateName]] About to upsert the template with composite key:', { account, organization, decodedTemplateName, version });
+    console.log('[POST /api/workflow-templates/[templateId]] About to upsert the template with composite key:', { account, organization, decodedTemplateId, version });
 
     // Upsert the template
-    const upserted = await WorkflowTemplateDbUtil.upsert(account, organization, decodedTemplateName, version, template);
+    const upserted = await WorkflowTemplateDbUtil.upsert(account, organization, decodedTemplateId, version, template);
     return NextResponse.json({ success: true, data: upserted }, { status: 201 });
 
   } catch (error) {
@@ -216,7 +216,7 @@ export async function POST(
 }
 
 /**
- * DELETE /api/workflow-templates/[templateName]
+ * DELETE /api/workflow-templates/[templateId]
  * Delete a workflow template
  */
 export async function DELETE(
@@ -224,11 +224,11 @@ export async function DELETE(
   { params }: RouteParams
 ): Promise<NextResponse> {
   try {
-    const { id: templateName } = await params;
+    const { id: templateId } = await params;
     const { searchParams } = new URL(request.url);
     const version = searchParams.get('version');
 
-    if (!templateName) {
+    if (!templateId) {
       return NextResponse.json(
         { error: 'Template name is required' },
         { status: 400 }
@@ -246,10 +246,10 @@ export async function DELETE(
     const account = request.headers.get('x-account') || 'default-account';
 
     // Decode URL-encoded template name
-    const decodedTemplateName = decodeURIComponent(templateName);
+    const decodedTemplateId = decodeURIComponent(templateId);
 
     // Delete template
-    const deleted = await WorkflowTemplateDbUtil.delete(account, decodedTemplateName, version);
+    const deleted = await WorkflowTemplateDbUtil.delete(account, decodedTemplateId, version);
 
     if (!deleted) {
       return NextResponse.json(
@@ -257,6 +257,10 @@ export async function DELETE(
         { status: 404 }
       );
     }
+
+    const deletedChats = await AimeWorkflowMessagesDBUtil.deleteMessagesForTemplate(account, decodedTemplateId);
+    console.log(`[WorkflowTemplatesRoute] Deleted ${deletedChats.deletedCount} associated conversation messages.`); 
+
 
     return NextResponse.json({
       success: true,

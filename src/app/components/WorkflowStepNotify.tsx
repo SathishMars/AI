@@ -16,7 +16,7 @@ interface triggerFormData {
     label: string;
     to: string;
     subject: string;
-    notificationTemplateName: string;
+    notificationTemplateId: string;
 }
 
 
@@ -32,7 +32,7 @@ export default function WorkflowStepNotify({
                 label: step.label,
                 to: step.functionParams?.to as string || '',
                 subject: step.functionParams?.subject as string || '',
-                notificationTemplateName: step.functionParams?.notificationTemplateName as string || ''
+                notificationTemplateId: step.functionParams?.notificationTemplateId as string || ''
             }
             : null
     );
@@ -48,7 +48,7 @@ export default function WorkflowStepNotify({
             label: step.label,
             to: step.functionParams?.to as string || '',
             subject: step.functionParams?.subject as string || '',
-            notificationTemplateName: step.functionParams?.notificationTemplateName as string || ''
+            notificationTemplateId: step.functionParams?.notificationTemplateId as string || ''
         });
     }, [step]);
 
@@ -60,7 +60,7 @@ export default function WorkflowStepNotify({
             const updated: WorkflowStep = {
                 ...step!,
                 label: (formData.label as string) || "",
-                functionParams: { to: formData.to || '', subject: formData.subject || '', notificationTemplateName: formData.notificationTemplateName || '' }
+                functionParams: { to: formData.to || '', subject: formData.subject || '', notificationTemplateId: formData.notificationTemplateId || '' }
             }
             setError(null);
             if (onSave) onSave(updated);
@@ -78,7 +78,7 @@ export default function WorkflowStepNotify({
             label: step?.label || "",
             to: step?.functionParams?.to as string || "",
             subject: step?.functionParams?.subject as string || "",
-            notificationTemplateName: step?.functionParams?.notificationTemplateName as string || ""
+            notificationTemplateId: step?.functionParams?.notificationTemplateId as string || ""
         });
         if (onCancel) onCancel();
     };
@@ -109,8 +109,8 @@ export default function WorkflowStepNotify({
 
             <TextField
                 label="Notification Template Name"
-                value={formData.notificationTemplateName}
-                onChange={(e) => setFormData((prev) => (prev ? { ...prev, notificationTemplateName: e.target.value } : null))}
+                value={formData.notificationTemplateId}
+                onChange={(e) => setFormData((prev) => (prev ? { ...prev, notificationTemplateId: e.target.value } : null))}
                 helperText="Edit JSON params for the trigger."
             />
 

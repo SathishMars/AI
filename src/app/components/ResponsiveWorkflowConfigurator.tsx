@@ -12,7 +12,8 @@ import {
   IconButton,
   Typography,
   Button,
-  Tooltip
+  Tooltip,
+  Chip
 } from '@mui/material';
 import {
   Publish as PublishIcon,
@@ -67,6 +68,7 @@ function formatRelativeTime(date: Date | string): string {
 interface ResponsiveWorkflowConfiguratorProps {
   workflowTemplate?: WorkflowTemplate;
   messages?: WorkflowMessage[];
+  isPublishReady?: boolean;
   sendMessage?: (message: string) => Promise<void>;
   regenerateMermaidDiagram?: () => Promise<void>;
   onWorkflowDefinitionChange: (workflowDefinition: WorkflowDefinition, mermaidDiagram?: string) => void;
@@ -76,6 +78,7 @@ interface ResponsiveWorkflowConfiguratorProps {
 export default function ResponsiveWorkflowConfigurator({
   workflowTemplate,
   messages,
+  isPublishReady,
   sendMessage,
   regenerateMermaidDiagram,
   onWorkflowDefinitionChange,
@@ -215,11 +218,19 @@ export default function ResponsiveWorkflowConfigurator({
                 </IconButton>
               </Tooltip>
 
-              {/* Last Updated Timestamp */}
-              {workflowTemplate?.metadata?.updatedAt && (
-                <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-                  Updated {formatRelativeTime(workflowTemplate.metadata.updatedAt)}
-                </Typography>
+              {/* current template status */}
+              {isPublishReady ? (
+                <Chip
+                  label="Publish-Ready"
+                  color="success"
+                  size="small"
+                />
+              ) : (
+                <Chip
+                  label="Draft"
+                  color="default"
+                  size="small"
+                />
               )}
             </Box>
           </Box>
@@ -232,21 +243,12 @@ export default function ResponsiveWorkflowConfigurator({
               variant="contained"
               size="small"
               onClick={handlePublish}
-              disabled={!isTemplateValid}
+              disabled={!isPublishReady}
               sx={{ minWidth: { xs: 'auto', sm: 'unset' } }}
             >
               Publish
             </Button>
           )}
-
-          {/* will have to change this to a menu with the versions as a dropdown to select from */}
-          <IconButton
-            size="small"
-            onClick={() => setShowHistory(!showHistory)}
-            title="View History"
-          >
-            <HistoryIcon />
-          </IconButton>
 
           <IconButton
             size="small"

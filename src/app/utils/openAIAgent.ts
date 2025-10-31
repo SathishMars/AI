@@ -2,15 +2,21 @@ import { Agent, AgentInputItem, run, setDefaultOpenAIKey } from '@openai/agents'
 import z from 'zod';
 import { WorkflowMessage, WorkflowMessageSchema } from '../types/aimeWorkflowMessages';
 import { WorkflowDefinition, WorkflowDefinitionSchema } from '../types/workflowTemplate';
-import aimeInstructions from './langchain/instructions/aimeWorkflowGeneralInstructions.md';
-import aimeToolInstructions from './langchain/instructions/aimeWorkflowToolUsageInstructions.md';
+import aimeInstructions from '@/app/utils/aiInstructions/aimeWorkflowGeneralInstructions.md';
+import aimeToolInstructions from '@/app/utils/aiInstructions/aimeWorkflowToolUsageInstructions.md';
 import { sampleWorkflowDefinitionJSONForLlm } from '../data/sampleWorkflowDefinitionJSONForLlm';
-import { workflowFunctionInstructions } from '../data/workflow-tool-defintions';
+import { workflowFunctionInstructions } from '@/app/data/workflow-step-definitions';
 import { workflowVariableLLMInstructions } from '../data/workflow-variable-definitions';
 import { shortUUIDTool } from './openAITools/ShortUUID';
 import { GetListOfWorkflowTemplatesTool } from './openAITools/GetListOfWorkflowTemplates';
 import { workflowDefinitionValidatorTool } from './openAITools/WorkflowValidator';
 import { GetListOfMRFTemplatesTool } from './openAITools/GetListOfMRFTemplates';
+import { GetListOfRequestTemplatesTool } from './openAITools/GetListOfRequestTemplates';
+import { GetListOfNotificationTemplatesTool } from './openAITools/GetListOfNotificationTemplates';
+import { GetListOfApprovalTemplatesTool } from './openAITools/GetListOfApprovalTemplates';
+import { GetMRFFactsTool } from './openAITools/GetMRFFacts';
+import { GetRequestFactsTool } from './openAITools/GetRequestFacts';
+import { IsWorkflowDefinitionReadyForPublishTool } from './openAITools/IsWorkflowDefinitionReadyForPublish';
 
 
 
@@ -101,10 +107,6 @@ const INSTRUCTIONS = `# 🧩 Condensed System Instructions for “aime” (with 
   
   ---
   
-  ${TOOL_USAGE_INSTRUCTIONS}
-  
-  ---
-  
   ${workflowVariableLLMInstructions}
   
   ---
@@ -164,7 +166,18 @@ export async function runAgentToGenerateWorkflow(
             name: 'aime',
             instructions: systemInstructions,
             model: process.env.OPENAI_MODEL_WORKFLOW || 'gpt-4o-mini',
-            tools: [shortUUIDTool, GetListOfWorkflowTemplatesTool, workflowDefinitionValidatorTool, GetListOfMRFTemplatesTool], // Tools would be added here as needed
+            tools: [
+                shortUUIDTool, 
+                GetListOfWorkflowTemplatesTool, 
+                workflowDefinitionValidatorTool, 
+                GetListOfMRFTemplatesTool, 
+                GetListOfRequestTemplatesTool, 
+                GetListOfNotificationTemplatesTool,
+                GetListOfApprovalTemplatesTool,
+                GetMRFFactsTool,
+                GetRequestFactsTool,
+                IsWorkflowDefinitionReadyForPublishTool,
+            ], // Tools would be added here as needed
             outputType: WorkflowMessageSchema,
         });
 

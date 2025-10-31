@@ -34,7 +34,7 @@ export default function WorkflowConfigurePage({ params }: PageProps) {
   // Use workflow template hook with immediate auto-save
   const {
   template, isLoading, isContextLoading,
-  error, isSaving,
+  error, isSaving,isPublishReady,
     loadTemplate, 
     updateWorkflowDefinition, updateTemplateLabel,
     clearError
@@ -141,6 +141,7 @@ export default function WorkflowConfigurePage({ params }: PageProps) {
       <ResponsiveWorkflowConfigurator
         workflowTemplate={template}
         messages={messages}
+        isPublishReady={isPublishReady}
         sendMessage={sendMessage}
         regenerateMermaidDiagram={regenerateMermaidDiagram}
         onWorkflowDefinitionChange={updateWorkflowDefinition}

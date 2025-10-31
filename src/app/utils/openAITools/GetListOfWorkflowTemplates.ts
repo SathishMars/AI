@@ -1,11 +1,4 @@
-// Tool: GetListOfWorkflowTemplates
-// Purpose: Provide a LangChain-compatible tool that returns a concise list of published
-// workflow templates for a given account and (optionally) an organization.
-//
-// Contract:
-// - Input: { account: string, organization?: string | null }
-// - Output: { templates: Array<{ id, version, label, description? }> }
-// - Errors: ZodValidationError for invalid input; runtime errors are propagated.
+// Tool: getListOfWorkflowTemplates
 
 import { tool } from '@openai/agents';
 import { z } from 'zod';
@@ -33,7 +26,7 @@ export const getListOfWorkflowTemplates = async (
     input: ListOfWorkflowTemplatesInput
 ): Promise<ListOfWorkflowTemplatesOutput> => {
     const { account, organization } = input;
-
+    console.log('[GetListOfWorkflowTemplates] Fetching workflow templates for account:', account, 'organization:', organization);
     // Defensive: ensure account present
     if (!account || typeof account !== 'string') {
         throw new Error('account is required and must be a string');
@@ -57,7 +50,7 @@ export const getListOfWorkflowTemplates = async (
             };
         }
     );
-
+    console.log('[GetListOfWorkflowTemplates] returning the list of workflow templates.', templates.length);
     return { templates };
 };
 
@@ -83,20 +76,20 @@ const listToolFunc = async (input: unknown) => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const zerr: any = err;
             const details = zerr.issues ? JSON.stringify(zerr.issues) : String(err);
-            throw new Error(`GetListOfWorkflowTemplates: invalid input - ${zerr.message || String(err)}; validationIssues=${details}`);
+            throw new Error(`getListOfWorkflowTemplates: invalid input - ${zerr.message || String(err)}; validationIssues=${details}`);
         }
         throw err;
     }
 };
 
 export const GetListOfWorkflowTemplatesTool = tool({
-    name: 'GetListOfWorkflowTemplates',
+    name: 'getListOfWorkflowTemplates',
     // A clear description for LLMs: explain inputs, behaviour, and output schema.
     description:
         'Returns a structured object containing published workflow templates for a given account and optional organization. IMPORTANT: this tool expects an OBJECT input (not a raw string) and returns an OBJECT (not a JSON-string).\n' +
         'Input (OBJECT): { account: string, organization?: string | null }\n' +
         'Output (OBJECT): { templates: [{ id: string, version: string, label: string, description?: string | null }] }\n' +
-        'Error behaviour: If the input is invalid the tool will throw a validation error. The error message will include "GetListOfWorkflowTemplates: invalid input" and a validationIssues field describing what failed.\n' +
+        'Error behaviour: If the input is invalid the tool will throw a validation error. The error message will include "getListOfWorkflowTemplates: invalid input" and a validationIssues field describing what failed.\n' +
         'Notes: organization is optional; when provided it filters templates to that organization. Use this tool to discover available templates for a user/account before taking template-specific actions.',
 
     parameters: getListOfWorkflowTemplatesSchema,

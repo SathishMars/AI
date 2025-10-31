@@ -227,6 +227,224 @@ async function example() {
 4. Ensure responsiveness (phone, tablet, desktop)
 5. Write comprehensive tests
 
+## � Docker Deployment
+
+### Prerequisites
+
+- Docker Desktop installed and running
+- `.env.local` file configured in project root (required for build)
+
+### Build Docker Image
+
+```bash
+# Build the Docker image
+npm run docker-build
+
+# Or build manually
+docker build -t groupize-workflows:latest .
+```
+
+The build process:
+- Uses Node.js 22 Alpine (minimal footprint)
+- Installs dependencies with npm
+- Embeds `.env.local` file in the image
+- Creates optimized production build with Next.js standalone output
+- Runs as non-root user for security
+- Final image size: ~521MB
+
+### Run Docker Container
+
+```bash
+# Run container (detached mode, port 3000)
+docker run -d -p 3000:3000 --name groupize-workflows-container groupize-workflows:latest
+
+# Run with custom name and port mapping
+docker run -d -p 8080:3000 --name my-workflow-app groupize-workflows:latest
+
+# Run in foreground (see logs in terminal)
+docker run -p 3000:3000 --name groupize-workflows-container groupize-workflows:latest
+
+# Run with environment variable overrides
+docker run -d -p 3000:3000 \
+  -e NODE_ENV=production \
+  -e DATABASE_ENVIRONMENT=documentdb \
+  --name groupize-workflows-container \
+  groupize-workflows:latest
+```
+
+### Manage Running Container
+
+```bash
+# View running containers
+docker ps
+
+# View all containers (including stopped)
+docker ps -a
+
+# View container logs
+docker logs groupize-workflows-container
+
+# Follow logs in real-time
+docker logs -f groupize-workflows-container
+
+# Stop container
+docker stop groupize-workflows-container
+
+# Start stopped container
+docker start groupize-workflows-container
+
+# Restart container
+docker restart groupize-workflows-container
+
+# Remove container (must be stopped first)
+docker stop groupize-workflows-container
+docker rm groupize-workflows-container
+
+# Remove container forcefully
+docker rm -f groupize-workflows-container
+```
+
+### Test Docker Container
+
+```bash
+# Test health endpoint
+curl http://localhost:3000/api/health
+
+# Expected response:
+# {
+#   "status": "ok",
+#   "timestamp": "2025-10-30T15:35:34.289Z",
+#   "environment": "production"
+# }
+
+# Check container health status
+docker inspect --format='{{.State.Health.Status}}' groupize-workflows-container
+
+# Open in browser
+open http://localhost:3000
+```
+
+### Export Docker Image
+
+If you need to share or backup the Docker image:
+
+```bash
+# Export image as tar file
+docker save -o groupize-workflows.tar groupize-workflows:latest
+
+# Export and compress (recommended for sharing)
+docker save groupize-workflows:latest | gzip > groupize-workflows.tar.gz
+
+# Load image from tar file (on another machine)
+docker load -i groupize-workflows.tar
+
+# Or load from compressed file
+gunzip -c groupize-workflows.tar.gz | docker load
+```
+
+### Push to Docker Registry
+
+```bash
+# Tag image for Docker Hub
+docker tag groupize-workflows:latest yourusername/groupize-workflows:latest
+docker tag groupize-workflows:latest yourusername/groupize-workflows:v1.0.0
+
+# Login to Docker Hub
+docker login
+
+# Push to Docker Hub
+docker push yourusername/groupize-workflows:latest
+docker push yourusername/groupize-workflows:v1.0.0
+
+# Tag for private registry (e.g., AWS ECR, Google GCR)
+docker tag groupize-workflows:latest registry.example.com/groupize-workflows:latest
+
+# Push to private registry
+docker push registry.example.com/groupize-workflows:latest
+```
+
+### Docker Compose (Optional)
+
+For easier multi-container deployment, create a `docker-compose.yml`:
+
+```yaml
+version: '3.8'
+
+services:
+  app:
+    image: groupize-workflows:latest
+    container_name: groupize-workflows
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_ENVIRONMENT=local
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  mongodb:
+    image: mongo:5.0
+    container_name: groupize-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=password
+      - MONGO_INITDB_DATABASE=groupize-workflows
+    volumes:
+      - mongodb_data:/data/db
+    restart: unless-stopped
+
+volumes:
+  mongodb_data:
+```
+
+Then run:
+
+```bash
+# Start all services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop all services
+docker-compose down
+
+# Stop and remove volumes
+docker-compose down -v
+```
+
+### Troubleshooting Docker
+
+```bash
+# View Docker images
+docker images
+
+# Remove old images
+docker image prune -a
+
+# View container resource usage
+docker stats groupize-workflows-container
+
+# Execute command inside running container
+docker exec -it groupize-workflows-container sh
+
+# View container configuration
+docker inspect groupize-workflows-container
+
+# Check Docker disk usage
+docker system df
+
+# Clean up unused resources
+docker system prune -a
+```
+
 ## 🚀 Production Deployment
 
 ### AWS DocumentDB Setup
@@ -234,24 +452,25 @@ async function example() {
 For production, the application uses AWS DocumentDB:
 
 ```bash
-# Update environment variables
+# Update environment variables in .env.local before building Docker image
 DATABASE_ENVIRONMENT=documentdb
-DOCUMENTDB_HOST=your-cluster.cluster-xyz.us-east-1.docdb.amazonaws.com
-DOCUMENTDB_USER=your-username
-DOCUMENTDB_PASSWORD=your-password
+DOCUMENTDB_URI=mongodb://username:password@your-cluster.cluster-xyz.us-east-1.docdb.amazonaws.com:27017/groupize-workflows?ssl=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false
 ```
 
 ### Build Commands
 
 ```bash
-# Production build
+# Production build (local)
 npm run build
 
-# Start production server
+# Start production server (local)
 npm start
 
 # Lint code
 npm run lint
+
+# Build Docker image for production
+npm run docker-build
 ```
 
 ## 📚 Documentation

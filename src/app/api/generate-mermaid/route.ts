@@ -1,4 +1,4 @@
-import { generateMermaidFromWorkflow } from "@/app/utils/langchain/langchain-mermaid-generator";
+import { generateMermaidFromWorkflow } from "@/app/utils/MermaidGenerator";
 import { NextRequest, NextResponse } from "next/server";
 
 

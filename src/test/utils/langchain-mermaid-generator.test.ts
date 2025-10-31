@@ -1,4 +1,4 @@
-import { generateMermaidFromWorkflow } from '@/app/utils/langchain/langchain-mermaid-generator';
+import { generateMermaidFromWorkflow } from '@/app/utils/MermaidGenerator';
 
 describe('generateMermaidFromWorkflow', () => {
     it('uses curly braces for decision nodes', () => {
@@ -20,8 +20,8 @@ describe('generateMermaidFromWorkflow', () => {
         };
 
         const diagram = generateMermaidFromWorkflow(workflow);
-        // decision node should be emitted with {} around the label
-        expect(diagram).toContain('n_decide{"Is OK?\\n(decision)"}');
+    // decision node should be emitted with {} around the label (generator now includes markdown/backtick formatting)
+    expect(diagram).toContain('n_decide{"`**Is OK?**(decision)`"}');
         // class assignment and definition should be present for the decision type
         expect(diagram).toMatch(/class n_decide cls_decision;/);
         expect(diagram).toMatch(/classDef cls_decision .*fill:/);
