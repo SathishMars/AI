@@ -16,6 +16,10 @@ COPY . .
 FROM base AS builder
 ENV NODE_ENV=production
 
+#Set base path before build
+ARG BASE_PATH=/n
+ENV NEXT_PUBLIC_BASE_PATH=${BASE_PATH}
+
 # Ensure standalone output is enabled in next.config.js
 RUN npm run build
 
