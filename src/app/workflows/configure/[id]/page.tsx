@@ -2,15 +2,10 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  Box,
-  Alert,
-  CircularProgress,
-  Typography,
-  Container,
-  Button
-} from '@mui/material';
-import {WorkflowTemplate } from '@/app/types/workflowTemplate';
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
+import { WorkflowTemplate } from '@/app/types/workflowTemplate';
 import ResponsiveWorkflowConfigurator from '@/app/components/ResponsiveWorkflowConfigurator';
 import { useWorkflowTemplate } from '@/app/hooks/useWorkflowTemplate';
 import { useAimeWorkflow } from '@/app/hooks/useAimeWorkflow';
@@ -83,32 +78,30 @@ export default function WorkflowConfigurePage({ params }: PageProps) {
   // Show loading state (wait for both context and template)
   if (isContextLoading || isLoading) {
     return (
-      <Container maxWidth="xl" sx={{ py: 4 }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: 400, gap: 2 }}>
-          <CircularProgress />
-          <Typography variant="body2" color="text.secondary">
+      <div className="container mx-auto py-4">
+        <div className="flex flex-col justify-center items-center min-h-[400px] gap-4">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <p className="text-sm text-muted-foreground">
             {isContextLoading ? 'Loading user context...' : 'Loading workflow...'}
-          </Typography>
-        </Box>
-      </Container>
+          </p>
+        </div>
+      </div>
     );
   }
 
   // Show error state
   if (error) {
     return (
-      <Container maxWidth="xl" sx={{ py: 4 }}>
-        <Alert 
-          severity="error" 
-          action={
-            <Button color="inherit" size="small" onClick={clearError}>
+      <div className="container mx-auto py-4">
+        <Alert variant="destructive">
+          <AlertDescription className="flex items-center justify-between">
+            <span>{error}</span>
+            <Button variant="ghost" size="sm" onClick={clearError}>
               Dismiss
             </Button>
-          }
-        >
-          {error}
+          </AlertDescription>
         </Alert>
-      </Container>
+      </div>
     );
   }
 
@@ -116,25 +109,27 @@ export default function WorkflowConfigurePage({ params }: PageProps) {
   console.log('📄 Page render - Template state:', template);
   if (!(template && template.metadata)) {
     return (
-      <Container maxWidth="md" sx={{ py: 4 }}>
-        <Box sx={{ textAlign: 'center' }}>
-          <Typography variant="h5" gutterBottom>
+      <div className="container mx-auto max-w-2xl py-4">
+        <div className="text-center">
+          <h2 className="text-2xl font-semibold mb-2">
             No Workflow Loaded
-          </Typography>
-          <Typography color="text.secondary">
+          </h2>
+          <p className="text-muted-foreground">
             Loading workflow template...
-          </Typography>
-        </Box>
-      </Container>
+          </p>
+        </div>
+      </div>
     );
   }
 
   // Main workflow configurator
   return (
-    <Container sx={{ m: 0, p: 0, py: 2, height: 'calc(100% - 64px)', width: '100%' }}>
+    <div className="m-0 p-0 py-4 h-[calc(100%-64px)] w-full">
       {isSaving && (
-        <Alert severity="info" sx={{ mb: 2 }}>
-          Saving workflow to database...
+        <Alert className="mb-4">
+          <AlertDescription>
+            Saving workflow to database...
+          </AlertDescription>
         </Alert>
       )}
       
@@ -147,6 +142,6 @@ export default function WorkflowConfigurePage({ params }: PageProps) {
         onWorkflowDefinitionChange={updateWorkflowDefinition}
         onTemplateLabelChange={updateTemplateLabel}
       />
-    </Container>
+    </div>
   );
 }

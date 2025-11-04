@@ -2,18 +2,9 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  TextField,
-  Popper,
-  ClickAwayListener,
-  MenuList,
-  MenuItem,
-  Paper,
-  InputAdornment,
-  IconButton,
-  PopperProps
-} from '@mui/material';
-import SendIcon from '@mui/icons-material/Send';
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Send } from "lucide-react";
 import { WorkflowAutocompleteItem } from '@/app/types/workflowAutocomplete';
 import { WorkflowDefinition, WorkflowStep } from '../types/workflowTemplate';
 
@@ -460,85 +451,72 @@ export default function SmartAutocomplete({
   // debug: show some key state on render
   console.log('[SmartAutocomplete] render', { open, triggerChar, searchText, filteredCount: filtered.length, anchorEl });
   return (
-    <div>
-      <ClickAwayListener onClickAway={closeSuggestions}>
-        <div style={{ position: 'relative' }}>
-          <TextField
-            autoFocus={autoFocus}
-            inputRef={inputRef as unknown as React.Ref<HTMLTextAreaElement | HTMLInputElement>}
-            value={value}
-            onChange={handleInputChange}
-            slotProps={{
-              input: {
-                onKeyDown: handleKeyDown,
-                endAdornment: (
-                  <InputAdornment position="end" sx={{ alignSelf: 'end' }}>
-                    <IconButton aria-label="send" size='small' onClick={() => { if (typeof handleSendToAime === 'function') handleSendToAime(value ?? ''); }} edge="end">
-                      <SendIcon />
-                    </IconButton>
-                  </InputAdornment>
-                )
-              }
-            }}
-            placeholder={placeholder}
-            multiline
-            minRows={3}
-            maxRows={10}
-            fullWidth
-            variant="outlined"
-            disabled={disabled}
-            sx={{
-              backgroundColor: (disabled) ? 'divider' : 'transparent',
-            }}
-          />
+    <div className="relative">
+      <div className="relative">
+        <Textarea
+          autoFocus={autoFocus}
+          ref={inputRef as unknown as React.Ref<HTMLTextAreaElement>}
+          value={value}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          rows={3}
+          disabled={disabled}
+          className={`w-full resize-y ${disabled ? 'bg-muted' : ''}`}
+        />
+        <Button
+          type="button"
+          size="icon-sm"
+          className="absolute bottom-2 right-2"
+          onClick={() => { if (typeof handleSendToAime === 'function') handleSendToAime(value ?? ''); }}
+          aria-label="send"
+        >
+          <Send className="h-4 w-4" />
+        </Button>
+      </div>
 
-          <Popper
-            {...({
-              open,
-              anchorEl: anchorEl ?? undefined,
-              placement: 'bottom-start',
-              strategy: 'fixed',
-              modifiers: [
-                { name: 'offset', options: { offset: [0, 6] } },
-                { name: 'preventOverflow', options: { boundary: 'viewport' } },
-                { name: 'computeStyles', options: { adaptive: false } }
-              ],
-              style: { zIndex: 1300 }
-            } as PopperProps)}
-          >
-            <Paper style={{ minWidth: 260 }}>
-              <MenuList ref={menuRef}>
-                {filtered.map((item, idx) => (
-                  <MenuItem
-                    key={item.id}
-                    selected={idx === highlightIndex}
-                    onClick={() => insertSuggestion(item)}
-                  >
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <strong>{item.label}</strong>
-                      <small style={{ color: '#666' }}>{item.description}</small>
-                    </div>
-                  </MenuItem>
-                ))}
-              </MenuList>
-            </Paper>
-          </Popper>
-          {/* Temporary visual debug overlay for computed caret rect */}
-          {latestRect && open && (
-            <div style={{
-              position: 'fixed',
-              left: latestRect.left,
-              top: latestRect.top,
-              width: Math.max(8, latestRect.width || 8),
-              height: 8,
-              background: 'rgba(255,0,0,0.25)',
-              border: '1px solid rgba(255,0,0,0.5)',
-              pointerEvents: 'none',
-              zIndex: 99999
-            }} />
-          )}
+      {/* Autocomplete suggestions dropdown */}
+      {open && anchorEl && (
+        <div
+          className="fixed bg-popover border rounded-md shadow-md min-w-[260px] z-[1300]"
+          style={{
+            left: latestRect?.left || 0,
+            top: (latestRect?.top || 0) + (latestRect?.height || 0) + 6,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="py-1" ref={menuRef as React.Ref<HTMLDivElement>}>
+            {filtered.map((item, idx) => (
+              <button
+                key={item.id}
+                className={`w-full text-left px-4 py-2 hover:bg-accent cursor-pointer ${
+                  idx === highlightIndex ? 'bg-accent' : ''
+                }`}
+                onClick={() => insertSuggestion(item)}
+              >
+                <div className="flex flex-col">
+                  <strong className="text-sm">{item.label}</strong>
+                  <small className="text-xs text-muted-foreground">{item.description}</small>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
-      </ClickAwayListener>
+      )}
+
+      {/* Debug overlay for caret position */}
+      {latestRect && open && (
+        <div
+          className="fixed pointer-events-none border border-red-500 bg-red-500/25"
+          style={{
+            left: latestRect.left,
+            top: latestRect.top,
+            width: Math.max(8, latestRect.width || 8),
+            height: 8,
+            zIndex: 99999
+          }}
+        />
+      )}
     </div>
   );
 }
