@@ -37,26 +37,17 @@ This project uses **asdf** to manage the Node.js version automatically. asdf is 
 
 1. **Install asdf (Required)**:
 
-   **macOS (Homebrew - Recommended):**
    ```bash
    # Install asdf
    brew install asdf
    
-   # Add to your shell configuration
-   # For zsh (default on macOS):
+   # Add to your shell configuration (for zsh - default on macOS)
    echo -e "\n. $(brew --prefix asdf)/libexec/asdf.sh" >> ~/.zshrc
    source ~/.zshrc
-   
-   # For bash (if you're using bash instead):
-   # echo -e "\n. $(brew --prefix asdf)/libexec/asdf.sh" >> ~/.bash_profile
-   # source ~/.bash_profile
    
    # Verify installation
    asdf --version
    ```
-   
-   **Linux/Windows (WSL2):**
-   📖 **[Follow the official asdf installation guide](https://asdf-vm.com/guide/getting-started.html#_1-install-asdf)**
 
 2. **Add Node.js Plugin**:
    ```bash
@@ -136,25 +127,13 @@ NEXT_PUBLIC_ENABLE_MOCK_DATA=true
 
 1. **Install MongoDB 5.0**:
    ```bash
-   # macOS (using Homebrew)
    brew tap mongodb/brew
    brew install mongodb-community@5.0
-   
-   # Ubuntu/Debian
-   wget -qO - https://www.mongodb.org/static/pgp/server-5.0.asc | sudo apt-key add -
-   sudo apt-get install -y mongodb-org=5.0.*
-   
-   # Windows: Download from MongoDB website
    ```
 
 2. **Start MongoDB**:
    ```bash
-   # macOS/Linux
    brew services start mongodb/brew/mongodb-community@5.0
-   # or
-   sudo systemctl start mongod
-   
-   # Windows: Start as Windows Service or run mongod.exe
    ```
 
 3. **Set up Database and User**:
@@ -184,16 +163,72 @@ NEXT_PUBLIC_ENABLE_MOCK_DATA=true
 Start the development server:
 
 ```bash
-# Start with Turbopack (recommended)
 npm run dev
-
-# Alternative development commands
-yarn dev
-pnpm dev
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to view the application.
+The app runs on port **3001**.
+
+**Access URLs:**
+- **Development (standalone)**: `http://localhost:3001`
+- **Integrated with Rails (via nginx)**: `http://groupize.local/app/aimeworkflows` (requires nginx setup below)
+
+> **Note**: The app runs at root (`/`) internally. When accessed via nginx proxy, nginx rewrites `/app/aimeworkflows/*` to `/*` before forwarding to Next.js.
+
+### 5. Nginx Proxy Setup (Integration with Rails)
+
+When running alongside the Rails application, use nginx to proxy requests:
+
+#### Setup Steps
+np   
+   ```bash
+   # Copy the configuration file or update existing nginx file to include the configrations
+   sudo cp nginx.conf /usr/local/etc/nginx/servers/groupize.conf
+   
+   # Test configuration and start/restart nginx
+   nginx -t && brew services restart nginx
+   ```
+
+3. **Update your hosts file**:
+   
+   ```bash
+   # Add to /etc/hosts
+   echo "127.0.0.1 groupize.local" | sudo tee -a /etc/hosts
+   ```
+
+4. **Access the application**:
+   
+   - Rails app: `http://groupize.local/`
+   - Next.js Workflows: `http://groupize.local/app/aimeworkflows`
+
+#### URL Structure
+
+The nginx proxy routes and rewrites requests:
+
+- `/app/aimeworkflows/foo` → nginx rewrites to `/foo` → Next.js on port 3001
+- Everything else → Rails app (port 3000)
+
+**Example:**
+```
+User visits: http://groupize.local/app/aimeworkflows/workflows
+nginx rewrites to: /workflows
+Next.js receives: GET /workflows (on port 3001)
+```
+
+This allows for:
+- Next.js runs at root (`/`) internally - no code changes needed
+- nginx handles the `/app/aimeworkflows` prefix externally
+- Shared authentication/session via cookies
+- Seamless navigation between Rails and Next.js
+- Future micro-apps at `/app/approvals`, `/app/analytics`, etc.
+
+> **TODO**: When ready, add `basePath: '/app/aimeworkflows'` to `next.config.ts` and update all internal routes. This requires coordinating with the team since it's a breaking change for all Links, routes, and API calls.
+
+#### Development Workflow
+
+1. Start Rails: `cd /path/to/reg_app && rails s` (runs on port 3000)
+2. Start Next.js: `cd /path/to/Workflows && npm run dev` (runs on port 3001)
+3. Start nginx: `brew services start nginx`
+4. Access via: `http://groupize.local/app/aimeworkflows`
 
 ## 🧪 Testing
 
