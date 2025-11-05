@@ -17,10 +17,67 @@ A Next.js 15+ embeddable frontend application for workflow automation with AI-po
 
 ### Prerequisites
 
-- **Node.js 18+** (recommended: Node.js 20)
+- **asdf** - Version manager for Node.js (see setup below)
+- **Node.js 18+** (recommended: Node.js 20) - managed via asdf
 - **npm** (comes with Node.js)
 - **MongoDB 5.0** for local development
 - **Git** for version control
+
+### 0. Install asdf Version Manager and Node.js
+
+This project uses **asdf** to manage the Node.js version automatically. asdf is a version manager that allows you to manage multiple runtime versions with a single CLI tool.
+
+#### Why asdf?
+
+- **Consistent environments** across all developers and CI/CD
+- **Automatic version switching** when entering the project directory
+- **Single tool** for managing multiple languages (Node.js, Python, Ruby, etc.)
+
+#### Setup Steps
+
+1. **Install asdf (Required)**:
+
+   **macOS (Homebrew - Recommended):**
+   ```bash
+   # Install asdf
+   brew install asdf
+   
+   # Add to your shell configuration
+   # For zsh (default on macOS):
+   echo -e "\n. $(brew --prefix asdf)/libexec/asdf.sh" >> ~/.zshrc
+   source ~/.zshrc
+   
+   # For bash (if you're using bash instead):
+   # echo -e "\n. $(brew --prefix asdf)/libexec/asdf.sh" >> ~/.bash_profile
+   # source ~/.bash_profile
+   
+   # Verify installation
+   asdf --version
+   ```
+   
+   **Linux/Windows (WSL2):**
+   📖 **[Follow the official asdf installation guide](https://asdf-vm.com/guide/getting-started.html#_1-install-asdf)**
+
+2. **Add Node.js Plugin**:
+   ```bash
+   asdf plugin add nodejs https://github.com/asdf-vm/asdf-nodejs.git
+   ```
+
+3. **Install Node.js** (run from project directory):
+   ```bash
+   cd groupize-workflows
+   asdf install  # Installs Node.js 20.10.0 from .tool-versions
+   ```
+
+4. **Verify Installation**:
+   ```bash
+   node --version  # Should show v20.10.0
+   npm --version   # Should show npm version bundled with Node.js 20.10.0
+   ```
+
+**How it works**: The `.tool-versions` file in the project root specifies Node.js 20.10.0. When you're in this directory, asdf automatically uses this version. When you leave the directory, it switches back to whatever version is configured for that location.
+
+> **Note**: We recommend NOT setting a global Node.js version with `asdf global`, as different projects may require different versions. Let asdf manage versions per-project automatically.
 
 ### 1. Clone and Install Dependencies
 
@@ -227,224 +284,6 @@ async function example() {
 4. Ensure responsiveness (phone, tablet, desktop)
 5. Write comprehensive tests
 
-## � Docker Deployment
-
-### Prerequisites
-
-- Docker Desktop installed and running
-- `.env.local` file configured in project root (required for build)
-
-### Build Docker Image
-
-```bash
-# Build the Docker image
-npm run docker-build
-
-# Or build manually
-docker build -t groupize-workflows:latest .
-```
-
-The build process:
-- Uses Node.js 22 Alpine (minimal footprint)
-- Installs dependencies with npm
-- Embeds `.env.local` file in the image
-- Creates optimized production build with Next.js standalone output
-- Runs as non-root user for security
-- Final image size: ~521MB
-
-### Run Docker Container
-
-```bash
-# Run container (detached mode, port 3000)
-docker run -d -p 3000:3000 --name groupize-workflows-container groupize-workflows:latest
-
-# Run with custom name and port mapping
-docker run -d -p 8080:3000 --name my-workflow-app groupize-workflows:latest
-
-# Run in foreground (see logs in terminal)
-docker run -p 3000:3000 --name groupize-workflows-container groupize-workflows:latest
-
-# Run with environment variable overrides
-docker run -d -p 3000:3000 \
-  -e NODE_ENV=production \
-  -e DATABASE_ENVIRONMENT=documentdb \
-  --name groupize-workflows-container \
-  groupize-workflows:latest
-```
-
-### Manage Running Container
-
-```bash
-# View running containers
-docker ps
-
-# View all containers (including stopped)
-docker ps -a
-
-# View container logs
-docker logs groupize-workflows-container
-
-# Follow logs in real-time
-docker logs -f groupize-workflows-container
-
-# Stop container
-docker stop groupize-workflows-container
-
-# Start stopped container
-docker start groupize-workflows-container
-
-# Restart container
-docker restart groupize-workflows-container
-
-# Remove container (must be stopped first)
-docker stop groupize-workflows-container
-docker rm groupize-workflows-container
-
-# Remove container forcefully
-docker rm -f groupize-workflows-container
-```
-
-### Test Docker Container
-
-```bash
-# Test health endpoint
-curl http://localhost:3000/api/health
-
-# Expected response:
-# {
-#   "status": "ok",
-#   "timestamp": "2025-10-30T15:35:34.289Z",
-#   "environment": "production"
-# }
-
-# Check container health status
-docker inspect --format='{{.State.Health.Status}}' groupize-workflows-container
-
-# Open in browser
-open http://localhost:3000
-```
-
-### Export Docker Image
-
-If you need to share or backup the Docker image:
-
-```bash
-# Export image as tar file
-docker save -o groupize-workflows.tar groupize-workflows:latest
-
-# Export and compress (recommended for sharing)
-docker save groupize-workflows:latest | gzip > groupize-workflows.tar.gz
-
-# Load image from tar file (on another machine)
-docker load -i groupize-workflows.tar
-
-# Or load from compressed file
-gunzip -c groupize-workflows.tar.gz | docker load
-```
-
-### Push to Docker Registry
-
-```bash
-# Tag image for Docker Hub
-docker tag groupize-workflows:latest yourusername/groupize-workflows:latest
-docker tag groupize-workflows:latest yourusername/groupize-workflows:v1.0.0
-
-# Login to Docker Hub
-docker login
-
-# Push to Docker Hub
-docker push yourusername/groupize-workflows:latest
-docker push yourusername/groupize-workflows:v1.0.0
-
-# Tag for private registry (e.g., AWS ECR, Google GCR)
-docker tag groupize-workflows:latest registry.example.com/groupize-workflows:latest
-
-# Push to private registry
-docker push registry.example.com/groupize-workflows:latest
-```
-
-### Docker Compose (Optional)
-
-For easier multi-container deployment, create a `docker-compose.yml`:
-
-```yaml
-version: '3.8'
-
-services:
-  app:
-    image: groupize-workflows:latest
-    container_name: groupize-workflows
-    ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=production
-      - DATABASE_ENVIRONMENT=local
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-  mongodb:
-    image: mongo:5.0
-    container_name: groupize-mongodb
-    ports:
-      - "27017:27017"
-    environment:
-      - MONGO_INITDB_ROOT_USERNAME=admin
-      - MONGO_INITDB_ROOT_PASSWORD=password
-      - MONGO_INITDB_DATABASE=groupize-workflows
-    volumes:
-      - mongodb_data:/data/db
-    restart: unless-stopped
-
-volumes:
-  mongodb_data:
-```
-
-Then run:
-
-```bash
-# Start all services
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop all services
-docker-compose down
-
-# Stop and remove volumes
-docker-compose down -v
-```
-
-### Troubleshooting Docker
-
-```bash
-# View Docker images
-docker images
-
-# Remove old images
-docker image prune -a
-
-# View container resource usage
-docker stats groupize-workflows-container
-
-# Execute command inside running container
-docker exec -it groupize-workflows-container sh
-
-# View container configuration
-docker inspect groupize-workflows-container
-
-# Check Docker disk usage
-docker system df
-
-# Clean up unused resources
-docker system prune -a
-```
-
 ## 🚀 Production Deployment
 
 ### AWS DocumentDB Setup
@@ -452,25 +291,24 @@ docker system prune -a
 For production, the application uses AWS DocumentDB:
 
 ```bash
-# Update environment variables in .env.local before building Docker image
+# Update environment variables
 DATABASE_ENVIRONMENT=documentdb
-DOCUMENTDB_URI=mongodb://username:password@your-cluster.cluster-xyz.us-east-1.docdb.amazonaws.com:27017/groupize-workflows?ssl=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false
+DOCUMENTDB_HOST=your-cluster.cluster-xyz.us-east-1.docdb.amazonaws.com
+DOCUMENTDB_USER=your-username
+DOCUMENTDB_PASSWORD=your-password
 ```
 
 ### Build Commands
 
 ```bash
-# Production build (local)
+# Production build
 npm run build
 
-# Start production server (local)
+# Start production server
 npm start
 
 # Lint code
 npm run lint
-
-# Build Docker image for production
-npm run docker-build
 ```
 
 ## 📚 Documentation
@@ -485,22 +323,40 @@ npm run docker-build
 
 ### Common Issues
 
-1. **Dependency Conflicts**:
+1. **Node.js Version Issues**:
+   ```bash
+   # Ensure asdf is properly installed
+   asdf --version
+   
+   # Check if Node.js plugin is installed
+   asdf plugin list
+   
+   # Reinstall the correct Node.js version
+   asdf install nodejs 20.10.0
+   
+   # Verify the version in the project directory
+   cd groupize-workflows
+   node --version  # Should show v20.10.0
+   ```
+   
+   For more help, see the [asdf troubleshooting guide](https://asdf-vm.com/guide/getting-started.html)
+
+2. **Dependency Conflicts**:
    ```bash
    rm -rf node_modules package-lock.json
    npm install --legacy-peer-deps
    ```
 
-2. **MongoDB Connection Issues**:
+3. **MongoDB Connection Issues**:
    - Ensure MongoDB is running: `brew services start mongodb-community@5.0`
    - Check connection string in `.env.local`
    - Verify user credentials: `mongosh "mongodb://groupize_app:gr0up!zeapP@localhost:27017/groupize-workflows"`
 
-3. **Test Failures**:
+4. **Test Failures**:
    - Ensure all environment variables are set
    - Run tests with: `npm test -- --verbose`
 
-4. **Build Issues**:
+5. **Build Issues**:
    - Clear Next.js cache: `rm -rf .next`
    - Rebuild: `npm run build`
 
@@ -535,3 +391,4 @@ DATABASE_ENVIRONMENT=documentdb
 - [MongoDB Documentation](https://docs.mongodb.com/)
 - [TypeScript Documentation](https://www.typescriptlang.org/docs/)
 - [Jest Testing Framework](https://jestjs.io/docs/getting-started)
+- [asdf Documentation](https://asdf-vm.com/)
