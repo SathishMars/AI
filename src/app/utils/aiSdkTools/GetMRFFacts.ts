@@ -1,6 +1,7 @@
 // Tool: getMRFFacts
+// AI SDK (Vercel) compatible tool definition
 
-import { tool } from '@openai/agents';
+import { tool } from 'ai';
 import { z } from 'zod';
 
 export interface ListOfMRFFactsInput {
@@ -25,6 +26,7 @@ export const getListOfMRFFacts = async (
 ): Promise<ListOfMRFFactsOutput> => {
     const { account, organization, mrfTemplateId } = input;
     console.log('[GetMRFFacts] Fetching MRF facts for account:', account, 'organization:', organization, 'mrfTemplateId:', mrfTemplateId);
+    
     // Defensive: ensure account present
     if (!account || typeof account !== 'string') {
         throw new Error('account is required and must be a string');
@@ -50,6 +52,7 @@ export const getListOfMRFFacts = async (
         { id: 'requestorUserId', label: 'Requestor User ID', description: 'The user ID of the person requesting the MRF' },
         { id: 'isUrgent', label: 'Urgent', description: 'If this is an expedited request' },
     ];
+    
     console.log('[GetMRFFacts] returning the list of MRF facts.', facts.length);
     return { facts };
 };
@@ -60,39 +63,50 @@ const getListOfMRFFactsSchema = z.object({
     account: z.string().min(1).describe('Account identifier (required)'),
     // organization may be omitted, null, or a non-empty string
     organization: nonEmptyStringOrNull.optional().nullable().describe('Organization identifier (optional)'),
+    mrfTemplateId: z.string().min(1).describe('MRF template identifier (required)'),
 });
 
-const listToolFunc = async (input: unknown) => {
-    // The tool expects a JSON object (not a raw string or array) with the shape:
-    // { account: string, organization?: string | null, mrfTemplateId: string }
-    // We validate using Zod and re-throw a normalized error message so callers (and the LLM)
-    // can clearly see what was wrong with the input.
-    try {
-        const parsedInput = getListOfMRFFactsSchema.parse(input);
-        return await getListOfMRFFacts(parsedInput as ListOfMRFFactsInput);
-    } catch (err) {
-        // Zod throws a ZodError with `issues` array; normalize into a readable message
-        if (err && typeof err === 'object' && 'issues' in err) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const zerr: any = err;
-            const details = zerr.issues ? JSON.stringify(zerr.issues) : String(err);
-            throw new Error(`getListOfMRFFacts: invalid input - ${zerr.message || String(err)}; validationIssues=${details}`);
-        }
-        throw err;
-    }
-};
-
-export const GetMRFFactsTool = tool({
-    name: 'getMRFFacts',
-    // A clear description for LLMs: explain inputs, behaviour, and output schema.
+/**
+ * AI SDK tool for retrieving MRF facts
+ * Compatible with Vercel AI SDK (ai package v5.x)
+ * 
+ * Tool definition using the `tool` function from the 'ai' package.
+ * Can be used with Agent class or directly with generateText, streamText, etc.
+ * 
+ * Usage example with Agent:
+ * ```typescript
+ * import { Experimental_Agent as Agent } from 'ai';
+ * import { getMrfFactsTool } from './aiSdkTools/GetMRFFacts';
+ * 
+ * const myAgent = new Agent({
+ *   model: 'openai/gpt-4o',
+ *   tools: { getMRFFacts: getMrfFactsTool }
+ * });
+ * 
+ * const result = await myAgent.generate({
+ *   prompt: 'Get MRF facts for account xyz and template abc'
+ * });
+ * ```
+ */
+export const getMrfFactsTool = tool({
     description:
-        'Returns a structured object containing published MRF facts for a given account and optional organization. IMPORTANT: this tool expects an OBJECT input (not a raw string) and returns an OBJECT (not a JSON-string).\n' +
-        'Input (OBJECT): { account: string, organization?: string | null, mrfTemplateId: string }\n' +
-        'Output (OBJECT): { facts: [{ id: string, label: string, description?: string | null }] }\n' +
-        'Error behaviour: If the input is invalid the tool will throw a validation error. The error message will include "getListOfMRFFacts: invalid input" and a validationIssues field describing what failed.\n' +
-        'Notes: Use this tool to discover available facts available in the selected MRF template.',
-
-    parameters: getListOfMRFFactsSchema,
-    execute: listToolFunc,
-    strict: true
+        'Returns a structured object containing published MRF facts for a given account and optional organization. ' +
+        'This tool expects an object input with account (required), mrfTemplateId (required), and organization (optional). ' +
+        'Returns an object with a facts array containing MRF fact details. ' +
+        'Use this tool to discover available facts in the selected MRF template.',
+    
+    inputSchema: getListOfMRFFactsSchema,
+    
+    execute: async ({ account, organization, mrfTemplateId }) => {
+        try {
+            const result = await getListOfMRFFacts({ account, organization, mrfTemplateId });
+            return result;
+        } catch (err) {
+            // Provide clear error messages for debugging
+            if (err instanceof Error) {
+                throw new Error(`getListOfMRFFacts: ${err.message}`);
+            }
+            throw new Error(`getListOfMRFFacts: unexpected error - ${String(err)}`);
+        }
+    },
 });

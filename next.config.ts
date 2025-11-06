@@ -2,8 +2,8 @@ import type { NextConfig } from "next";
 
 
 const nextConfig: NextConfig = {
-  output: 'standalone', // this for the creation of a docker image
-  basePath: '', // Set your desired base path here oif you want to change from default
+  // output: 'standalone', // this for the creation of a docker image
+  basePath: '/aime', // Set your desired base path here oif you want to change from default
   /* config options here */
   typescript: {
     // !! WARN !!

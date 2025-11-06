@@ -2,22 +2,12 @@
 'use client';
 
 import React from 'react';
-import {
-  AppBar,
-  Toolbar,
-  Typography,
-  Box,
-  Container,
-  Chip,
-  Skeleton,
-  Avatar
-} from '@mui/material';
-import {
-  Business as BusinessIcon,
-  AccountCircle as AccountIcon
-} from '@mui/icons-material';
-import ThemeToggle from './ThemeToggle';
+import { Building2, User } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Separator } from '@/components/ui/separator';
 import { useUnifiedUserContext } from '@/app/contexts/UnifiedUserContext';
+import { ThemeToggle } from './ThemeToggle';
 
 interface TopNavigationProps {
   title?: string;
@@ -27,105 +17,57 @@ export default function TopNavigation({ title = "Groupize Workflows" }: TopNavig
   const { user, account, currentOrganization, isLoading, displayName } = useUnifiedUserContext();
 
   return (
-    <AppBar 
-      position="static" 
-      elevation={1}
-      sx={{
-        backgroundColor: 'background.paper',
-        color: 'text.primary',
-        borderBottom: 1,
-        borderColor: 'divider'
-      }}
-    >
-      <Container maxWidth="xl">
-        <Toolbar sx={{ px: { xs: 0 } }}>
-          <Typography 
-            variant="h6" 
-            component="div" 
-            sx={{ 
-              fontWeight: 600,
-              color: 'primary.main',
-              mr: 2
-            }}
-          >
-            {title}
-          </Typography>
-          
-          {/* Account and Organization Display */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexGrow: 1 }}>
-            {isLoading ? (
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <Skeleton variant="rectangular" width={100} height={24} sx={{ borderRadius: 1 }} />
-                <Skeleton variant="rectangular" width={120} height={24} sx={{ borderRadius: 1 }} />
-              </Box>
-            ) : (
-              <>
-                {account && (
-                  <Chip
-                    icon={<AccountIcon />}
-                    label={account.name}
-                    size="small"
-                    variant="outlined"
-                    sx={{ 
-                      fontSize: '0.75rem',
-                      height: 28,
-                      '& .MuiChip-icon': { fontSize: '1rem' }
-                    }}
-                  />
-                )}
-                {currentOrganization && (
-                  <Chip
-                    icon={<BusinessIcon />}
-                    label={currentOrganization.name}
-                    size="small"
-                    color="primary"
-                    variant="filled"
-                    sx={{ 
-                      fontSize: '0.75rem',
-                      height: 28,
-                      '& .MuiChip-icon': { fontSize: '1rem', color: 'inherit' }
-                    }}
-                  />
-                )}
-              </>
-            )}
-          </Box>
-          
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            {/* User Display */}
-            {isLoading ? (
-              <Skeleton variant="circular" width={32} height={32} />
-            ) : user ? (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography 
-                  variant="body2" 
-                  sx={{ 
-                    color: 'text.secondary',
-                    display: { xs: 'none', sm: 'block' },
-                    fontWeight: 500
-                  }}
-                >
-                  {displayName}
-                </Typography>
-                <Avatar 
-                  src={user.profile.avatar}
-                  alt={displayName}
-                  sx={{ 
-                    width: 32, 
-                    height: 32,
-                    fontSize: '0.875rem',
-                    bgcolor: 'primary.main'
-                  }}
-                >
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur">
+      <div className="flex h-14 items-center px-4">
+        <h1 className="text-lg font-semibold mr-4">
+          {title}
+        </h1>
+        
+        <div className="flex items-center gap-2 flex-1">
+          {isLoading ? (
+            <div className="flex gap-2">
+              <div className="h-6 w-24 animate-pulse rounded bg-muted" />
+              <div className="h-6 w-28 animate-pulse rounded bg-muted" />
+            </div>
+          ) : (
+            <>
+              {account && (
+                <Badge className="glass">
+                  <User className="h-3 w-3" />
+                  {account.name}
+                </Badge>
+              )}
+              {currentOrganization && (
+                <Badge className="glass">
+                  <Building2 className="h-3 w-3" />
+                  {currentOrganization.name}
+                </Badge>
+              )}
+            </>
+          )}
+        </div>
+        
+        <div className="flex items-center gap-2">
+          {isLoading ? (
+            <div className="h-8 w-8 animate-pulse rounded-full bg-muted" />
+          ) : user ? (
+            <div className="flex items-center gap-2">
+              <span className="hidden sm:block text-sm">
+                {displayName}
+              </span>
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={user.profile.avatar} alt={displayName} />
+                <AvatarFallback>
                   {user.profile.firstName[0]}{user.profile.lastName[0]}
-                </Avatar>
-              </Box>
-            ) : null}
-            
-            <ThemeToggle />
-          </Box>
-        </Toolbar>
-      </Container>
-    </AppBar>
+                </AvatarFallback>
+              </Avatar>
+            </div>
+          ) : null}
+          
+          <Separator orientation="vertical" className="h-6" />
+          <ThemeToggle />
+        </div>
+      </div>
+    </header>
   );
 }

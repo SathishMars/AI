@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { WorkflowStep } from "../types/workflowTemplate";
-import { Box, Button, TextField, Typography } from "@mui/material";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface WorkflowStepNotifyProps {
     step: WorkflowStep | null | undefined;
@@ -85,49 +87,60 @@ export default function WorkflowStepNotify({
 
 
     return (
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }} onClick={(e) => e.stopPropagation()}>
-            <TextField
-                label="Label"
-                size="small"
-                value={formData.label}
-                onChange={(e) => setFormData((prev) => (prev ? { ...prev, label: e.target.value } : null))}
-            />
+        <div className="flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
+            <div className="space-y-2">
+                <Label htmlFor="label">Label</Label>
+                <Input
+                    id="label"
+                    value={formData.label}
+                    onChange={(e) => setFormData((prev) => (prev ? { ...prev, label: e.target.value } : null))}
+                />
+            </div>
 
-            <TextField
-                label="To"
-                value={formData.to}
-                onChange={(e) => setFormData((prev) => (prev ? { ...prev, to: e.target.value } : null))}
-                helperText="Edit JSON params for the trigger."
-            />
+            <div className="space-y-2">
+                <Label htmlFor="to">To</Label>
+                <Input
+                    id="to"
+                    value={formData.to}
+                    onChange={(e) => setFormData((prev) => (prev ? { ...prev, to: e.target.value } : null))}
+                />
+                <p className="text-xs text-muted-foreground">Edit JSON params for the trigger.</p>
+            </div>
 
-            <TextField
-                label="Subject"
-                value={formData.subject}
-                onChange={(e) => setFormData((prev) => (prev ? { ...prev, subject: e.target.value } : null))}
-                helperText="Edit JSON params for the trigger."
-            />
+            <div className="space-y-2">
+                <Label htmlFor="subject">Subject</Label>
+                <Input
+                    id="subject"
+                    value={formData.subject}
+                    onChange={(e) => setFormData((prev) => (prev ? { ...prev, subject: e.target.value } : null))}
+                />
+                <p className="text-xs text-muted-foreground">Edit JSON params for the trigger.</p>
+            </div>
 
-            <TextField
-                label="Notification Template Name"
-                value={formData.notificationTemplateId}
-                onChange={(e) => setFormData((prev) => (prev ? { ...prev, notificationTemplateId: e.target.value } : null))}
-                helperText="Edit JSON params for the trigger."
-            />
+            <div className="space-y-2">
+                <Label htmlFor="template">Notification Template Name</Label>
+                <Input
+                    id="template"
+                    value={formData.notificationTemplateId}
+                    onChange={(e) => setFormData((prev) => (prev ? { ...prev, notificationTemplateId: e.target.value } : null))}
+                />
+                <p className="text-xs text-muted-foreground">Edit JSON params for the trigger.</p>
+            </div>
 
             {error && (
-                <Typography color="error" variant="body2">
+                <p className="text-sm text-destructive">
                     {error}
-                </Typography>
+                </p>
             )}
 
-            <Box sx={{ display: "flex", gap: 1 }}>
-                <Button variant="contained" color="primary" onClick={handleSave} size="small">
+            <div className="flex gap-2">
+                <Button onClick={handleSave} size="sm">
                     Save
                 </Button>
-                <Button variant="outlined" onClick={handleCancel} size="small">
+                <Button variant="outline" onClick={handleCancel} size="sm">
                     Cancel
                 </Button>
-            </Box>
-        </Box>
+            </div>
+        </div>
     );
 }

@@ -1,6 +1,7 @@
 // Tool: getRequestFacts
+// AI SDK (Vercel) compatible tool definition
 
-import { tool } from '@openai/agents';
+import { tool } from 'ai';
 import { z } from 'zod';
 
 export interface ListOfRequestFactsInput {
@@ -25,6 +26,7 @@ export const getListOfRequestFacts = async (
 ): Promise<ListOfRequestFactsOutput> => {
     const { account, organization, requestTemplateId } = input;
     console.log('[GetListOfRequestFacts] Fetching request facts for account:', account, 'organization:', organization, 'requestTemplateId:', requestTemplateId);
+    
     // Defensive: ensure account present
     if (!account || typeof account !== 'string') {
         throw new Error('account is required and must be a string');
@@ -46,6 +48,7 @@ export const getListOfRequestFacts = async (
         { id: 'requestorUserId', label: 'Requestor User ID', description: 'The user ID of the person requesting the MRF' },
         { id: 'isUrgent', label: 'Urgent', description: 'If this is an expedited request' },
     ];
+    
     console.log('[GetListOfRequestFacts] returning the list of request facts.', facts.length);
     return { facts };
 };
@@ -56,39 +59,50 @@ const getListOfRequestFactsSchema = z.object({
     account: z.string().min(1).describe('Account identifier (required)'),
     // organization may be omitted, null, or a non-empty string
     organization: nonEmptyStringOrNull.optional().nullable().describe('Organization identifier (optional)'),
+    requestTemplateId: z.string().min(1).describe('Request template identifier (required)'),
 });
 
-const listToolFunc = async (input: unknown) => {
-    // The tool expects a JSON object (not a raw string or array) with the shape:
-    // { account: string, organization?: string | null, requestTemplateId: string }
-    // We validate using Zod and re-throw a normalized error message so callers (and the LLM)
-    // can clearly see what was wrong with the input.
-    try {
-        const parsedInput = getListOfRequestFactsSchema.parse(input);
-        return await getListOfRequestFacts(parsedInput as ListOfRequestFactsInput);
-    } catch (err) {
-        // Zod throws a ZodError with `issues` array; normalize into a readable message
-        if (err && typeof err === 'object' && 'issues' in err) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const zerr: any = err;
-            const details = zerr.issues ? JSON.stringify(zerr.issues) : String(err);
-            throw new Error(`getListOfRequestFacts: invalid input - ${zerr.message || String(err)}; validationIssues=${details}`);
-        }
-        throw err;
-    }
-};
-
-export const GetRequestFactsTool = tool({
-    name: 'getRequestFacts',
-    // A clear description for LLMs: explain inputs, behaviour, and output schema.
+/**
+ * AI SDK tool for retrieving request facts
+ * Compatible with Vercel AI SDK (ai package v5.x)
+ * 
+ * Tool definition using the `tool` function from the 'ai' package.
+ * Can be used with Agent class or directly with generateText, streamText, etc.
+ * 
+ * Usage example with Agent:
+ * ```typescript
+ * import { Experimental_Agent as Agent } from 'ai';
+ * import { getRequestFactsTool } from './aiSdkTools/GetRequestFacts';
+ * 
+ * const myAgent = new Agent({
+ *   model: 'openai/gpt-4o',
+ *   tools: { getRequestFacts: getRequestFactsTool }
+ * });
+ * 
+ * const result = await myAgent.generate({
+ *   prompt: 'Get request facts for account xyz and template abc'
+ * });
+ * ```
+ */
+export const getRequestFactsTool = tool({
     description:
-        'Returns a structured object containing published request facts for a given account and optional organization. IMPORTANT: this tool expects an OBJECT input (not a raw string) and returns an OBJECT (not a JSON-string).\n' +
-        'Input (OBJECT): { account: string, organization?: string | null, requestTemplateId: string }\n' +
-        'Output (OBJECT): { facts: [{ id: string, label: string, description?: string | null }] }\n' +
-        'Error behaviour: If the input is invalid the tool will throw a validation error. The error message will include "getListOfRequestFacts: invalid input" and a validationIssues field describing what failed.\n' +
-        'Notes: Use this tool to discover available facts available in the selected request template.',
-
-    parameters: getListOfRequestFactsSchema,
-    execute: listToolFunc,
-    strict: true
+        'Returns a structured object containing published request facts for a given account and optional organization. ' +
+        'This tool expects an object input with account (required), requestTemplateId (required), and organization (optional). ' +
+        'Returns an object with a facts array containing request fact details. ' +
+        'Use this tool to discover available facts in the selected request template.',
+    
+    inputSchema: getListOfRequestFactsSchema,
+    
+    execute: async ({ account, organization, requestTemplateId }) => {
+        try {
+            const result = await getListOfRequestFacts({ account, organization, requestTemplateId });
+            return result;
+        } catch (err) {
+            // Provide clear error messages for debugging
+            if (err instanceof Error) {
+                throw new Error(`getListOfRequestFacts: ${err.message}`);
+            }
+            throw new Error(`getListOfRequestFacts: unexpected error - ${String(err)}`);
+        }
+    },
 });

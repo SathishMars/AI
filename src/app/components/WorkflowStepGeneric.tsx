@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { WorkflowStep } from "../types/workflowTemplate";
-import { Box, Button, TextField, Typography } from "@mui/material";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface WorkflowStepTriggerProps {
   step: WorkflowStep | null | undefined;
@@ -69,28 +71,30 @@ export default function WorkflowStepTrigger({
   
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 2}} onClick={(e) => e.stopPropagation()}>
-      <TextField
-        label="Label"
-        size="small"
-        value={formData.label as string}
-        onChange={(e) => setFormData((prev) => (prev ? { ...prev, label: e.target.value } : null))}
-      />
+    <div className="flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
+      <div className="space-y-2">
+        <Label htmlFor="label">Label</Label>
+        <Input
+          id="label"
+          value={formData.label as string}
+          onChange={(e) => setFormData((prev) => (prev ? { ...prev, label: e.target.value } : null))}
+        />
+      </div>
 
       {error && (
-        <Typography color="error" variant="body2">
+        <p className="text-sm text-destructive">
           {error}
-        </Typography>
+        </p>
       )}
 
-      <Box sx={{ display: "flex", gap: 1 }}>
-        <Button variant="contained" color="primary" onClick={handleSave} size="small">
+      <div className="flex gap-2">
+        <Button onClick={handleSave} size="sm">
           Save
         </Button>
-        <Button variant="outlined" onClick={handleCancel} size="small">
+        <Button variant="outline" onClick={handleCancel} size="sm">
           Cancel
         </Button>
-      </Box>
-    </Box>
+      </div>
+    </div>
   );
 }

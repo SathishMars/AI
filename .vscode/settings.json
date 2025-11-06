@@ -1,0 +1,11 @@
+{
+  "css.lint.unknownAtRules": "ignore",
+  "scss.lint.unknownAtRules": "ignore",
+  "[markdown]": {
+    "editor.wordWrap": "on",
+    "files.trimTrailingWhitespace": false
+  },
+  "markdown.validate.enabled": false,
+  "markdown.validate.referenceLinks.enabled": "ignore",
+  "markdown.validate.fragmentLinks.enabled": "ignore"
+}
