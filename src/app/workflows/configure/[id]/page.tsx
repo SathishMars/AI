@@ -124,7 +124,7 @@ export default function WorkflowConfigurePage({ params }: PageProps) {
 
   // Main workflow configurator
   return (
-    <div className="m-0 p-0 py-4 h-[calc(100%-64px)] w-full">
+    <div className="m-0 p-0 h-full w-full">
       {isSaving && (
         <Alert className="mb-4">
           <AlertDescription>

@@ -50,8 +50,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${openSans.variable} ${roboto.variable} ${lato.variable} font-sans`}>
-      <body>
+    <html lang="en" suppressHydrationWarning className={`${openSans.variable} ${roboto.variable} ${lato.variable} font-sans h-full`}>
+      <body className="w-full h-full min-h-screen">
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -61,7 +61,9 @@ export default function RootLayout({
         >
           <UnifiedUserProvider>
             <TopNavigation />
+            <div className="w-full h-[calc(100vh-64px)]">
             {children}
+            </div>
           </UnifiedUserProvider>
         </ThemeProvider>
         {/* Hidden SVG filter that creates a subtle liquid distortion */}
@@ -72,12 +74,7 @@ export default function RootLayout({
                 feTurbulence generates a noise pattern, which is crucial for a "liquid" or dynamic look.
                 baseFrequency controls the size and detail of the noise.
               */}
-              <feTurbulence
-                type="turbulence"
-                baseFrequency="0.05"
-                numOctaves="2"
-                result="turbulence"
-              />
+              <feTurbulence type="turbulence" baseFrequency="0.05" numOctaves="2" result="turbulence" />
 
               {/* 
                 feDisplacementMap uses the turbulence to shift pixels of the background content (SourceGraphic).
@@ -85,14 +82,7 @@ export default function RootLayout({
                 R channel of the turbulence map moves pixels horizontally (xChannelSelector="R").
                 G channel moves pixels vertically (yChannelSelector="G").
               */}
-              <feDisplacementMap
-                in="SourceGraphic"
-                in2="turbulence"
-                scale="20"
-                xChannelSelector="R"
-                yChannelSelector="G"
-                result="displaced"
-              />
+              <feDisplacementMap in="SourceGraphic" in2="turbulence" scale="10" xChannelSelector="R" yChannelSelector="G" result="displaced" />
             </filter>
           </defs>
         </svg>

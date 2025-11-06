@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { WorkflowDefinition, WorkflowTemplate } from '@/app/types/workflowTemplate';
 import VisualizationPane from './VisualizationPane';
-import WorkflowTemplateSelector, {workflowTemplateSelectorMenuItem} from './WorkflowTemplateSelector';
+import WorkflowTemplateSelector, { workflowTemplateSelectorMenuItem } from './WorkflowTemplateSelector';
 import WorkflowTemplateNameDialog from './WorkflowTemplateNameDialog';
 import AimeWorkflowPane from './AimeWorkflowPane';
 import { WorkflowMessage } from '../types/aimeWorkflowMessages';
@@ -81,7 +81,7 @@ export default function ResponsiveWorkflowConfigurator({
   const [showFullVisualization, setShowFullVisualization] = useState(false);
   const [showRawJSON, setShowRawJSON] = useState(false);
   const [activeTab, setActiveTab] = useState('aime'); // For mobile tab navigation
-  const [conversationPaneWidth, setConversationPaneWidth] = useState(400); // Default 400px
+  const [aimePanelWidth, setAimePanelWidth] = useState(400); // Default 400px
   const [isDragging, setIsDragging] = useState(false); // For resizable divider
 
   // Template naming state
@@ -112,8 +112,8 @@ export default function ResponsiveWorkflowConfigurator({
   const dividerRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const MIN_CONVERSATION_WIDTH = 500;
-  const MAX_CONVERSATION_WIDTH_PERCENT = 0.5; // 50% of container width
+  const MIN_AIME_WIDTH = 400;
+  const MAX_AIME_WIDTH_PERCENT = 0.5; // 50% of container width
 
 
   // Resizable divider logic
@@ -125,15 +125,17 @@ export default function ResponsiveWorkflowConfigurator({
       if (!containerRef.current) return;
 
       const containerRect = containerRef.current.getBoundingClientRect();
-      const newWidth = e.clientX - containerRect.left;
-      const maxWidth = containerRect.width * MAX_CONVERSATION_WIDTH_PERCENT;
+      const newWidth = containerRect.right - e.clientX;
+      const maxWidth = containerRect.width * MAX_AIME_WIDTH_PERCENT;
+
+      // console.log('New width:', newWidth, 'Max width:', maxWidth);
 
       const clampedWidth = Math.max(
-        MIN_CONVERSATION_WIDTH,
+        MIN_AIME_WIDTH,
         Math.min(newWidth, maxWidth)
       );
 
-      setConversationPaneWidth(clampedWidth);
+      setAimePanelWidth(clampedWidth);
     };
 
     const handleMouseUp = () => {
@@ -284,13 +286,12 @@ export default function ResponsiveWorkflowConfigurator({
     <div
       ref={dividerRef}
       className={cn(
-        "w-1 cursor-col-resize relative flex items-center justify-center min-h-full",
+        "relative flex items-center justify-center min-h-full",
         "transition-colors duration-200",
-        isDragging ? "bg-primary/30" : "bg-border hover:bg-primary/30"
+        // isDragging ? "bg-primary/30" : "bg-border hover:bg-primary/30"
       )}
-      onMouseDown={handleMouseDown}
     >
-      <DragIcon className="h-4 w-4 text-muted-foreground" />
+      <DragIcon className="h-4 w-4 cursor-col-resize text-muted-foreground" onMouseDown={handleMouseDown} />
     </div>
   );
 
@@ -323,7 +324,7 @@ export default function ResponsiveWorkflowConfigurator({
   }
 
   return (
-    <div className="h-full w-full p-0 m-0">
+    <div className="h-full w-full p-0 m-0 flex flex-col items-stretch bg-border">
       {renderToolbar()}
 
       {/* Mobile Layout */}
@@ -348,16 +349,27 @@ export default function ResponsiveWorkflowConfigurator({
       {(isDesktop || isTablet) && (
         <div
           ref={containerRef}
-          className="flex w-full min-h-0"
-          style={{ height: 'calc(100% - 72px)' }}
+          className="flex-1 flex w-full min-h-0"
         >
+          {/* Visualization Pane */}
+          <div className="h-full min-w-0 inline-flex flex-col flex-1">
+            <VisualizationPane
+              workflowTemplate={workflowTemplate}
+              regenerateMermaidDiagram={regenerateMermaidDiagram ? regenerateMermaidDiagram : async () => { console.log('regenerateMermaidDiagram not provided.'); }}
+              onWorkflowDefinitionChange={onWorkflowDefinitionChange}
+            />
+          </div>
+
+          {/* Resizable Divider (Desktop only) */}
+          {isDesktop && renderDivider()}
+
+
           {/* Conversation Pane */}
-          <div
+          <div className="h-full min-h-0 flex flex-col items-stretch"
             style={{
-              width: isDesktop ? `${conversationPaneWidth}px` : '50%',
-              minWidth: `${MIN_CONVERSATION_WIDTH}px`,
+              width: isDesktop ? `${aimePanelWidth}px` : '50%',
+              minWidth: `${MIN_AIME_WIDTH}px`,
             }}
-            className="border-r h-full min-h-0"
           >
             <AimeWorkflowPane
               messages={messages || []}
@@ -367,17 +379,6 @@ export default function ResponsiveWorkflowConfigurator({
             />
           </div>
 
-          {/* Resizable Divider (Desktop only) */}
-          {isDesktop && renderDivider()}
-
-          {/* Visualization Pane */}
-          <div className="flex-1 h-full min-w-0 inline-flex flex-col">
-            <VisualizationPane
-              workflowTemplate={workflowTemplate}
-              regenerateMermaidDiagram={regenerateMermaidDiagram ? regenerateMermaidDiagram : async () => { console.log('regenerateMermaidDiagram not provided.'); }}
-              onWorkflowDefinitionChange={onWorkflowDefinitionChange}
-            />
-          </div>
         </div>
       )}
 

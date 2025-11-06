@@ -16,7 +16,7 @@ import {
 
 // Create the context
 const UnifiedUserContext = createContext<UnifiedUserContextState | undefined>(undefined);
-
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
 /**
  * Unified User Context Provider
  * Provides complete user session context including user, account, and organization data
@@ -31,11 +31,6 @@ export function UnifiedUserProvider({ children }: UnifiedUserProviderProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [userError, setUserError] = useState<string | null>(null);
 
-  // Base URL for API calls
-  const baseUrl = typeof window !== 'undefined' 
-    ? window.location.origin 
-    : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-
   /**
    * Load complete user session data from unified API
    */
@@ -44,7 +39,7 @@ export function UnifiedUserProvider({ children }: UnifiedUserProviderProps) {
       setIsLoading(true);
       setUserError(null);
 
-      const response = await fetch(`${baseUrl}/api/user-session`);
+      const response = await fetch(`${basePath}/api/user-session`);
       
       if (!response.ok) {
         throw new Error(`User Session API error: ${response.status}`);
@@ -113,7 +108,7 @@ export function UnifiedUserProvider({ children }: UnifiedUserProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [baseUrl]);
+  }, []);
 
   /**
    * Switch to a different organization

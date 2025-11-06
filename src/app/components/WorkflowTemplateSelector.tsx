@@ -21,6 +21,7 @@ interface WorkflowTemplateSelectorProps {
   currentTemplateMenuItem?: workflowTemplateSelectorMenuItem;
   onTemplateChange?: (templateId: string, templateName: string) => void;
 }
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
 
 export default function WorkflowTemplateSelector({
   currentTemplateMenuItem
@@ -47,7 +48,7 @@ export default function WorkflowTemplateSelector({
           // No status filter - backend returns latest version per template (draft/published preferred)
         });
 
-        const url = `/api/workflow-templates?${params}`;
+        const url = `${basePath}/api/workflow-templates?${params}`;
         console.log('🌐 Fetching templates from:', url);
 
         const response = await fetch(url);

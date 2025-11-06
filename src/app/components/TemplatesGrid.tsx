@@ -23,6 +23,7 @@ interface TemplateRow {
     status: string;
     author?: string;
 }
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
 
 export default function TemplatesGrid() {
     const router = useRouter();
@@ -41,7 +42,7 @@ export default function TemplatesGrid() {
                 setError(null);
 
                 const params = new URLSearchParams({ page: '1', pageSize: '100', status: 'draft,published' });
-                const res = await fetch(`/api/workflow-templates?${params}`);
+                const res = await fetch(`${basePath}/api/workflow-templates?${params}`);
                 if (!res.ok) throw new Error(`Failed to fetch templates: ${res.status}`);
                 const data = await res.json();
                 const fetched: WorkflowTemplate[] = data.data?.templates || data.templates || [];
@@ -105,7 +106,7 @@ export default function TemplatesGrid() {
                 const row = rows.find(r => r.id === id);
                 if (!row) return;
                 const version = row.version;
-                const url = `/api/workflow-templates/${encodeURIComponent(id)}?version=${encodeURIComponent(version)}`;
+                const url = `${basePath}/api/workflow-templates/${encodeURIComponent(id)}?version=${encodeURIComponent(version)}`;
 
                 const headers: Record<string, string> = {};
                 if (account && typeof account === 'object') {

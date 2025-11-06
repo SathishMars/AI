@@ -7,7 +7,9 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { FollowUpOption, WorkflowMessage } from "../types/aimeWorkflowMessages";
 import SmartAutocomplete from "./SmartAutocomplete";
 import { cn } from "@/lib/utils";
-
+import Image from "next/image";
+import Markdown from "react-markdown";
+import remarkBreaks from "remark-breaks";
 
 
 
@@ -56,11 +58,11 @@ function formatRelativeTime(date: Date | string): string {
 // Memoized message item component to prevent unnecessary re-renders
 const MessageItem = memo(({ message, isFirst, onOptionSelected }: { message: WorkflowMessage, isFirst: boolean, onOptionSelected?: (option: FollowUpOption, forKey: string) => void  }) => {
     const listItemClassName = message.sender === 'aime' 
-        ? 'rounded-lg bg-transparent mb-1 border border-green-200' 
-        : 'rounded-lg bg-blue-50 mb-1';
+        ? 'rounded-lg bg-transparent pt-4' 
+        : 'rounded-lg bg-gray-100 p-[12px] pt-4';
     const timestampClassName = cn(
-        "text-xs opacity-70 whitespace-nowrap absolute top-1",
-        message.sender === 'aime' ? 'right-2' : 'left-2'
+        "text-xs opacity-70 whitespace-nowrap absolute",
+        message.sender === 'aime' ? 'top-0 left-0' : 'top-1 left-[12px]'
     );
 
     const handleFollowUpOptionClick = (option: FollowUpOption, forKey: string) => {
@@ -77,33 +79,15 @@ const MessageItem = memo(({ message, isFirst, onOptionSelected }: { message: Wor
         <div 
             key={message.id} 
             className={cn(
-                "flex items-start gap-3 py-2 w-[calc(100%-30px)]",
-                message.sender === 'aime' ? 'justify-start' : 'justify-end',
-                listItemClassName
+                "flex items-end gap-3 py-2",                
             )}
-        >
-            {message.sender === 'aime' && (
-                <Avatar className="rounded-none bg-transparent">
-                    <AvatarImage src="/aime-workflow-chat.png" alt="aime" />
-                    <AvatarFallback>aime</AvatarFallback>
-                </Avatar>
-            )}
-            
-            <div className="flex-1 relative pt-4">
-                <span className={timestampClassName}>
-                    {formatRelativeTime(message.timestamp)}
-                </span>
-
-                <div className="space-y-1">
-                    {message.content.text
-                        .replace(/^\s*\n/, '')                // strip leading newline(s)
-                        .replace(/\s*\n\s*$/, '')             // strip trailing newline(s)
-                        .split('\n')
-                        .map((line, index) => (
-                            <p key={index} className="text-sm mb-1">
-                                {line}
-                            </p>
-                        ))}
+        >            
+            <div className="flex-1">
+                <div className={cn("space-y-1 relative", listItemClassName)}>
+                    <span className={timestampClassName}>
+                        {formatRelativeTime(message.timestamp)}
+                    </span>
+                    <Markdown remarkPlugins={[remarkBreaks]}>{message.content.text}</Markdown>
                 </div>
 
                 {message.content.followUpQuestions && message.content.followUpQuestions.length > 0 && (
@@ -141,8 +125,8 @@ const MessageItem = memo(({ message, isFirst, onOptionSelected }: { message: Wor
             </div>
 
             {message.sender !== 'aime' && (
-                <Avatar className="bg-primary">
-                    <AvatarFallback>JD</AvatarFallback>
+                <Avatar className="bg-gray-300">
+                    <AvatarFallback className="bg-gray-300">JD</AvatarFallback>
                 </Avatar>
             )}
         </div>
@@ -218,7 +202,7 @@ export default function AimeWorkflowPane({
 
 
     return (
-        <div className="p-1 pl-0 flex-1 flex flex-col h-full">
+        <div className="p-0 pt-2 flex-1 flex flex-col h-full max-h-full">
             {error && (
                 <Alert variant="destructive" className="mb-2">
                     <AlertDescription>{error}</AlertDescription>
@@ -226,15 +210,15 @@ export default function AimeWorkflowPane({
             )}
 
             {!error && workflowTemplateId && (
-                <div className="self-stretch h-full p-1 flex flex-col items-stretch border rounded-md bg-card">
-                    <div className="mb-1 font-bold">
-                        Ask aime
+                <div className="flex-1 p-[20px] max-h-full flex flex-col items-stretch rounded-none bg-card">
+                    <div className="mb-1 font-bold flex items-center gap-2">
+                        <Image src="/aime-request-100x100.png" alt="aime Request" width={48} height={48} />
+                        Ask aime Request
                     </div>
                     <div
                         ref={messagesContainerRef}
-                        className="border border-border rounded-md p-4 flex-1 mb-1 min-h-0 overflow-y-auto max-h-full"
+                        className="border border-border rounded-md p-4 flex-1 mb-1 overflow-y-auto"
                     >
-                        <div className="w-full min-h-0">
                             {(messages?.length === 0) ? (
                                 <div className="text-center text-muted-foreground">
                                     No messages yet. Start the conversation!
@@ -244,7 +228,6 @@ export default function AimeWorkflowPane({
                                     <MessageItem key={message.id} message={message} isFirst={(index === 0)} onOptionSelected={onOptionSelected} />
                                 ))
                             )}
-                        </div>
                     </div>
                     {isLoading && (<Progress value={100} className="w-full animate-pulse" />)}
                     <SmartAutocomplete

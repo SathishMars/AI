@@ -7,13 +7,13 @@ import { WorkflowDefinition, WorkflowStep } from '@/app/types/workflowTemplate';
  * - Edges are created for `next`, `onConditionPass`, `onConditionFail`, `onError`, and `onTimeout`.
  */
 export function generateMermaidFromWorkflow(workflow: WorkflowDefinition): string {
-    console.info('[mermaid] generateMermaidFromWorkflow called');
+    // console.info('[mermaid] generateMermaidFromWorkflow called');
     if (!workflow || !Array.isArray(workflow.steps) || workflow.steps.length === 0) {
         console.warn('[mermaid] no workflow or empty steps array');
         return '%% Empty workflow - no mermaid diagram available';
     }
 
-    console.debug('[mermaid] workflow summary', { stepsCount: workflow.steps.length });
+    console.log('[mermaid] workflow summary', { stepsCount: workflow.steps.length });
 
     // Helper: sanitize node ids for Mermaid (prefix to avoid numeric-start issues)
     const sanitize = (id: string) => `n_${id.replace(/[^a-zA-Z0-9_]/g, '_')}`;
@@ -24,11 +24,11 @@ export function generateMermaidFromWorkflow(workflow: WorkflowDefinition): strin
     // Flatten any nested WorkflowStep and collect nodes/edges
     const processStep = (step: WorkflowStep) => {
         try {
-            console.debug('[mermaid] processing step', { id: step?.id, label: step?.label, type: step?.type });
+            // console.log('[mermaid] processing step', { id: step?.id, label: step?.label, type: step?.type });
             if (!step || !step.id) return;
             const nodeId = sanitize(step.id);
             if (!nodes.has(step.id)) {
-                console.debug('[mermaid] registering node', { id: step.id, nodeId });
+                // console.log('[mermaid] registering node', { id: step.id, nodeId });
                 nodes.set(step.id, { id: nodeId, label: step.label || step.id, type: step.type });
             }
 
@@ -36,17 +36,17 @@ export function generateMermaidFromWorkflow(workflow: WorkflowDefinition): strin
                 if (!target) return;
                 if (typeof target === 'string') {
                     const tgt = sanitize(target);
-                    console.debug('[mermaid] adding edge to string target', { from: nodeId, to: tgt, label });
+                    // console.log('[mermaid] adding edge to string target', { from: nodeId, to: tgt, label });
                     edges.push({ from: nodeId, to: tgt, label });
                 } else {
                     // nested step object
                     if (target.id) {
-                        console.debug('[mermaid] nested step object found', { parent: step.id, nestedId: target.id });
+                        // console.log('[mermaid] nested step object found', { parent: step.id, nestedId: target.id });
                         // ensure target node is registered
                         if (!nodes.has(target.id)) {
                             nodes.set(target.id, { id: sanitize(target.id), label: target.label || target.id, type: target.type });
                         }
-                        console.debug('[mermaid] adding edge to nested target', { from: nodeId, to: sanitize(target.id), label });
+                        // console.log('[mermaid] adding edge to nested target', { from: nodeId, to: sanitize(target.id), label });
                         edges.push({ from: nodeId, to: sanitize(target.id), label });
                         // process nested step recursively
                         processStep(target);
@@ -94,7 +94,7 @@ export function generateMermaidFromWorkflow(workflow: WorkflowDefinition): strin
         processStep(s);
     }
 
-    console.info('[mermaid] finished processing steps', { nodes: nodes.size, edges: edges.length });
+    // console.info('[mermaid] finished processing steps', { nodes: nodes.size, edges: edges.length });
 
     // Build mermaid lines
     const lines: string[] = [];
@@ -192,8 +192,8 @@ title: "Generated mermaid diagram"
     }
 
     const diagram = lines.join('\n');
-    console.debug('[mermaid] generated diagram length', diagram.length);
-    console.debug('[mermaid] diagram preview', diagram);
+    // console.log('[mermaid] generated diagram length', diagram.length);
+    console.log('[mermaid] diagram preview', diagram);
     return diagram;
 }
 
