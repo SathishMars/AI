@@ -4,6 +4,7 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { FollowUpOption, WorkflowMessage } from "../types/aimeWorkflowMessages";
 import styles from "./AimeWorkflowPane.module.scss";
 import SmartAutocomplete from "./SmartAutocomplete";
+import { BASE_PATH } from "../utils/api";
 
 
 
@@ -72,7 +73,7 @@ const MessageItem = memo(({ message, isFirst, onOptionSelected }: { message: Wor
             <ListItem key={message.id} sx={{ alignItems: 'normal', justifySelf: message.sender === 'aime' ? 'flex-start' : 'flex-end', width: 'calc(100% - 30px)' }} className={listItemClassName}>
                 {(message.sender === 'aime') && (
                     <ListItemAvatar sx={{ justifySelf: "flex-start" }}>
-                        <Avatar alt="aime" src="/aime-workflow-chat.png" sx={{ borderRadius: 0, backgroundColor: 'transparent' }}>aime</Avatar>
+                        <Avatar alt="aime" src={`${BASE_PATH}/aime-workflow-chat.png`} sx={{ borderRadius: 0, backgroundColor: 'transparent' }}>aime</Avatar>
                     </ListItemAvatar>
                 )}
                 <Typography variant="caption" sx={timestampSX}>

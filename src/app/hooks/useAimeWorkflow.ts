@@ -4,6 +4,7 @@ import ShortUniqueId from 'short-unique-id';
 import { WorkflowDefinition } from "../types/workflowTemplate";
 // removed unused import 'text'
 import { useUnifiedUserContext } from "../contexts/UnifiedUserContext";
+import { apiFetch } from "../utils/api";
 
 // 10-char alphanumeric short id generator (reusable instance)
 const uid = new ShortUniqueId({ length: 10, dictionary: 'alphanum' });
@@ -81,7 +82,7 @@ export function useAimeWorkflow({
                 return;           
         }
         // Reset messages when workflowTemplateId changes
-        fetch('/api/workflow-templates/' + encodeURIComponent(workflowTemplateId) + '/aime-messages', {
+        apiFetch('/api/workflow-templates/' + encodeURIComponent(workflowTemplateId) + '/aime-messages', {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
@@ -132,7 +133,7 @@ export function useAimeWorkflow({
             workflowDefinition: workflowDefinition
         };
 
-        const response = await fetch('/api/generate-workflow', {
+        const response = await apiFetch('/api/generate-workflow', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -175,7 +176,7 @@ export function useAimeWorkflow({
             workflowDefinition
         };
 
-        const response = await fetch('/api/generate-mermaid', {
+        const response = await apiFetch('/api/generate-mermaid', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -207,7 +208,7 @@ export function useAimeWorkflow({
             workflowDefinition
         };
 
-        const response = await fetch('/api/regenerate-workflow-definition', {
+        const response = await apiFetch('/api/regenerate-workflow-definition', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

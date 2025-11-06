@@ -2,6 +2,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { apiFetch } from '@/app/utils/api';
 import { 
   User,
   Account,
@@ -44,7 +45,7 @@ export function UnifiedUserProvider({ children }: UnifiedUserProviderProps) {
       setIsLoading(true);
       setUserError(null);
 
-      const response = await fetch(`${baseUrl}/api/user-session`);
+      const response = await apiFetch('/api/user-session');
       
       if (!response.ok) {
         throw new Error(`User Session API error: ${response.status}`);

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { WorkflowDefinition, WorkflowTemplate } from '@/app/types/workflowTemplate';
 import { useUnifiedUserContext } from '@/app/contexts/UnifiedUserContext';
+import { apiFetch } from '@/app/utils/api';
 
 
 
@@ -91,7 +92,7 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
       }
 
       // Call API to get template
-      const response = await fetch(`/api/workflow-templates/${id}`, {
+      const response = await apiFetch(`/api/workflow-templates/${id}`, {
         headers: {
           'x-account': accountId,
           'x-organization': organizationId || ''
@@ -152,7 +153,7 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
           console.log('  - composite id:', { id: currentTemplate.id, account: currentTemplate.account, organization: currentTemplate.organization, version: currentTemplate.version });
           console.log('  - workflow template:', currentTemplate);
 
-          const response = await fetch(`/api/workflow-templates/${currentTemplate.id}`, {
+          const response = await apiFetch(`/api/workflow-templates/${currentTemplate.id}`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -185,7 +186,7 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
           }
         } else {
           // Update existing template with PUT
-          const response = await fetch(`/api/workflow-templates/${currentTemplate.id}`, {
+          const response = await apiFetch(`/api/workflow-templates/${currentTemplate.id}`, {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
@@ -319,7 +320,7 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
     }
 
     try {
-      const response = await fetch('/api/workflow-templates/validate', {
+      const response = await apiFetch('/api/workflow-templates/validate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

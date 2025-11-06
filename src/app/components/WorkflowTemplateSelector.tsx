@@ -16,6 +16,7 @@ import {
 } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
 import { WorkflowTemplate } from '@/app/types/workflowTemplate';
+import { apiFetch } from '@/app/utils/api';
 
 
 
@@ -59,7 +60,7 @@ export default function WorkflowTemplateSelector({
         const url = `/api/workflow-templates?${params}`;
         console.log('🌐 Fetching templates from:', url);
 
-        const response = await fetch(url);
+        const response = await apiFetch(url);
 
         if (!response.ok) {
           console.error('❌ Failed to fetch templates:', response.status, response.statusText);

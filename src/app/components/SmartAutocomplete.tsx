@@ -16,6 +16,7 @@ import {
 import SendIcon from '@mui/icons-material/Send';
 import { WorkflowAutocompleteItem } from '@/app/types/workflowAutocomplete';
 import { WorkflowDefinition, WorkflowStep } from '../types/workflowTemplate';
+import { apiFetch } from '@/app/utils/api';
 
 
 interface SmartAutocompleteProps {
@@ -116,7 +117,7 @@ export default function SmartAutocomplete({
     const loadAutocompleteItems = async () => {
       let isMounted = true;
       setLoading(true);
-      const response = await fetch('/api/workflow-autocomplete');
+      const response = await apiFetch('/api/workflow-autocomplete');
       if (response.ok) {
         const data = await response.json();
         if (isMounted && Array.isArray(data)) {

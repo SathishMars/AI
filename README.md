@@ -179,13 +179,19 @@ The app runs on port **3001**.
 When running alongside the Rails application, use nginx to proxy requests:
 
 #### Setup Steps
-np   
+
    ```bash
-   # Copy the configuration file or update existing nginx file to include the configrations
-   sudo cp nginx.conf /usr/local/etc/nginx/servers/groupize.conf
+   # macOS (Homebrew nginx)
+   cp nginx.example.conf /opt/homebrew/etc/nginx/servers/groupize.local.conf
    
-   # Test configuration and start/restart nginx
-   nginx -t && brew services restart nginx
+   # Linux
+   sudo cp nginx.example.conf /etc/nginx/sites-available/groupize.local
+   sudo ln -s /etc/nginx/sites-available/groupize.local /etc/nginx/sites-enabled/
+   
+   # Test configuration and restart nginx
+   nginx -t && brew services restart nginx  # macOS
+   # OR
+   sudo nginx -t && sudo systemctl restart nginx  # Linux
    ```
 
 3. **Update your hosts file**:
@@ -198,30 +204,33 @@ np
 4. **Access the application**:
    
    - Rails app: `http://groupize.local/`
-   - Next.js Workflows: `http://groupize.local/app/aimeworkflows`
+   - Next.js Workflows: `http://groupize.local/aime/aimeworkflows/`
+   - New workflow: `http://groupize.local/aime/aimeworkflows/workflows/configure/new/`
 
 #### URL Structure
 
-The nginx proxy routes and rewrites requests:
+The nginx proxy uses Next.js `basePath` configuration:
 
-- `/app/aimeworkflows/foo` → nginx rewrites to `/foo` → Next.js on port 3001
+- User visits: `http://groupize.local/aime/aimeworkflows/*`
+- nginx passes full path to Next.js on port 3001
+- Next.js configured with `basePath: '/aime/aimeworkflows'` in `next.config.ts`
 - Everything else → Rails app (port 3000)
 
 **Example:**
 ```
-User visits: http://groupize.local/app/aimeworkflows/workflows
-nginx rewrites to: /workflows
-Next.js receives: GET /workflows (on port 3001)
+User visits:     http://groupize.local/aime/aimeworkflows/workflows/configure/123
+nginx proxies:   /aime/aimeworkflows/workflows/configure/123 → Next.js (port 3001)
+Next.js serves:  src/app/workflows/configure/[id]/page.tsx
 ```
 
-This allows for:
-- Next.js runs at root (`/`) internally - no code changes needed
-- nginx handles the `/app/aimeworkflows` prefix externally
-- Shared authentication/session via cookies
-- Seamless navigation between Rails and Next.js
-- Future micro-apps at `/app/approvals`, `/app/analytics`, etc.
+**Important Notes:**
+- ✅ Next.js `<Link>` components automatically prepend basePath
+- ⚠️ Images require basePath: `src={`${BASE_PATH}/image.png`}` (see `src/app/utils/api.ts`)
+- ✅ API fetch calls use `apiFetch()` helper which adds basePath
+- ✅ Shared authentication via forwarded cookies
+- ✅ Future micro-apps: `/aime/approvals/`, `/aime/analytics/`, etc.
 
-> **TODO**: When ready, add `basePath: '/app/aimeworkflows'` to `next.config.ts` and update all internal routes. This requires coordinating with the team since it's a breaking change for all Links, routes, and API calls.
+See `nginx.example.conf` for the complete configuration with detailed comments.
 
 #### Development Workflow
 
