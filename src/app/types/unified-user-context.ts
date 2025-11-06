@@ -158,4 +158,5 @@ export interface UnifiedUserContextState {
 
 export interface UnifiedUserProviderProps {
   children: React.ReactNode;
+  initialCurrentUser?: import('./auth').CurrentUserState;  // Optional current user from SSR
 }
