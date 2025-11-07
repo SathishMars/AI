@@ -1,6 +1,8 @@
-// this will be used in langchain-workflow-generator.ts as a tool to validate WorkflowDefinition JSON especially to chaek for unique step ids
-import { tool } from '@openai/agents';
-import { z } from "zod";
+// Tool: workflowDefinitionValidator
+// AI SDK (Vercel) compatible tool definition
+
+import { tool } from 'ai';
+import { z } from 'zod';
 
 interface WorkflowValidatorInput {
     // The workflowDefinition may be passed as a JS object or a JSON string by different tool-call paths
@@ -150,11 +152,46 @@ const workflowValidatorSchema = z.object({
     workflowDefinition: z.string().describe('The workflow definition as a JSON string to validate'),
 });
 
+/**
+ * AI SDK tool for validating workflow definitions
+ * Compatible with Vercel AI SDK (ai package v5.x)
+ * 
+ * Tool definition using the `tool` function from the 'ai' package.
+ * Can be used with Agent class or directly with generateText, streamText, etc.
+ * 
+ * Usage example with Agent:
+ * ```typescript
+ * import { Experimental_Agent as Agent } from 'ai';
+ * import { workflowDefinitionValidatorTool } from './aiSdkTools/WorkflowValidator';
+ * 
+ * const myAgent = new Agent({
+ *   model: 'openai/gpt-4o',
+ *   tools: { workflowDefinitionValidator: workflowDefinitionValidatorTool }
+ * });
+ * 
+ * const result = await myAgent.generate({
+ *   prompt: 'Validate this workflow definition: {...}'
+ * });
+ * ```
+ */
 export const workflowDefinitionValidatorTool = tool({
-    name: "workflowDefinitionValidator",
-    description: "Validates a workflow definition JSON to ensure all step ids are unique and all references are valid. The response is a JSON Object with a isValid flag and an errors array if any.",
-    parameters: workflowValidatorSchema,
-    execute: validateWorkflowDefinition
+    description:
+        'Validates a workflow definition JSON to ensure all step ids are unique and all references are valid. ' +
+        'The response is a JSON Object with an isValid flag and an errors array if any. ' +
+        'Accepts workflow definition as a JSON string.',
+    
+    inputSchema: workflowValidatorSchema,
+    
+    execute: async ({ workflowDefinition }) => {
+        try {
+            const result = await validateWorkflowDefinition({ workflowDefinition });
+            return result;
+        } catch (err) {
+            // Provide clear error messages for debugging
+            if (err instanceof Error) {
+                throw new Error(`workflowDefinitionValidator: ${err.message}`);
+            }
+            throw new Error(`workflowDefinitionValidator: unexpected error - ${String(err)}`);
+        }
+    },
 });
-
-

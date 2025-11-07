@@ -2,17 +2,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import {
-  Box,
-  Typography,
-  Alert,
-  Tabs,
-  Tab,
-} from '@mui/material';
-import {
-  AccountTree as WorkflowIcon,
-  AutoAwesome as AIIcon
-} from '@mui/icons-material';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Network, Sparkles } from "lucide-react";
 import WorkflowStepTree from '@/app/components/WorkflowStepTree';
 import { WorkflowStep, WorkflowDefinition, WorkflowTemplate } from '../types/workflowTemplate';
 import MermaidChart from './MermaidChart';
@@ -26,60 +18,24 @@ interface VisualizationPaneProps {
   fullScreen?: boolean;
 }
 
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
-
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
-
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`visualization-tabpanel-${index}`}
-      aria-labelledby={`visualization-tab-${index}`}
-      {...other}
-      style={{ height: '100%', display: value === index ? 'flex' : 'none', flexDirection: 'column' }}
-    >
-      {value === index && children}
-    </div>
-  );
-}
-
-function a11yProps(index: number) {
-  return {
-    id: `visualization-tab-${index}`,
-    'aria-controls': `visualization-tabpanel-${index}`,
-  };
-}
-
 export default function VisualizationPane({
   workflowTemplate,
   regenerateMermaidDiagram,
   onWorkflowDefinitionChange,
   fullScreen = false
 }: VisualizationPaneProps) {
-  const [tabValue, setTabValue] = useState(0);
-  // const llmFunctionDefinitions = React.useMemo(() => getLLMContext(), []);
-  // const functionDefinitionLookup = React.useMemo(
-  //   () => buildFunctionDefinitionLookup(llmFunctionDefinitions),
-  //   [llmFunctionDefinitions]
-  // );
+  const [editingStepId, setEditingStepId] = useState<string | null>(null);
 
-  // Initialize Mermaid generation hook
-  // const mermaidGeneration = useMermaidGeneration(workflow, onWorkflowChange, {
-  //   autoGenerate: true,
-  //   debounceMs: 2000
-  // });
+  const handleStepEdit = (step: WorkflowStep) => {
+    setEditingStepId(step.id);
+  };
 
-  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
-    setTabValue(newValue);
+  const handleStepCancel = () => {
+    setEditingStepId(null);
   };
 
   const handleStepSave = (updatedStep: WorkflowStep) => {
+    setEditingStepId(null);
     // Update the step in the workflow definition
     const updateStepsRecursively = (steps: Array<WorkflowStep | string>): Array<WorkflowStep | string> => {
       return steps.map(step => {
@@ -117,93 +73,64 @@ export default function VisualizationPane({
 
 
   return (
-    <Box sx={{
-      height: '100%',
-      display: 'flex',
-      flexDirection: 'column',
-      p: fullScreen ? 3 : 2
-    }}>
-      {/* Tabs with title integrated */}
-      <Box sx={{
-        display: 'flex',
-        alignItems: 'center',
-        borderBottom: 1,
-        borderColor: 'divider'
-      }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', px: 2 }}>
-          <WorkflowIcon sx={{ mr: 1, color: 'primary.main', fontSize: 20 }} />
-          <Typography variant="subtitle1" component="h3" sx={{ fontWeight: 500 }}>
-            Workflow Visualization
-          </Typography>
-        </Box>
-        <Tabs value={tabValue} onChange={handleTabChange} aria-label="workflow visualization tabs" sx={{ ml: 2 }}>
-          <Tab label="Step Tree" {...a11yProps(0)} />
-          <Tab
-            label={
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                Diagram
-                {/* {mermaidGeneration.isGenerating && (
-                  <CircularProgress size={12} />
-                )} */}
-                <AIIcon fontSize="small" color="primary" />
-              </Box>
-            }
-            {...a11yProps(1)}
-          />
-        </Tabs>
-      </Box>
+    <div className={`h-full flex flex-col ${fullScreen ? 'p-6' : 'p-4'}`}>
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-4">
+        <Network className="h-5 w-5 text-primary" />
+        <h3 className="text-lg font-medium">Workflow Visualization</h3>
+      </div>
 
-      {/* Tab Content */}
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <TabPanel value={tabValue} index={0}>
+      {/* Tabs */}
+      <Tabs defaultValue="tree" className="flex-1 flex flex-col overflow-hidden">
+        <TabsList>
+          <TabsTrigger value="tree">Step Tree</TabsTrigger>
+          <TabsTrigger value="diagram" className="gap-2">
+            Diagram
+            <Sparkles className="h-4 w-4 text-primary" />
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="tree" className="flex-1 overflow-auto mt-4">
           {workflowTemplate.workflowDefinition.steps.length >= 0 ? (
-            <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Box>
-                  <Typography variant="h6">
-                    Workflow Step Tree
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h4 className="text-xl font-semibold">Workflow Step Tree</h4>
+                  <p className="text-sm text-muted-foreground">
                     Tree view showing complete workflow structure with all nested steps
-                  </Typography>
-                </Box>
-              </Box>
+                  </p>
+                </div>
+              </div>
               <WorkflowStepTree
-                workflowSteps={workflowTemplate.workflowDefinition.steps}
+                steps={workflowTemplate.workflowDefinition.steps}
+                editingStepId={editingStepId}
+                onStepEdit={handleStepEdit}
                 onStepSave={handleStepSave}
+                onStepCancel={handleStepCancel}
               />
-            </Box>
+            </div>
           ) : (
-            <Box sx={{
-              flex: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <Alert severity="info">
-                <Typography variant="h6" gutterBottom>
-                  No Workflow Steps
-                </Typography>
-                <Typography variant="body2">
+            <div className="flex items-center justify-center h-full">
+              <Alert>
+                <AlertTitle>No Workflow Steps</AlertTitle>
+                <AlertDescription>
                   Start a conversation with aime to create workflow steps.
-                </Typography>
+                </AlertDescription>
               </Alert>
-            </Box>
+            </div>
           )}
-        </TabPanel>
+        </TabsContent>
 
-        <TabPanel value={tabValue} index={1}>
-          <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
-            <MermaidChart
-              mermaidDiagram={workflowTemplate.mermaidDiagram || ''}
-              regenerateMermaidDiagram={regenerateMermaidDiagram}
-              onError={(error) => {
-                console.error('Mermaid chart error:', error);
-              }}
-            />
-          </Box>
-        </TabPanel>
-      </Box>
-    </Box>
+        <TabsContent value="diagram" className="flex-1 overflow-auto mt-4">
+          <MermaidChart
+            mermaidDiagram={workflowTemplate.mermaidDiagram || ''}
+            regenerateMermaidDiagram={regenerateMermaidDiagram}
+            onError={(error) => {
+              console.error('Mermaid chart error:', error);
+            }}
+          />
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 }

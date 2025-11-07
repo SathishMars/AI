@@ -39,6 +39,8 @@ interface UseWorkflowTemplateReturn {
   reset: () => void;
 }
 
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+
 export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): UseWorkflowTemplateReturn {
   const {
     templateId,
@@ -91,7 +93,7 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
       }
 
       // Call API to get template
-      const response = await fetch(`/api/workflow-templates/${id}`, {
+      const response = await fetch(`${basePath}/api/workflow-templates/${id}`, {
         headers: {
           'x-account': accountId,
           'x-organization': organizationId || ''
@@ -152,7 +154,7 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
           console.log('  - composite id:', { id: currentTemplate.id, account: currentTemplate.account, organization: currentTemplate.organization, version: currentTemplate.version });
           console.log('  - workflow template:', currentTemplate);
 
-          const response = await fetch(`/api/workflow-templates/${currentTemplate.id}`, {
+          const response = await fetch(`${basePath}/api/workflow-templates/${currentTemplate.id}`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -185,7 +187,7 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
           }
         } else {
           // Update existing template with PUT
-          const response = await fetch(`/api/workflow-templates/${currentTemplate.id}`, {
+          const response = await fetch(`${basePath}/api/workflow-templates/${currentTemplate.id}`, {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
@@ -319,7 +321,7 @@ export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): U
     }
 
     try {
-      const response = await fetch('/api/workflow-templates/validate', {
+      const response = await fetch(`${basePath}/api/workflow-templates/validate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

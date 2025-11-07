@@ -2,16 +2,19 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { Loader2 } from 'lucide-react';
 import {
   Dialog,
-  DialogTitle,
   DialogContent,
-  DialogActions,
-  TextField,
-  Button,
-  Alert,
-  CircularProgress
-} from '@mui/material';
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface WorkflowTemplateNameDialogProps {
   open: boolean;
@@ -82,60 +85,59 @@ export default function WorkflowTemplateNameDialog({
   };
 
   return (
-    <Dialog 
-      open={open} 
-      onClose={!currentName? undefined : onClose} // Prevent closing if template name is blank
-      maxWidth="sm"
-      fullWidth
-    >
-      <DialogTitle>
-        {currentName ? 'Rename Workflow Template' : 'Name Your Workflow Template'}
-      </DialogTitle>
-      
-      <DialogContent>
-        {!currentName && (
-          <Alert severity="info" sx={{ mb: 2 }}>
-            Give your workflow template a descriptive name to help identify it later.
-          </Alert>
-        )}
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && currentName && onClose()}>
+      <DialogContent className="sm:max-w-[500px] glass">
+        <DialogHeader>
+          <DialogTitle>
+            {currentName ? 'Rename Workflow Template' : 'Name Your Workflow Template'}
+          </DialogTitle>
+          {!currentName && (
+            <DialogDescription>
+              Give your workflow template a descriptive name to help identify it later.
+            </DialogDescription>
+          )}
+        </DialogHeader>
         
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
+        <div className="space-y-4">
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          
+          <div className="space-y-2">
+            <Label htmlFor="template-name">Workflow Template Name</Label>
+            <Input
+              id="template-name"
+              ref={labelTextFieldRef}
+              autoFocus
+              type="text"
+              value={templateName}
+              onChange={(e) => {
+                setTemplateName(e.target.value);
+                setError(null);
+              }}
+              onKeyUp={handleKeyUp}
+              disabled={isSubmitting}
+              placeholder="e.g., Event Approval Workflow"
+            />
+            <p className="text-xs text-muted-foreground">
+              Use letters, numbers, spaces, hyphens, and underscores
+            </p>
+          </div>
+        </div>
         
-        <TextField
-          autoFocus
-          margin="dense"
-          label="Workflow Template Name"
-          type="text"
-          fullWidth
-          variant="outlined"
-          value={templateName}
-          onChange={(e) => {
-            setTemplateName(e.target.value);
-            setError(null);
-          }}
-          onKeyUp={handleKeyUp}
-          disabled={isSubmitting}
-          placeholder="e.g., Event Approval Workflow"
-          helperText="Use letters, numbers, spaces, hyphens, and underscores"
-          inputRef={labelTextFieldRef}
-        />
+        <DialogFooter>
+          <Button 
+            onClick={handleSubmit} 
+            disabled={isSubmitting || !templateName.trim()}
+            className="w-full"
+          >
+            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {currentName ? 'Save' : 'Create Template'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
-      
-      <DialogActions>
-        <Button 
-          onClick={handleSubmit} 
-          variant="contained"
-          disabled={isSubmitting || !templateName.trim()}
-          startIcon={isSubmitting && <CircularProgress size={16} />}
-          fullWidth
-        >
-          {currentName ? 'Save' : 'Create Template'}
-        </Button>
-      </DialogActions>
     </Dialog>
   );
 }

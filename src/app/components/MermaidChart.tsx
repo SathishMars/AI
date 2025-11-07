@@ -1,11 +1,9 @@
 'use client';
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Box, Typography, CircularProgress, IconButton, Stack, Tooltip } from '@mui/material';
-import ZoomInIcon from '@mui/icons-material/ZoomIn';
-import ZoomOutIcon from '@mui/icons-material/ZoomOut';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import ScreenRotationIcon from '@mui/icons-material/ScreenRotation';
+import { ZoomIn, ZoomOut, RotateCw, RotateCcw, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import mermaid from 'mermaid';
 
 interface MermaidChartProps {
@@ -159,44 +157,71 @@ export default function MermaidChart({
 
 
     return (
-        <Box sx={{ height: '100%', width: '100%' }}>
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-                <Tooltip title="Regenerate Diagram">
-                    <IconButton size="small" onClick={regenerateMermaidDiagram} aria-label="regenerate-diagram">
-                        <RefreshIcon />
-                    </IconButton>
-                </Tooltip>
-                <Tooltip title="Zoom out ( - )">
-                    <IconButton size="small" onClick={zoomOut} aria-label="zoom-out">
-                        <ZoomOutIcon />
-                    </IconButton>
-                </Tooltip>
-                <Tooltip title="Reset zoom (0)">
-                    <IconButton size="small" onClick={resetZoom} aria-label="reset-zoom">
-                        <RefreshIcon />
-                    </IconButton>
-                </Tooltip>
-                <Tooltip title="Zoom in ( + )">
-                    <IconButton size="small" onClick={zoomIn} aria-label="zoom-in">
-                        <ZoomInIcon />
-                    </IconButton>
-                </Tooltip>
-                <Typography variant="caption" sx={{ ml: 1 }}>{Math.round(scale * 100)}%</Typography>
-                <Tooltip title="Rotate">
-                    <IconButton size="small" onClick={rotate} aria-label="rotate">
-                        <ScreenRotationIcon />
-                    </IconButton>
-                </Tooltip>
-            </Stack>
+        <div className="h-full w-full">
+            <TooltipProvider>
+                <div className="flex items-center gap-1 mb-2">
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" onClick={regenerateMermaidDiagram} aria-label="regenerate-diagram">
+                                <RotateCw className="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Regenerate Diagram</TooltipContent>
+                    </Tooltip>
+                    
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" onClick={zoomOut} aria-label="zoom-out">
+                                <ZoomOut className="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Zoom out ( - )</TooltipContent>
+                    </Tooltip>
+                    
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" onClick={resetZoom} aria-label="reset-zoom">
+                                <RotateCw className="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Reset zoom (0)</TooltipContent>
+                    </Tooltip>
+                    
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" onClick={zoomIn} aria-label="zoom-in">
+                                <ZoomIn className="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Zoom in ( + )</TooltipContent>
+                    </Tooltip>
+                    
+                    <span className="text-xs text-muted-foreground ml-2">{Math.round(scale * 100)}%</span>
+                    
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" onClick={rotate} aria-label="rotate">
+                                <RotateCcw className="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Rotate</TooltipContent>
+                    </Tooltip>
+                </div>
+            </TooltipProvider>
 
-            {isLoading && <CircularProgress />}
-            {error && <Typography color="error">{error}</Typography>}
+            {isLoading && (
+                <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-sm">Loading diagram...</span>
+                </div>
+            )}
+            {error && <p className="text-sm text-destructive">{error}</p>}
 
             {/* scrollRef holds the scrollable area; wheel zoom works when Ctrl/Meta is pressed */}
-            <div ref={scrollRef} onWheel={handleWheel} style={{ overflow: 'auto', height: '100%', width: '100%', border: '1px solid transparent' }}>
+            <div ref={scrollRef} onWheel={handleWheel} className="overflow-auto h-full w-full border border-transparent">
                 {/* mermaidRef will contain the SVG; apply transform scaling to it */}
                 <div ref={mermaidRef} className='mermaidChart' style={{ transform: `scale(${scale})`, transformOrigin: '0 0' }} />
             </div>
-        </Box>
+        </div>
     );
 }

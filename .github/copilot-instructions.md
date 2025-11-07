@@ -7,8 +7,8 @@ This is a Next.js 15+ embeddable frontend application designed to gradually migr
 **Tech Stack:**
 - Next.js 15 with App Router and Turbopack
 - TypeScript with strict mode
-- Material-UI (MUI) v7 for components
-- Tailwind CSS v4 for additional styling  
+- shadcn/ui for components (built on Radix UI primitives)
+- Tailwind CSS v4 for styling  
 - MongoDB 5.0 (local development) / AWS DocumentDB (production) with connection pooling
 - PostgreSQL database connection
 - JWT-based session management
@@ -22,21 +22,20 @@ This is a Next.js 15+ embeddable frontend application designed to gradually migr
 - Test components both standalone and embedded
 
 ### Styling Strategy
-- Use MUI components for consistent design system
-- Use tailwind for creating styled components if MUI components need to be modified to match the given design
+- Use shadcn/ui components as the foundation (built on Radix UI primitives)
+- Leverage Tailwind CSS v4 for all styling and layout
+- Use CSS variables for theming (defined in globals.css)
 - Follow wireframes or UI designs mentioned in the stories closely
 - Maintain a uniform look and feel across all components and pages
-- Allow for custom themes and easy switch to those themes
+- Allow for custom themes via CSS variable overrides
 
-
-### Font Loading Pattern
-Follow the established pattern in `layout.tsx`:
-```tsx
-import "@fontsource/roboto/300.css";
-import "@fontsource/roboto/400.css";
-import "@fontsource/roboto/500.css";
-import "@fontsource/roboto/700.css";
-```
+### Component Architecture
+- **shadcn/ui Philosophy**: Copy components into your project for full customization
+- **Component Location**: shadcn/ui components are installed to `@/components/ui`
+- **Utilities**: Use `cn()` utility from `@/lib/utils` for conditional class merging
+- **Icons**: Use Lucide React for consistent iconography
+- **Theming**: Theme switching via CSS class on root element (`light` or `dark`)
+- **Adding Components**: Use `npx shadcn@latest add <component>` to add new UI components
 
 ### Workflow Architecture
 **Multi-Step Workflow System**: Build workflows with conditional branching and pre-built function integration
@@ -85,7 +84,8 @@ const templateId = uid(); // e.g. 'aB3k9ZpQ1x'
 - **Auto-Save Rules**: Save only when workflow has ≥1 real step AND template is named (not 'new'/'create')
 - **Data Separation**: AIME conversations stored separately from workflow templates in distinct collection
 - **Conversation Autosave**: Persist conversation messages only for user input and completed aime responses; streaming or placeholder system messages must not trigger autosave. Loading conversations with `setState` should be done without re-triggering saves unless explicitly requested with `triggerAutosave`.
-- **Rule condition schema**:
+- **Rule condition schema** (JSON Schema format - $ref are schema references, not tool references):
+<!-- markdownlint-disable -->
 ```json
 {
   "title": "JsonRulesEngine Rule Schema",
@@ -145,6 +145,7 @@ const templateId = uid(); // e.g. 'aB3k9ZpQ1x'
   }
 }
 ```
+<!-- markdownlint-enable -->
 - **Workflow Template Structure**:
 ```json
 {
@@ -261,24 +262,24 @@ const templateId = uid(); // e.g. 'aB3k9ZpQ1x'
 **MANDATORY**: When recommending or writing code, ALWAYS reference the EXACT versions specified in `package.json`. Never assume or use outdated API patterns.
 
 **Current Exact Versions (as of package.json):**
-- **Next.js**: `15.5.3` - Use App Router patterns, Turbopack features
+- **Next.js**: `15.5.4` - Use App Router patterns, Turbopack features
 - **React**: `19.1.0` - Follow React 19 patterns and hooks
-- **Material-UI**: `@mui/material@^7.3.2`, `@mui/icons-material@^7.3.2` - Use MUI v7 API
+- **shadcn/ui**: Latest - Built on Radix UI primitives with Tailwind CSS
+- **Lucide React**: `^0.552.0` - Icon library for shadcn/ui components
 - **Tailwind CSS**: `^4` - Use Tailwind v4 syntax and features
-- **Zod**: `^4.1.11` - Use Zod v4 API (breaking changes from v3)
+- **Zod**: `^3.23.8` - Use Zod v3 API for validation
 - **TypeScript**: `^5` - Use TypeScript 5 features
-- **OpenAI SDK**: `^5.20.3` - Use OpenAI v5 API patterns
-- **Anthropic SDK**: `^0.63.0` - Use current Anthropic SDK patterns
+- **OpenAI SDK**: Latest via `@openai/agents@^0.1.10` - Use OpenAI API patterns
 - **MongoDB**: `mongodb@^6.20.0` - Use MongoDB v6.20.0 driver (includes built-in TypeScript types)
 - **json-rules-engine**: `^7.3.1` - Use v7 API for workflow rules
 - **react-md-editor**: `@uiw/react-md-editor@^4.0.8` - Use v4 API
 - **Mermaid**: `^11.12.0` - Use Mermaid v11 syntax
-- **Testing Libraries**: `@testing-library/react@^16.3.0`, `jest@^30.1.3`
+- **Testing Libraries**: `@testing-library/react@^16.3.0`, `jest@^30.2.0`
 
 **Before Adding New Packages:**
 1. **Version Check**: Review `package.json` for exact versions FIRST
 2. **API Compatibility**: Ensure code examples match the installed versions
-3. **Dependency Conflicts**: Verify compatibility with current versions (especially Zod v4, React 19, MUI v7)
+3. **Dependency Conflicts**: Verify compatibility with current versions (especially Zod v3, React 19, shadcn/ui)
 4. **Bundle Size**: Consider impact for embedded contexts
 5. **Peer Dependencies**: Use `npm install --legacy-peer-deps` if needed
 6. **Documentation**: Update this list when adding major new dependencies
@@ -382,10 +383,10 @@ npm test
 1. **Check existing code first**: Scan `src/app/components/`, `src/app/utils/`, `src/app/validators/`, and `src/app/types/` for reusable code
 2. **Version-specific development**: Always check `package.json` for exact versions before writing code - use version-specific APIs and patterns
 3. **Check package.json**: Review existing dependencies before adding new packages with similar functionality
-4. Start with MUI v7 components as the foundation
+4. Start with shadcn/ui components as the foundation
 5. Use Tailwind v4 for creating styled components and layout and spacing adjustments
 6. Place reusable components in `src/app/components/`
-7. Extract form validators to `src/app/validators/` (use Zod v4 API)
+7. Extract form validators to `src/app/validators/` (use Zod v3 API)
 8. Define TypeScript types in `src/app/types/`
 9. Ensure components work in embedded contexts
 10. For workflow components: Build and update workflow components using the AI chat functionality.

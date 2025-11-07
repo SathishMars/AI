@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+
 /**
  * Middleware to ensure API routes always receive `x-account` and `x-organization` headers.
  *
@@ -14,6 +16,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function middleware(request: NextRequest) {
   try {
     const pathname = request.nextUrl.pathname;
+    console.log("[middleware] the pathname:", pathname, ' basePath:', basePath);
 
     // Skip Next.js internals and static assets to avoid unnecessary middleware work
     // This preserves performance for assets and avoids interfering with internal handlers
@@ -33,7 +36,7 @@ export async function middleware(request: NextRequest) {
     }
 
     // Skip middleware for the user-session endpoint itself to avoid any chance of recursion
-    if (pathname === '/api/user-session') {
+    if (pathname === `/api/user-session`) {
       return NextResponse.next();
     }
 
@@ -51,13 +54,13 @@ export async function middleware(request: NextRequest) {
     // Include any resolved query params so the API can be aware if desired.
     let apiUrl: URL;
     try {
-      apiUrl = new URL('/api/user-session', request.nextUrl.origin);
+      apiUrl = new URL(`${basePath}/api/user-session`, request.nextUrl.origin);
       if (accountFromQuery) apiUrl.searchParams.set('account', accountFromQuery);
       if (orgFromQuery) apiUrl.searchParams.set('organization', orgFromQuery);
     } catch {
       // Fallback when origin isn't available for some runtimes
       const host = request.headers.get('host') || 'localhost:3000';
-      apiUrl = new URL(`https://${host}/api/user-session`);
+      apiUrl = new URL(`http://${host}${basePath}/api/user-session`);
       if (accountFromQuery) apiUrl.searchParams.set('account', accountFromQuery);
       if (orgFromQuery) apiUrl.searchParams.set('organization', orgFromQuery);
     }
@@ -90,6 +93,7 @@ export async function middleware(request: NextRequest) {
 
     let fetchedData: UserSessionData = null;
     try {
+      console.log("[middleware] fetching user session from", apiUrl.toString());
       const apiRes = await fetch(apiUrl.toString(), {
         method: 'GET',
         headers: {
@@ -104,6 +108,8 @@ export async function middleware(request: NextRequest) {
         if (json && json.success && json.data) {
           fetchedData = json.data;
         }
+      } else {
+        console.warn('[Middleware]: user-session fetch failed with response', apiRes);
       }
     } catch (err) {
       // network/fetch failed; we'll fall back to defaults below
@@ -159,18 +165,18 @@ export async function middleware(request: NextRequest) {
     // Use encodeURIComponent to keep the cookie values safe. Non-httpOnly so client can read.
     try {
       res.cookies.set('user', encodeURIComponent(JSON.stringify(finalUser)), {
-        path: '/',
+        path: `/${basePath}`,
         httpOnly: false,
         sameSite: 'lax'
       });
       res.cookies.set('account', encodeURIComponent(JSON.stringify({ id: accountId })), {
-        path: '/',
+        path: `/${basePath}`,
         httpOnly: false,
         sameSite: 'lax'
       });
       if (organizationId) {
         res.cookies.set('organization', encodeURIComponent(JSON.stringify({ id: organizationId })), {
-          path: '/',
+          path: `/${basePath}/`,
           httpOnly: false,
           sameSite: 'lax'
         });
@@ -199,5 +205,5 @@ export async function middleware(request: NextRequest) {
 // Run middleware for all site paths. The middleware itself early-returns for internal/static
 // paths (see above) to avoid interfering with Next internals.
 export const config = {
-  matcher: ['/:path*']
+  matcher: [`/:path*`]
 };
