@@ -16,7 +16,11 @@ COPY . .
 FROM base AS builder
 ENV NODE_ENV=production
 
-# Build the Next.js app (ensure next.config.js has output: 'standalone')
+# Optional: set base path argument for build-time customization
+ARG BASE_PATH="/aime"
+ENV NEXT_PUBLIC_BASE_PATH=${BASE_PATH}
+
+# Build the Next.js app (ensure next.config.js uses process.env.NEXT_PUBLIC_BASE_PATH)
 RUN npm run build
 
 # ---- Stage 3: Production Runtime ----
@@ -25,9 +29,10 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3000
-
-# Ensures accessible by IP address, not internal DNS
 ENV HOST=0.0.0.0
+
+# (Optional) Pass runtime base path if needed for dynamic overrides
+ENV NEXT_PUBLIC_BASE_PATH=${BASE_PATH}
 
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs \
