@@ -59,11 +59,28 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(loginUrl);
     }
 
+    // Log token for debugging (first 50 chars only)
+    console.log('[Auth Middleware] Token found, length:', token.length);
+    console.log('[Auth Middleware] Token preview:', token.substring(0, 50) + '...');
+    
+    // Decode header to see algorithm (for debugging)
+    try {
+      const headerB64 = token.split('.')[0];
+      const header = JSON.parse(Buffer.from(headerB64, 'base64').toString());
+      console.log('[Auth Middleware] Token algorithm:', header.alg);
+    } catch (e) {
+      console.log('[Auth Middleware] Could not decode token header');
+    }
+    
     // Verify JWT token
     const verification = await verifyJWT(token);
     
     if (!verification.success) {
       console.error('[Auth Middleware] Token verification failed:', verification.error.code);
+      console.error('[Auth Middleware] Error details:', verification.error.message);
+      if (verification.error.originalError) {
+        console.error('[Auth Middleware] Original error:', verification.error.originalError);
+      }
       
       // In mock mode, regenerate token
       if (env.isMockMode) {
@@ -88,8 +105,71 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(loginUrl);
     }
 
-    // Token is valid - inject headers for downstream use
+    // Token is valid - validate URL-based scoping
     const { currentUser } = verification;
+    
+    // Parse account and org from URL path
+    // URL format: /accounts/:accountId/orgs/:orgId/... or /accounts/:accountId/...
+    const pathSegments = pathname.split('/').filter(Boolean);
+    let urlAccountId: string | null = null;
+    let urlOrgId: string | null = null;
+    
+    const accountsIndex = pathSegments.indexOf('accounts');
+    if (accountsIndex !== -1 && pathSegments[accountsIndex + 1]) {
+      urlAccountId = pathSegments[accountsIndex + 1];
+      
+      const orgsIndex = pathSegments.indexOf('orgs');
+      if (orgsIndex !== -1 && pathSegments[orgsIndex + 1]) {
+        urlOrgId = pathSegments[orgsIndex + 1];
+      }
+    }
+    
+    // URL scoping validation (ONLY in embedded/production mode)
+    // In standalone mode, URL scoping is optional for easier development
+    if (!env.isMockMode) {
+      // Validate account ID from URL matches JWT claims
+      if (urlAccountId && urlAccountId !== currentUser.accountId) {
+        console.error(
+          `[Auth Middleware] Account ID mismatch. URL: ${urlAccountId}, JWT: ${currentUser.accountId}`
+        );
+        return NextResponse.json(
+          { error: 'Forbidden: Account access denied' },
+          { status: 403 }
+        );
+      }
+      
+      // Validate organization ID from URL matches JWT claims (if present)
+      if (urlOrgId) {
+        if (!currentUser.organizationId) {
+          console.error(
+            `[Auth Middleware] User ${currentUser.userId} attempted to access org ${urlOrgId} but has no org in JWT`
+          );
+          return NextResponse.json(
+            { error: 'Forbidden: Organization access denied' },
+            { status: 403 }
+          );
+        }
+        
+        if (urlOrgId !== currentUser.organizationId) {
+          console.error(
+            `[Auth Middleware] Org ID mismatch. URL: ${urlOrgId}, JWT: ${currentUser.organizationId}`
+          );
+          return NextResponse.json(
+            { error: 'Forbidden: Organization access denied' },
+            { status: 403 }
+          );
+        }
+      }
+    } else {
+      // Standalone mode: URL scoping is optional, just log it
+      if (urlAccountId || urlOrgId) {
+        console.log(
+          `[Auth Middleware] Standalone mode: URL scope detected (account:${urlAccountId}, org:${urlOrgId}) - validation skipped`
+        );
+      }
+    }
+    
+    // All validation passed - inject headers for downstream use
     const requestHeaders = new Headers(request.headers);
     
     // Inject user context headers
@@ -104,14 +184,31 @@ export async function middleware(request: NextRequest) {
       requestHeaders.set('x-organization-id', currentUser.organizationId);
     }
     
-    // Pass authenticated request through
+    // Inject URL-based scoping info (for API routes to use)
+    if (urlAccountId) {
+      requestHeaders.set('x-url-account-id', urlAccountId);
+    }
+    if (urlOrgId) {
+      requestHeaders.set('x-url-org-id', urlOrgId);
+    }
+    
+    // Pass authenticated and authorized request through
     const response = NextResponse.next({
       request: {
         headers: requestHeaders,
       },
     });
     
-    console.log(`[Auth Middleware] Authenticated user: ${currentUser.userId} (${currentUser.email})`);
+    const scope = urlOrgId 
+      ? `org:${urlOrgId}` 
+      : urlAccountId 
+        ? `account:${urlAccountId}` 
+        : env.isMockMode 
+          ? 'mock' 
+          : 'global';
+    console.log(
+      `[Auth Middleware] Authorized: ${currentUser.userId} (${currentUser.email}) - Scope: ${scope}${env.isMockMode ? ' (standalone)' : ''}`
+    );
     
     return response;
   } catch (err) {

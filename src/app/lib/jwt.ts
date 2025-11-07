@@ -198,9 +198,9 @@ function mapJoseError(error: unknown): UnauthorizedError {
  * Main JWT verification function
  * 
  * Automatically uses the appropriate verification method based on environment:
- * - Production: RS256/PS256 with JWKS
- * - Development (embedded): HS256 with shared secret
- * - Development (mock): Special handling for mock tokens
+ * - Production: PS256 with JWKS (from KMS public key)
+ * - Development (embedded): PS256 with JWKS (from KMS public key)
+ * - Mock mode: HS256 with shared secret (for standalone testing)
  * 
  * @param token - JWT token string
  * @returns JWTVerification result with claims and viewer
@@ -223,22 +223,13 @@ export async function verifyJWT(token: string): Promise<JWTVerification> {
     let claims: JWTClaims;
     
     if (env.isMockMode) {
-      // Mock mode: Use HS256 verification
+      // Mock mode: Use HS256 verification (for standalone testing without Rails)
       console.log('[JWT] Verifying token in mock mode (HS256)');
       claims = await verifyDevelopmentToken(token);
-    } else if (env.isDevelopment) {
-      // Development embedded mode: Try HS256 first, fall back to JWKS
-      console.log('[JWT] Verifying token in development mode');
-      try {
-        claims = await verifyDevelopmentToken(token);
-      } catch (hsError) {
-        // If HS256 fails, try JWKS (for testing production-like setup)
-        console.log('[JWT] HS256 verification failed, trying JWKS...');
-        claims = await verifyProductionToken(token);
-      }
     } else {
-      // Production: Use JWKS verification
-      console.log('[JWT] Verifying token in production mode (JWKS)');
+      // Production and Development (embedded): Use JWKS verification (PS256 from KMS)
+      const mode = env.isProduction ? 'production' : 'development';
+      console.log(`[JWT] Verifying token in ${mode} mode (PS256 via JWKS)`);
       claims = await verifyProductionToken(token);
     }
     
@@ -268,7 +259,7 @@ export async function verifyJWT(token: string): Promise<JWTVerification> {
       error: {
         code: (authError.details as any)?.code || AuthErrorCode.VERIFICATION_FAILED,
         message: authError.message,
-        details: authError.details,
+        details: authError.details as string | undefined,
         statusCode: authError.statusCode,
       },
     };

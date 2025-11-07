@@ -81,16 +81,15 @@ function buildConfig(): EnvironmentConfig {
   const authMode = getAuthMode();
   const isMockMode = authMode === 'mock';
   
-  // Rails base URL (where JWKS and auth endpoints live)
   const railsBaseUrl = getEnv(
     'RAILS_BASE_URL',
-    isDevelopment ? 'http://groupize.local' : ''
+    isDevelopment ? 'http://127.0.0.1' : ''
   );
   
   // JWKS endpoint
   const jwksUrl = getEnv(
     'JWKS_URL',
-    `${railsBaseUrl}/.well-known/jwks.json`
+    `${railsBaseUrl}/api/v1/.well-known/jwks.json`
   );
   
   // JWT configuration

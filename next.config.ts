@@ -24,6 +24,19 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+
+  async rewrites() {
+    return [
+      {
+        source: '/accounts/:accountId/orgs/:orgId/:rest*',
+        destination: '/:rest*',
+      },
+      {
+        source: '/accounts/:accountId/:rest*',
+        destination: '/:rest*',
+      },
+    ];
+  },
   turbopack: {
     rules: {
       '*.md': {
