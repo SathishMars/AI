@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "PORT=3000 AUTH_MODE=mock next dev --turbopack",
+    "dev": "PORT=3000 AUTH_MODE=standalone next dev --turbopack",
     "dev:embedded": "PORT=3001 AUTH_MODE=embedded next dev --turbopack",
     "build": "next build --turbopack",
-    "start": "PORT=3001 next start",
+    "start": "AUTH_MODE=embedded PORT=3001 next start",
     "lint": "eslint",
     "test": "jest",
     "test:watch": "jest --watch",

@@ -107,7 +107,7 @@ export default function TemplatesGrid() {
                 const row = rows.find(r => r.id === id);
                 if (!row) return;
                 const version = row.version;
-                const url = `${basePath}/api/workflow-templates/${encodeURIComponent(id)}?version=${encodeURIComponent(version)}`;
+                const url = `/api/workflow-templates/${encodeURIComponent(id)}?version=${encodeURIComponent(version)}`;
 
                 const headers: Record<string, string> = {};
                 if (account && typeof account === 'object') {

@@ -7,8 +7,8 @@ This document describes the JWT-based authentication system for the Groupize Wor
 The application uses JWT (JSON Web Tokens) for authentication with a defense-in-depth approach:
 
 - **Production**: JWT signed with AWS KMS (PS256) via Rails
-- **Development Embedded**: JWT signed with HS256 shared secret via Rails  
-- **Development Standalone**: Mock JWT tokens for frontend-only development
+- **Development Embedded**: JWT signed with AWS KMS (PS256) via Rails
+- **Development Standalone**: Skips JWT verification, uses mocked API for frontend-only development
 
 ## Architecture
 
@@ -158,14 +158,14 @@ function MyComponent() {
 
 ## JWKS and Key Rotation
 
-**Note:** JWKS is **only used in embedded mode and production**. Standalone mode uses HS256 with a shared secret.
+**Note:** JWKS is **only used in embedded mode and production**. Standalone mode skips JWT verification entirely.
 
 ### Rails JWKS Endpoint (Embedded Mode & Production Only)
 
 - **URL**: `/.well-known/jwks.json`
 - **Cache-Control**: `public, max-age=300, stale-while-revalidate=60`
 - **ETag**: For efficient revalidation
-- **Not used in standalone mode** - standalone generates and verifies mock tokens with HS256
+- **Not used in standalone mode** - standalone skips JWT verification
 
 ### Next.js JWKS Caching (Embedded Mode & Production Only)
 
@@ -179,7 +179,7 @@ The `jose` library's `createRemoteJWKSet` automatically:
 
 | Mode | Verification Method | When Used |
 |------|-------------------|-----------|
-| **Standalone** (`AUTH_MODE=mock`) | HS256 with `JWT_SECRET` | Frontend-only development, no Rails |
+| **Standalone** (`AUTH_MODE=standalone`) | None - skips JWT verification | Frontend-only development, no Rails |
 | **Embedded** (`AUTH_MODE=embedded`) | JWKS with KMS public keys (PS256) | Development with Rails, Production |
 
 ### Key Rotation Strategy (Embedded Mode & Production Only)
@@ -225,11 +225,12 @@ npm run dev
 
 **Features:**
 - **Default development mode** (runs on PORT=3000)
-- Generates mock JWT tokens automatically using **HS256**
+- **Skips JWT verification entirely**
+- Uses mocked API responses for user data
 - No Rails connection needed
-- No JWKS calls - all verification done with shared secret
+- No JWKS calls or token verification
 - No authentication redirects
-- Shows app as logged in with mock user
+- Shows app with mocked user context
 - Perfect for UI/component development
 
 ## Environment Configuration
@@ -238,16 +239,15 @@ Create a `.env.local` file (never commit!):
 
 ```bash
 # Authentication Mode
-AUTH_MODE=embedded              # or "mock" for standalone
+AUTH_MODE=embedded              # or "standalone" for dev mode
 
 # Rails Backend
 RAILS_BASE_URL=http://groupize.local
 JWKS_URL=http://groupize.local/.well-known/jwks.json
 
-# JWT Configuration
+# JWT Configuration (embedded mode only)
 JWT_ISSUER=groupize
 JWT_AUDIENCE=workflows
-JWT_SECRET=dev-secret-change-me  # Only for dev HS256
 
 # Cookie Configuration
 COOKIE_NAME=gpw_session
@@ -302,10 +302,11 @@ if (!token || !verification.success) {
   return NextResponse.redirect(new URL('/', env.railsBaseUrl));
 }
 
-// Mock mode: Generate new token and continue
-if (env.isMockMode) {
-  const mockToken = await createMockToken();
-  response.cookies.set(env.cookieName, mockToken, { ... });
+// Standalone mode: Skip JWT verification, use mocked API
+if (env.isStandalone) {
+  // Fetch user context from mocked API endpoint
+  const userData = await fetch('/api/user-session');
+  // Inject headers and continue
   return response;
 }
 ```
@@ -400,16 +401,13 @@ const currentUser = await getCurrentUser();
 console.log('Authenticated:', currentUser.isAuthenticated);
 ```
 
-### Mock Token Generation
+### Test Mocked User API
 
 ```typescript
-import { createMockToken } from '@/app/lib/jwt';
-
-const token = await createMockToken(
-  'user-123',
-  'account-456',
-  'org-789'
-);
+// In standalone mode, user data comes from mocked API
+const response = await fetch('/api/user-session');
+const data = await response.json();
+console.log('Mocked user:', data.user);
 ```
 
 ## Troubleshooting

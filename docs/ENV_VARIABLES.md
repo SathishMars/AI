@@ -13,7 +13,7 @@ Copy this content to create your `.env.local` file. Never commit `.env.local` to
 # Controls how the application authenticates users
 # Options:
 #   - embedded: Uses Rails JWT from gpw_session cookie (for production and with Rails)
-#   - mock: Generates mock JWT tokens (for standalone frontend development)
+#   - standalone: Skips JWT verification, uses mocked API responses (for standalone frontend development)
 # Default: embedded
 AUTH_MODE=embedded
 
@@ -36,11 +36,6 @@ JWT_ISSUER=groupize
 
 # JWT audience (must match Rails configuration)
 JWT_AUDIENCE=workflows
-
-# JWT secret (ONLY used in standalone mock mode for HS256 signing)
-# Not used in embedded mode or production (which use JWKS/KMS)
-# Should match Rails JWT_SECRET if you want to test with Rails-generated tokens
-JWT_SECRET=dev-secret-change-me
 
 # -----------------------------------------------------------------------------
 # Cookie Configuration
@@ -68,11 +63,11 @@ NODE_ENV=development
 ```bash
 npm run dev
 ```
-- Sets `AUTH_MODE=mock` automatically
-- Generates mock JWT tokens automatically
+- Sets `AUTH_MODE=standalone` automatically
+- **Skips JWT verification** - uses mocked API responses
 - **No Rails connection needed**
 - Great for frontend development
-- Uses HS256 with `JWT_SECRET` for mock tokens
+- No token generation or verification
 - Runs on `PORT=3000`
 
 ### Embedded Mode (With Rails)
@@ -94,29 +89,28 @@ In production:
 - JWT tokens are signed with **AWS KMS (PS256)** by Rails
 - `JWKS_URL` points to production `/.well-known/jwks.json`
 - All cookies use `Secure`, `HttpOnly`, `SameSite=Lax`
-- `JWT_SECRET` is **NOT used** (JWKS handles verification)
 - Tokens verified via JWKS with automatic caching and rotation
 
 ## Environment Variables Reference
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `AUTH_MODE` | No | `embedded` | Authentication mode: `embedded` or `mock` |
+| `AUTH_MODE` | No | `embedded` | Authentication mode: `embedded` or `standalone` |
 | `RAILS_BASE_URL` | Yes (embedded) | `http://groupize.local` | Rails application base URL |
-| `JWKS_URL` | No | `${RAILS_BASE_URL}/.well-known/jwks.json` | JWKS endpoint for JWT verification |
-| `JWT_ISSUER` | No | `groupize` | JWT issuer claim (must match Rails) |
-| `JWT_AUDIENCE` | No | `workflows` | JWT audience claim (must match Rails) |
-| `JWT_SECRET` | No | `dev-secret-change-me` | Shared secret for HS256 (mock mode only) |
+| `JWKS_URL` | No | `${RAILS_BASE_URL}/.well-known/jwks.json` | JWKS endpoint for JWT verification (embedded only) |
+| `JWT_ISSUER` | No | `groupize` | JWT issuer claim (embedded only, must match Rails) |
+| `JWT_AUDIENCE` | No | `workflows` | JWT audience claim (embedded only, must match Rails) |
 | `COOKIE_NAME` | No | `gpw_session` | JWT cookie name (must match Rails) |
 | `NEXT_PUBLIC_BASE_PATH` | No | `/aime/aimeworkflows` | Next.js base path |
 | `NODE_ENV` | No | `development` | Node environment |
 
 ## JWT Verification Strategy by Mode
 
-### Standalone Mode (`AUTH_MODE=mock`)
+### Standalone Mode (`AUTH_MODE=standalone`)
+- **No JWT verification**
 - **No JWKS used**
-- Generates tokens with HS256 using `JWT_SECRET`
-- Verifies tokens with same `JWT_SECRET`
+- Uses mocked API responses for user data
+- No token generation or verification
 - No network calls to Rails
 - Perfect for frontend-only development
 
@@ -132,10 +126,9 @@ In production:
 
 ### For Standalone Development (No Rails)
 ```bash
-# Create .env.local
+# Create .env.local (optional - standalone is the default for dev script)
 cat > .env.local << 'EOF'
-AUTH_MODE=mock
-JWT_SECRET=dev-secret-change-me
+AUTH_MODE=standalone
 EOF
 
 # Run

@@ -223,7 +223,7 @@ npm run dev
 
 # Access without scoping (works!)
 curl http://localhost:3000/aime/aimeworkflows/
-# → 200 OK (mock token auto-generated)
+# → 200 OK (JWT verification skipped, uses mocked API)
 
 # Access with scoping (also works, validation skipped)
 curl http://localhost:3000/aime/aimeworkflows/accounts/123/workflows

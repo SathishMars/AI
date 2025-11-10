@@ -11,7 +11,6 @@ Create `.env.local` in the Workflows directory:
 ```bash
 AUTH_MODE=embedded
 RAILS_BASE_URL=http://groupize.local
-JWT_SECRET=dev-secret-change-me
 JWT_ISSUER=groupize
 JWT_AUDIENCE=workflows
 COOKIE_NAME=gpw_session
@@ -40,7 +39,7 @@ npm run dev
 
 Navigate to: `http://localhost:3000/aime/aimeworkflows/`
 
-**Note:** Standalone mode uses **HS256** for mock tokens, not JWKS.
+**Note:** Standalone mode skips JWT verification and uses mocked user API responses.
 
 ## What Was Implemented
 
@@ -79,7 +78,7 @@ Navigate to: `http://localhost:3000/aime/aimeworkflows/`
 
 **New files:**
 - `src/app/lib/env.ts` - Environment configuration
-- `src/app/lib/jwt.ts` - JWT verification (JWKS for embedded, HS256 for standalone)
+- `src/app/lib/jwt.ts` - JWT verification (JWKS for embedded mode only)
 - `src/app/lib/currentUser.ts` - Server-side current user access
 
 #### 3. Middleware
@@ -87,10 +86,10 @@ Navigate to: `http://localhost:3000/aime/aimeworkflows/`
 **File:** `src/middleware.ts`
 
 **Completely rewritten to:**
-- Verify JWT from `gpw_session` cookie
+- Verify JWT from `gpw_session` cookie (embedded mode only)
+- Skip JWT verification in standalone mode
 - Inject user context headers
-- Handle mock mode for standalone dev
-- Redirect to Rails login on auth failure
+- Redirect to Rails login on auth failure (embedded mode)
 
 #### 4. Layout & Context
 
@@ -115,12 +114,12 @@ Navigate to: `http://localhost:3000/aime/aimeworkflows/`
 **New scripts:**
 ```json
 {
-  "dev": "PORT=3000 AUTH_MODE=mock next dev --turbopack",
+  "dev": "PORT=3000 AUTH_MODE=standalone next dev --turbopack",
   "dev:embedded": "PORT=3001 AUTH_MODE=embedded next dev --turbopack"
 }
 ```
 
-**Note:** `npm run dev` is now standalone mode (default) - uses HS256 mock tokens, no JWKS.
+**Note:** `npm run dev` is now standalone mode (default) - skips JWT verification, uses mocked user API.
 
 #### 7. Documentation
 
@@ -137,7 +136,7 @@ Workflows/
 │   ├── app/
 │   │   ├── lib/
 │   │   │   ├── env.ts          # Environment config
-│   │   │   ├── jwt.ts          # JWT verification (JWKS/HS256)
+│   │   │   ├── jwt.ts          # JWT verification (JWKS for embedded mode)
 │   │   │   └── currentUser.ts  # Server-side current user
 │   │   ├── types/
 │   │   │   ├── auth.ts         # Auth types
@@ -182,9 +181,9 @@ npm run dev
 # Navigate to workflows
 open http://localhost:3000/aime/aimeworkflows/
 
-# Should automatically log in as "Mock User"
-# Check browser console for mock token generation
-# Uses HS256 tokens - no JWKS calls
+# Should automatically show mocked user
+# No JWT verification - uses mocked API responses
+# No JWKS calls or token generation
 ```
 
 ### 3. Test Token Verification
@@ -213,12 +212,11 @@ Check terminal logs for:
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `AUTH_MODE` | No | `embedded` | `embedded` or `mock` |
+| `AUTH_MODE` | No | `embedded` | `embedded` or `standalone` |
 | `RAILS_BASE_URL` | Yes (embedded) | `http://groupize.local` | Rails app URL |
-| `JWKS_URL` | No | `${RAILS_BASE_URL}/.well-known/jwks.json` | JWKS endpoint |
-| `JWT_ISSUER` | No | `groupize` | JWT issuer claim |
-| `JWT_AUDIENCE` | No | `workflows` | JWT audience claim |
-| `JWT_SECRET` | Yes (dev) | `dev-secret-change-me` | Shared secret for HS256 |
+| `JWKS_URL` | No | `${RAILS_BASE_URL}/.well-known/jwks.json` | JWKS endpoint (embedded only) |
+| `JWT_ISSUER` | No | `groupize` | JWT issuer claim (embedded only) |
+| `JWT_AUDIENCE` | No | `workflows` | JWT audience claim (embedded only) |
 | `COOKIE_NAME` | No | `gpw_session` | Cookie name |
 | `NEXT_PUBLIC_BASE_PATH` | No | `/aime/aimeworkflows` | Next.js basePath |
 | `NODE_ENV` | No | `development` | Node environment |
@@ -239,7 +237,7 @@ Check terminal logs for:
 2. Check Rails is running: `curl http://groupize.local/.well-known/jwks.json`
 3. Check `RAILS_BASE_URL` is correct
 4. Check Rails JWKS controller is working
-5. Or switch to standalone mode: `npm run dev` (uses HS256, no JWKS)
+5. Or switch to standalone mode: `npm run dev` (skips JWT verification)
 
 ### Issue: "Redirecting to login" in embedded mode
 
@@ -263,8 +261,8 @@ Check terminal logs for:
 npm run dev
 ```
 
-Work on UI without Rails running. Mock user is automatically logged in.
-Uses **HS256 mock tokens** - no JWKS, no network calls to Rails.
+Work on UI without Rails running. Mocked user is automatically available.
+**Skips JWT verification** - uses mocked API responses, no network calls to Rails.
 Runs on PORT=3000.
 
 ### Full Stack Development
@@ -287,7 +285,7 @@ Runs on PORT=3001.
 2. Set `JWT_GSSO_GROUPIZE_KEY_ID` in Rails
 3. Start Rails in production mode
 4. Start Next.js with `AUTH_MODE=embedded` (default)
-5. Tokens will use **PS256 with JWKS verification** (not HS256)
+5. Tokens will use **PS256 with JWKS verification**
 
 ## Next Steps
 
@@ -311,9 +309,9 @@ For issues or questions:
 
 | Mode | Command | Verification | JWKS Used? |
 |------|---------|--------------|------------|
-| **Standalone** | `npm run dev` | HS256 with shared secret | ❌ No |
+| **Standalone** | `npm run dev` | Skipped (uses mocked API) | ❌ No |
 | **Embedded** | `npm run dev:embedded` | JWKS with KMS public keys | ✅ Yes |
 | **Production** | `npm start` | JWKS with KMS public keys | ✅ Yes |
 
-**Summary:** The implementation provides secure JWT authentication with Rails SSO, standalone development mode (HS256), embedded/production mode (JWKS/PS256), typed errors, proper caching, and follows all security best practices.
+**Summary:** The implementation provides secure JWT authentication with Rails SSO for embedded/production modes, and a standalone development mode that skips JWT verification entirely, using mocked API responses instead.
 

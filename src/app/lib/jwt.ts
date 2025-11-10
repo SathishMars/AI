@@ -2,8 +2,8 @@
  * JWT Verification Utility
  * 
  * Handles JWT verification using JWKS (JSON Web Key Sets) with automatic
- * key caching and rotation support. Supports both production (RS256/PS256)
- * and development (HS256) signing algorithms.
+ * key caching and rotation support. Verifies RS256/PS256 tokens signed by
+ * Rails KMS. Only used in embedded mode; standalone mode skips verification.
  */
 
 import { jwtVerify, createRemoteJWKSet, JWTPayload, type JWTVerifyOptions } from 'jose';
@@ -52,9 +52,9 @@ function getJWKSKeySet(): ReturnType<typeof createRemoteJWKSet> {
 }
 
 /**
- * Verify JWT token for production (RS256/PS256 with JWKS)
+ * Verify JWT token (RS256/PS256 with JWKS)
  */
-async function verifyProductionToken(token: string): Promise<JWTClaims> {
+async function verifyToken(token: string): Promise<JWTClaims> {
   try {
     const jwks = getJWKSKeySet();
     
@@ -66,36 +66,6 @@ async function verifyProductionToken(token: string): Promise<JWTClaims> {
     };
     
     const { payload } = await jwtVerify(token, jwks, verifyOptions);
-    
-    // Validate required custom claims
-    const claims = payload as JWTPayload & Partial<JWTClaims>;
-    validateClaims(claims);
-    
-    return claims as JWTClaims;
-  } catch (error) {
-    throw mapJoseError(error);
-  }
-}
-
-/**
- * Verify JWT token for development (HS256 with shared secret)
- */
-async function verifyDevelopmentToken(token: string): Promise<JWTClaims> {
-  try {
-    if (!env.jwtSecret) {
-      throw new Error('JWT_SECRET is not configured for development mode');
-    }
-    
-    const secret = new TextEncoder().encode(env.jwtSecret);
-    
-    const verifyOptions: JWTVerifyOptions = {
-      issuer: env.jwtIssuer,
-      audience: env.jwtAudience,
-      algorithms: ['HS256'],
-      clockTolerance: 60,
-    };
-    
-    const { payload } = await jwtVerify(token, secret, verifyOptions);
     
     // Validate required custom claims
     const claims = payload as JWTPayload & Partial<JWTClaims>;
@@ -197,13 +167,11 @@ function mapJoseError(error: unknown): UnauthorizedError {
 /**
  * Main JWT verification function
  * 
- * Automatically uses the appropriate verification method based on environment:
- * - Production: PS256 with JWKS (from KMS public key)
- * - Development (embedded): PS256 with JWKS (from KMS public key)
- * - Mock mode: HS256 with shared secret (for standalone testing)
+ * Verifies JWT tokens using JWKS (PS256/RS256 from KMS public key).
+ * Used only in embedded mode; standalone mode skips JWT verification entirely.
  * 
  * @param token - JWT token string
- * @returns JWTVerification result with claims and viewer
+ * @returns JWTVerification result with claims and current user
  */
 export async function verifyJWT(token: string): Promise<JWTVerification> {
   try {
@@ -219,19 +187,10 @@ export async function verifyJWT(token: string): Promise<JWTVerification> {
       };
     }
     
-    // Choose verification method based on environment
-    let claims: JWTClaims;
-    
-    if (env.isMockMode) {
-      // Mock mode: Use HS256 verification (for standalone testing without Rails)
-      console.log('[JWT] Verifying token in mock mode (HS256)');
-      claims = await verifyDevelopmentToken(token);
-    } else {
-      // Production and Development (embedded): Use JWKS verification (PS256 from KMS)
-      const mode = env.isProduction ? 'production' : 'development';
-      console.log(`[JWT] Verifying token in ${mode} mode (PS256 via JWKS)`);
-      claims = await verifyProductionToken(token);
-    }
+    // Verify token using JWKS (PS256 from KMS)
+    const mode = env.isProduction ? 'production' : 'development';
+    console.log(`[JWT] Verifying token in ${mode} mode (PS256 via JWKS)`);
+    const claims = await verifyToken(token);
     
     // Create current user from claims
     const currentUser = createCurrentUserFromClaims(claims);
@@ -265,48 +224,3 @@ export async function verifyJWT(token: string): Promise<JWTVerification> {
     };
   }
 }
-
-/**
- * Create a mock JWT token for development (standalone mode)
- * 
- * This generates a token that can be verified with the same secret.
- * Should ONLY be used in development with AUTH_MODE=mock
- */
-export async function createMockToken(
-  userId = 'mock-user-123',
-  accountId = 'mock-account-456',
-  organizationId?: string
-): Promise<string> {
-  if (env.isProduction) {
-    throw new Error('Mock tokens cannot be created in production');
-  }
-  
-  if (!env.jwtSecret) {
-    throw new Error('JWT_SECRET is required for mock tokens');
-  }
-  
-  const { SignJWT } = await import('jose');
-  
-  const now = Math.floor(Date.now() / 1000);
-  const secret = new TextEncoder().encode(env.jwtSecret);
-  
-  const token = await new SignJWT({
-    account_id: accountId,
-    organization_id: organizationId || null,
-    email: 'mock.user@example.com',
-    user_first_name: 'Mock',
-    user_last_name: 'User',
-    user_name: 'Mock User',
-  })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuer(env.jwtIssuer)
-    .setAudience(env.jwtAudience)
-    .setSubject(userId)
-    .setIssuedAt(now)
-    .setNotBefore(now)
-    .setExpirationTime(now + 30 * 60) // 30 minutes
-    .sign(secret);
-  
-  return token;
-}
-

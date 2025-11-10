@@ -8,7 +8,7 @@
 /**
  * Authentication mode
  */
-export type AuthMode = 'embedded' | 'mock';
+export type AuthMode = 'embedded' | 'standalone';
 
 /**
  * Environment configuration interface
@@ -24,7 +24,6 @@ interface EnvironmentConfig {
   // JWT Configuration
   jwtIssuer: string;
   jwtAudience: string;
-  jwtSecret?: string;  // Only used in dev mock mode with HS256
   
   // Cookie configuration
   cookieName: string;
@@ -36,7 +35,7 @@ interface EnvironmentConfig {
   // Feature flags
   isDevelopment: boolean;
   isProduction: boolean;
-  isMockMode: boolean;
+  isStandalone: boolean;
 }
 
 /**
@@ -63,8 +62,8 @@ function getRequiredEnv(key: string): string {
 function getAuthMode(): AuthMode {
   const mode = process.env.AUTH_MODE?.toLowerCase();
   
-  if (mode === 'mock') {
-    return 'mock';
+  if (mode === 'standalone') {
+    return 'standalone';
   }
   
   // Default to embedded mode
@@ -79,25 +78,24 @@ function buildConfig(): EnvironmentConfig {
   const isDevelopment = nodeEnv === 'development';
   const isProduction = nodeEnv === 'production';
   const authMode = getAuthMode();
-  const isMockMode = authMode === 'mock';
+  const isStandalone = authMode === 'standalone';
   
   const railsBaseUrl = getEnv(
     'RAILS_BASE_URL',
     isDevelopment ? 'http://127.0.0.1' : ''
   );
   
-  // JWKS endpoint
+  // JWKS endpoint (only used in embedded mode)
   const jwksUrl = getEnv(
     'JWKS_URL',
     `${railsBaseUrl}/api/v1/.well-known/jwks.json`
   );
   
-  // JWT configuration
+  // JWT configuration (only used in embedded mode)
   const jwtIssuer = getEnv('JWT_ISSUER', 'groupize');
   const jwtAudience = getEnv('JWT_AUDIENCE', 'workflows');
-  const jwtSecret = process.env.JWT_SECRET || 'dev-secret-change-me';
   
-  // Cookie name (must match Rails)
+  // Cookie name (must match Rails in embedded mode)
   const cookieName = getEnv('COOKIE_NAME', 'gpw_session');
   
   // App configuration
@@ -109,13 +107,12 @@ function buildConfig(): EnvironmentConfig {
     jwksUrl,
     jwtIssuer,
     jwtAudience,
-    jwtSecret: isMockMode ? jwtSecret : undefined,
     cookieName,
     basePath,
     nodeEnv,
     isDevelopment,
     isProduction,
-    isMockMode,
+    isStandalone,
   };
 }
 
@@ -138,7 +135,7 @@ export function logEnvConfig(): void {
       cookieName: env.cookieName,
       basePath: env.basePath,
       nodeEnv: env.nodeEnv,
-      isMockMode: env.isMockMode,
+      isStandalone: env.isStandalone,
     });
   }
 }

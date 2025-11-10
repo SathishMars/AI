@@ -10,7 +10,7 @@ A comprehensive JWT-based authentication system has been implemented for the Gro
 
 1. **JWT Verification**
    - **Embedded Mode & Production**: PS256 via AWS KMS with JWKS verification
-   - **Standalone Mode**: HS256 with shared secret (no JWKS)
+   - **Standalone Mode**: Skips JWT verification, uses mocked API responses
    - Automatic JWKS caching and key rotation (embedded/prod only)
    - Clock tolerance (60s skew) for distributed systems
 
@@ -22,7 +22,7 @@ A comprehensive JWT-based authentication system has been implemented for the Gro
    - Proper claims validation (exp, aud, iss, nbf)
 
 3. **Dual Development Modes**
-   - **Standalone Mode (Default)**: HS256 mock tokens, no Rails, no JWKS
+   - **Standalone Mode (Default)**: Skips JWT verification, uses mocked API, no Rails
    - **Embedded Mode**: JWKS verification with KMS-signed tokens from Rails
 
 4. **Type-Safe Error Handling**
@@ -113,11 +113,11 @@ A comprehensive JWT-based authentication system has been implemented for the Gro
    - Type-safe env variable access
    - Support for embedded/mock modes
 
-4. **`src/app/lib/jwt.ts`** (322 lines)
-   - JWT verification with JWKS (embedded) or HS256 (standalone)
-   - Automatic key caching via jose (embedded only)
-   - Mock token generation (standalone)
+4. **`src/app/lib/jwt.ts`** (227 lines)
+   - JWT verification with JWKS (embedded mode only)
+   - Automatic key caching via jose
    - Error mapping and logging
+   - Standalone mode skips this entirely
 
 5. **`src/app/lib/currentUser.ts`** (115 lines)
    - Server-side current user access
@@ -136,12 +136,13 @@ A comprehensive JWT-based authentication system has been implemented for the Gro
    - Common issues and solutions
 
 #### Modified:
-1. **`src/middleware.ts`** (137 lines - completely rewritten)
-   - JWT verification from cookie
-   - JWKS verification (embedded) or HS256 (standalone)
+1. **`src/middleware.ts`** (330 lines - completely rewritten)
+   - JWT verification from cookie (embedded mode only)
+   - JWKS verification with automatic caching
    - Header injection for downstream use
-   - Embedded/mock mode support
-   - Redirect to Rails login on failure
+   - Embedded/standalone mode support
+   - Standalone mode skips JWT, uses mocked API
+   - Redirect to Rails login on failure (embedded)
 
 2. **`src/app/layout.tsx`**
    - Now async Server Component
@@ -163,7 +164,7 @@ A comprehensive JWT-based authentication system has been implemented for the Gro
    - HTTP error mapping
 
 6. **`package.json`**
-   - Changed `dev` to standalone mode (PORT=3000, AUTH_MODE=mock)
+   - Changed `dev` to standalone mode (PORT=3000, AUTH_MODE=standalone)
    - `dev:embedded` for Rails integration (PORT=3001, AUTH_MODE=embedded)
    - Installed `jose` package
 
@@ -188,13 +189,12 @@ A comprehensive JWT-based authentication system has been implemented for the Gro
 - ✅ Unknown kid auto-refetch
 - ✅ Multi-key support for rotation
 - ✅ Cache-Control headers from endpoint
-- ❌ Not used in standalone mode (uses HS256 instead)
+- ❌ Not used in standalone mode (skips JWT verification)
 
 ### 🧪 Development Experience
 
 - ✅ Embedded mode (with Rails)
-- ✅ Standalone mode (no Rails)
-- ✅ Mock token generation
+- ✅ Standalone mode (no Rails, mocked API)
 - ✅ Type-safe throughout
 - ✅ Detailed logging
 - ✅ Hot module reload support
@@ -237,7 +237,7 @@ cd Workflows && npm run dev
 open http://localhost:3000/aime/aimeworkflows/
 ```
 
-Uses HS256 mock tokens - no Rails, no JWKS calls.
+Skips JWT verification - uses mocked API, no Rails, no JWKS calls.
 
 **3. Check Logs:**
 Look for in terminal:
@@ -253,7 +253,6 @@ Create `.env.local`:
 ```bash
 AUTH_MODE=embedded
 RAILS_BASE_URL=http://groupize.local
-JWT_SECRET=dev-secret-change-me
 JWT_ISSUER=groupize
 JWT_AUDIENCE=workflows
 COOKIE_NAME=gpw_session
@@ -291,7 +290,7 @@ COOKIE_NAME=gpw_session
 
 | Mode | Command | Verification | JWKS | Port |
 |------|---------|--------------|------|------|
-| **Standalone** | `npm run dev` | HS256 shared secret | ❌ No | 3000 |
+| **Standalone** | `npm run dev` | Skipped (mocked API) | ❌ No | 3000 |
 | **Embedded** | `npm run dev:embedded` | JWKS + KMS (PS256) | ✅ Yes | 3001 |
 | **Production** | `npm start` | JWKS + KMS (PS256) | ✅ Yes | 3001 |
 
