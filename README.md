@@ -225,7 +225,7 @@ Next.js serves:  src/app/workflows/configure/[id]/page.tsx
 
 **Important Notes:**
 - ✅ Next.js `<Link>` components automatically prepend basePath
-- ⚠️ Images require basePath: `src={`${BASE_PATH}/image.png`}` (see `src/app/utils/api.ts`)
+- ⚠️ Images require basePath: `src={`${NEXT_PUBLIC_BASE_PATH}/image.png`}` (see `src/app/utils/api.ts`)
 - ✅ API fetch calls use `apiFetch()` helper which adds basePath
 - ✅ Shared authentication via forwarded cookies
 - ✅ Future micro-apps: `/aime/approvals/`, `/aime/analytics/`, etc.

@@ -1,6 +1,7 @@
 // Tool: getListOfNotificationTemplates
+// AI SDK (Vercel) compatible tool definition
 
-import { tool } from '@openai/agents';
+import { tool } from 'ai';
 import { z } from 'zod';
 
 export interface ListOfNotificationTemplatesInput {
@@ -25,6 +26,7 @@ export const getListOfNotificationTemplates = async (
 ): Promise<ListOfNotificationTemplatesOutput> => {
     const { account, organization } = input;
     console.log('[GetListOfNotificationTemplates] Fetching notification templates for account:', account, 'organization:', organization);
+    
     // Defensive: ensure account present
     if (!account || typeof account !== 'string') {
         throw new Error('account is required and must be a string');
@@ -51,37 +53,47 @@ const getListOfNotificationTemplatesSchema = z.object({
     organization: nonEmptyStringOrNull.optional().nullable().describe('Organization identifier (optional)'),
 });
 
-const listToolFunc = async (input: unknown) => {
-    // The tool expects a JSON object (not a raw string or array) with the shape:
-    // { account: string, organization?: string | null }
-    // We validate using Zod and re-throw a normalized error message so callers (and the LLM)
-    // can clearly see what was wrong with the input.
-    try {
-        const parsedInput = getListOfNotificationTemplatesSchema.parse(input);
-        return await getListOfNotificationTemplates(parsedInput as ListOfNotificationTemplatesInput);
-    } catch (err) {
-        // Zod throws a ZodError with `issues` array; normalize into a readable message
-        if (err && typeof err === 'object' && 'issues' in err) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const zerr: any = err;
-            const details = zerr.issues ? JSON.stringify(zerr.issues) : String(err);
-            throw new Error(`getListOfNotificationTemplates: invalid input - ${zerr.message || String(err)}; validationIssues=${details}`);
-        }
-        throw err;
-    }
-};
-
-export const GetListOfNotificationTemplatesTool = tool({
-    name: 'getListOfNotificationTemplates',
-    // A clear description for LLMs: explain inputs, behaviour, and output schema.
+/**
+ * AI SDK tool for retrieving notification templates
+ * Compatible with Vercel AI SDK (ai package v5.x)
+ * 
+ * Tool definition using the `tool` function from the 'ai' package.
+ * Can be used with Agent class or directly with generateText, streamText, etc.
+ * 
+ * Usage example with Agent:
+ * ```typescript
+ * import { Experimental_Agent as Agent } from 'ai';
+ * import { getListOfNotificationTemplatesTool } from './aiSdkTools/GetListOfNotificationTemplates';
+ * 
+ * const myAgent = new Agent({
+ *   model: 'openai/gpt-4o',
+ *   tools: { getListOfNotificationTemplates: getListOfNotificationTemplatesTool }
+ * });
+ * 
+ * const result = await myAgent.generate({
+ *   prompt: 'Get notification templates for account xyz'
+ * });
+ * ```
+ */
+export const getListOfNotificationTemplatesTool = tool({
     description:
-        'Returns a structured object containing published notification templates for a given account and optional organization. IMPORTANT: this tool expects an OBJECT input (not a raw string) and returns an OBJECT (not a JSON-string).\n' +
-        'Input (OBJECT): { account: string, organization?: string | null }\n' +
-        'Output (OBJECT): { templates: [{ id: string, version: string, label: string, description?: string | null }] }\n' +
-        'Error behaviour: If the input is invalid the tool will throw a validation error. The error message will include "getListOfNotificationTemplates: invalid input" and a validationIssues field describing what failed.\n' +
-        'Notes: organization is optional; when provided it filters templates to that organization. Use this tool to discover available templates for a user/account before taking template-specific actions.',
-
-    parameters: getListOfNotificationTemplatesSchema,
-    execute: listToolFunc,
-    strict: true
+        'Returns a structured object containing published notification templates for a given account and optional organization. ' +
+        'This tool expects an object input with account (required) and organization (optional). ' +
+        'Returns an object with a templates array containing notification template details. ' +
+        'Use this tool to discover available notification templates for an account before taking template-specific actions.',
+    
+    inputSchema: getListOfNotificationTemplatesSchema,
+    
+    execute: async ({ account, organization }) => {
+        try {
+            const result = await getListOfNotificationTemplates({ account, organization });
+            return result;
+        } catch (err) {
+            // Provide clear error messages for debugging
+            if (err instanceof Error) {
+                throw new Error(`getListOfNotificationTemplates: ${err.message}`);
+            }
+            throw new Error(`getListOfNotificationTemplates: unexpected error - ${String(err)}`);
+        }
+    },
 });

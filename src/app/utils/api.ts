@@ -5,9 +5,7 @@
  * This helper ensures API calls go through the correct basePath
  */
 
-// Hardcoded basePath - must match next.config.ts
-// DO NOT use env variable as it can get out of sync
-export const BASE_PATH = '/aime/aimeworkflows';
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
 
 /**
  * Fetch wrapper that automatically prepends basePath to API calls
@@ -26,7 +24,7 @@ export const apiFetch = (
   }
   
   // Otherwise, prepend basePath
-  const url = `${BASE_PATH}${input}`;
+  const url = `${basePath}${input}`;
   return fetch(url, init);
 };
 
@@ -35,6 +33,5 @@ export const apiFetch = (
  * Useful for debugging or logging
  */
 export const getApiUrl = (path: string): string => {
-  return `${BASE_PATH}${path}`;
+  return `${basePath}${path}`;
 };
-

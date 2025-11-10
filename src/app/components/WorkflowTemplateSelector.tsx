@@ -2,18 +2,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import {
-  Box,
-  FormControl,
-  Select,
-  MenuItem,
-  Typography,
-  CircularProgress,
-  Tooltip
-} from '@mui/material';
-import {
-  Add as AddIcon
-} from '@mui/icons-material';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Loader2, Plus } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { WorkflowTemplate } from '@/app/types/workflowTemplate';
 import { apiFetch } from '@/app/utils/api';
@@ -31,6 +22,7 @@ interface WorkflowTemplateSelectorProps {
   currentTemplateMenuItem?: workflowTemplateSelectorMenuItem;
   onTemplateChange?: (templateId: string, templateName: string) => void;
 }
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
 
 export default function WorkflowTemplateSelector({
   currentTemplateMenuItem
@@ -57,7 +49,7 @@ export default function WorkflowTemplateSelector({
           // No status filter - backend returns latest version per template (draft/published preferred)
         });
 
-        const url = `/api/workflow-templates?${params}`;
+        const url = `${basePath}/api/workflow-templates?${params}`;
         console.log('🌐 Fetching templates from:', url);
 
         const response = await apiFetch(url);
@@ -125,77 +117,64 @@ export default function WorkflowTemplateSelector({
 
   if (isLoading || !selectedTemplateId) {
     return (
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        <CircularProgress size={20} />
-        <Typography variant="body2" color="text.secondary">
+      <div className="flex items-center gap-2">
+        <Loader2 className="h-5 w-5 animate-spin" />
+        <span className="text-sm text-muted-foreground">
           Loading templates...
-        </Typography>
-      </Box>
+        </span>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <Typography variant="body2" color="error">
+      <span className="text-sm text-destructive">
         {error}
-      </Typography>
+      </span>
     );
   }
 
 
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 250, maxWidth: 400 }}>
-      <FormControl size="small" fullWidth>
-        <Select
-          value={selectedTemplateId}
-          onChange={(e) => handleTemplateChange(e.target.value)}
-          sx={{
-            minWidth: 200,
-            maxWidth: 400,
-            '& .MuiSelect-select': {
-              py: 1
-            }
-          }}
-        >
-
+    <div className="flex items-center min-w-[250px] max-w-[400px]">
+      <Select
+        value={selectedTemplateId}
+        onValueChange={handleTemplateChange}
+      >
+        <SelectTrigger className="min-w-[200px] max-w-[400px]">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
           {templates.map((template) => (
-            <MenuItem key={template.id} value={template.id}>
-              <Tooltip title={template.label} placement="top" arrow>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', gap: 1 }}>
-                  <Typography
-                    sx={{
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      flex: 1,
-                      minWidth: 0
-                    }}
-                  >
-                    {template.label}
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{
-                      flexShrink: 0,
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    v{template.version} • {template.status}
-                  </Typography>
-                </Box>
-              </Tooltip>
-            </MenuItem>
+            <SelectItem key={template.id} value={template.id}>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex justify-between w-full items-center gap-2">
+                      <span className="overflow-hidden text-ellipsis whitespace-nowrap flex-1 min-w-0">
+                        {template.label}
+                      </span>
+                      <span className="text-xs text-muted-foreground flex-shrink-0 whitespace-nowrap">
+                        v{template.version} • {template.status}
+                      </span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{template.label}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </SelectItem>
           ))}
 
-          <MenuItem value="new">
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'primary.main' }}>
-              <AddIcon fontSize="small" />
-              <Typography>Create New Template</Typography>
-            </Box>
-          </MenuItem>
-        </Select>
-      </FormControl>
-    </Box>
+          <SelectItem value="new">
+            <div className="flex items-center gap-2 text-primary">
+              <Plus className="h-4 w-4" />
+              <span>Create New Template</span>
+            </div>
+          </SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
   );
 }

@@ -17,7 +17,7 @@ import {
 
 // Create the context
 const UnifiedUserContext = createContext<UnifiedUserContextState | undefined>(undefined);
-
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
 /**
  * Unified User Context Provider
  * Provides complete user session context including user, account, and organization data

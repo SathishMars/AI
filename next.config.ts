@@ -2,9 +2,7 @@ import type { NextConfig } from "next";
 
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  
-  // This workflows micro-app serves from /aime/aimeworkflows
+  output: 'standalone', // this for the creation of a docker image
   basePath: '/aime/aimeworkflows',
   assetPrefix: '/aime/aimeworkflows',
   trailingSlash: true,

@@ -1,227 +1,203 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyJWT, createMockToken } from '@/app/lib/jwt';
-import { env } from '@/app/lib/env';
+
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
 
 /**
- * Authentication Middleware
- * 
- * Protects all routes by verifying JWT token from gpw_session cookie.
- * Implements defense-in-depth with proper error handling and logging.
- * 
- * Flow:
- * 1. Check for gpw_session cookie
- * 2. Verify JWT signature via JWKS (or HS256 in dev standalone mode)
- * 3. Validate claims (exp, aud, iss, etc.)
- * 4. Inject user headers for downstream use
- * 5. On failure: redirect to Rails login (embedded) or allow (mock mode)
+ * Middleware to ensure API routes always receive `x-account` and `x-organization` headers.
+ *
+ * Priority order for values:
+ * 1. URL query params (`account`, `organization`)
+ * 2. Existing request headers (`x-account`, `x-organization`)
+ * 3. Cookies (`account`, `organization`)
+ * 4. Fallback defaults (account: 'groupize-demos', organization: none)
+ *
+ * Applies to all `/api/*` routes by default (see `config.matcher`).
  */
 export async function middleware(request: NextRequest) {
   try {
     const pathname = request.nextUrl.pathname;
+    console.log("[middleware] the pathname:", pathname, ' basePath:', basePath);
 
-    // Skip Next.js internals and static assets
+    // Skip Next.js internals and static assets to avoid unnecessary middleware work
+    // This preserves performance for assets and avoids interfering with internal handlers
     if (
       pathname.startsWith('/_next') ||
       pathname.startsWith('/static') ||
       pathname === '/favicon.ico' ||
-      pathname.match(/\.(png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$/)
+      pathname.startsWith('/api/_next')
     ) {
       return NextResponse.next();
     }
 
-    // AUTHENTICATION: Verify JWT token from cookie
-    const token = request.cookies.get(env.cookieName)?.value;
-    
-    // Handle missing token
-    if (!token) {
-      console.warn('[Auth Middleware] No token found in cookie:', env.cookieName);
-      
-      // In mock mode, generate a mock token and set cookie
-      if (env.isMockMode) {
-        console.log('[Auth Middleware] Mock mode: generating mock token');
-        const mockToken = await createMockToken();
-        
-        const response = NextResponse.next();
-        response.cookies.set(env.cookieName, mockToken, {
-          httpOnly: true,
-          secure: env.isProduction,
-          sameSite: 'lax',
-          path: '/',
-          maxAge: 30 * 60, // 30 minutes
-        });
-        
-        return response;
-      }
-      
-      // In embedded mode, redirect to Rails login
-      const loginUrl = new URL('/', env.railsBaseUrl || 'http://localhost:3000');
-      console.log('[Auth Middleware] Redirecting to login:', loginUrl.toString());
-      return NextResponse.redirect(loginUrl);
+    // If this request was made by our middleware (internal fetch), skip processing to avoid recursion
+    // We set the header 'x-middleware-skip: 1' on internal fetches below.
+    if (request.headers.get('x-middleware-skip') === '1') {
+      return NextResponse.next();
     }
 
-    // Log token for debugging (first 50 chars only)
-    console.log('[Auth Middleware] Token found, length:', token.length);
-    console.log('[Auth Middleware] Token preview:', token.substring(0, 50) + '...');
-    
-    // Decode header to see algorithm (for debugging)
+    // Skip middleware for the user-session endpoint itself to avoid any chance of recursion
+    if (pathname === `/api/user-session`) {
+      return NextResponse.next();
+    }
+
+    const url = request.nextUrl;
+
+    // Resolve account/org candidates from common sources (query/header/cookie)
+    const accountFromQuery = url.searchParams.get('account');
+    const accountFromHeader = request.headers.get('x-account');
+    const accountFromCookie = request.cookies.get('account')?.value;
+    const orgFromQuery = url.searchParams.get('organization');
+    const orgFromHeader = request.headers.get('x-organization');
+    const orgFromCookie = request.cookies.get('organization')?.value;
+
+    // Build a best-effort API URL to fetch full user/session context
+    // Include any resolved query params so the API can be aware if desired.
+    let apiUrl: URL;
     try {
-      const headerB64 = token.split('.')[0];
-      const header = JSON.parse(Buffer.from(headerB64, 'base64').toString());
-      console.log('[Auth Middleware] Token algorithm:', header.alg);
-    } catch (e) {
-      console.log('[Auth Middleware] Could not decode token header');
-    }
-    
-    // Verify JWT token
-    const verification = await verifyJWT(token);
-    
-    if (!verification.success) {
-      console.error('[Auth Middleware] Token verification failed:', verification.error.code);
-      console.error('[Auth Middleware] Error details:', verification.error.message);
-      if (verification.error.originalError) {
-        console.error('[Auth Middleware] Original error:', verification.error.originalError);
-      }
-      
-      // In mock mode, regenerate token
-      if (env.isMockMode) {
-        console.log('[Auth Middleware] Mock mode: regenerating token after failure');
-        const mockToken = await createMockToken();
-        
-        const response = NextResponse.next();
-        response.cookies.set(env.cookieName, mockToken, {
-          httpOnly: true,
-          secure: env.isProduction,
-          sameSite: 'lax',
-          path: '/',
-          maxAge: 30 * 60,
-        });
-        
-        return response;
-      }
-      
-      // In embedded mode, redirect to Rails login
-      const loginUrl = new URL('/', env.railsBaseUrl || 'http://localhost:3000');
-      console.log('[Auth Middleware] Token invalid, redirecting to login');
-      return NextResponse.redirect(loginUrl);
+      apiUrl = new URL(`${basePath}/api/user-session`, request.nextUrl.origin);
+      if (accountFromQuery) apiUrl.searchParams.set('account', accountFromQuery);
+      if (orgFromQuery) apiUrl.searchParams.set('organization', orgFromQuery);
+    } catch {
+      // Fallback when origin isn't available for some runtimes
+      const host = request.headers.get('host') || 'localhost:3000';
+      apiUrl = new URL(`http://${host}${basePath}/api/user-session`);
+      if (accountFromQuery) apiUrl.searchParams.set('account', accountFromQuery);
+      if (orgFromQuery) apiUrl.searchParams.set('organization', orgFromQuery);
     }
 
-    // Token is valid - validate URL-based scoping
-    const { currentUser } = verification;
-    
-    // Parse account and org from URL path
-    // URL format: /accounts/:accountId/orgs/:orgId/... or /accounts/:accountId/...
-    const pathSegments = pathname.split('/').filter(Boolean);
-    let urlAccountId: string | null = null;
-    let urlOrgId: string | null = null;
-    
-    const accountsIndex = pathSegments.indexOf('accounts');
-    if (accountsIndex !== -1 && pathSegments[accountsIndex + 1]) {
-      urlAccountId = pathSegments[accountsIndex + 1];
-      
-      const orgsIndex = pathSegments.indexOf('orgs');
-      if (orgsIndex !== -1 && pathSegments[orgsIndex + 1]) {
-        urlOrgId = pathSegments[orgsIndex + 1];
-      }
-    }
-    
-    // URL scoping validation (ONLY in embedded/production mode)
-    // In standalone mode, URL scoping is optional for easier development
-    if (!env.isMockMode) {
-      // Validate account ID from URL matches JWT claims
-      if (urlAccountId && urlAccountId !== currentUser.accountId) {
-        console.error(
-          `[Auth Middleware] Account ID mismatch. URL: ${urlAccountId}, JWT: ${currentUser.accountId}`
-        );
-        return NextResponse.json(
-          { error: 'Forbidden: Account access denied' },
-          { status: 403 }
-        );
-      }
-      
-      // Validate organization ID from URL matches JWT claims (if present)
-      if (urlOrgId) {
-        if (!currentUser.organizationId) {
-          console.error(
-            `[Auth Middleware] User ${currentUser.userId} attempted to access org ${urlOrgId} but has no org in JWT`
-          );
-          return NextResponse.json(
-            { error: 'Forbidden: Organization access denied' },
-            { status: 403 }
-          );
+    // Default mock fallback (kept for robustness if fetch fails)
+    const fallbackUser = {
+      userId: 'john.doe',
+      firstName: 'John',
+      lastName: 'Doe',
+      email: 'john.doe@example.com',
+      fullName: 'John Doe'
+    };
+
+    // Small type to represent the subset of the /api/user-session response we consume
+    type DemoUser = {
+      id?: string;
+      userId?: string;
+      // Some responses store names/emails at top-level or under profile
+      firstName?: string;
+      lastName?: string;
+      email?: string;
+      profile?: { firstName?: string; lastName?: string; email?: string };
+    };
+
+    type UserSessionData = {
+      user?: DemoUser;
+      account?: { id?: string };
+      currentOrganization?: { id?: string } | null;
+    } | null;
+
+    let fetchedData: UserSessionData = null;
+    try {
+      console.log("[middleware] fetching user session from", apiUrl.toString());
+      const apiRes = await fetch(apiUrl.toString(), {
+        method: 'GET',
+        headers: {
+          accept: 'application/json',
+          // Mark this fetch as internal so middleware doesn't re-run its logic on the server
+          'x-middleware-skip': '1'
         }
-        
-        if (urlOrgId !== currentUser.organizationId) {
-          console.error(
-            `[Auth Middleware] Org ID mismatch. URL: ${urlOrgId}, JWT: ${currentUser.organizationId}`
-          );
-          return NextResponse.json(
-            { error: 'Forbidden: Organization access denied' },
-            { status: 403 }
-          );
+      });
+
+      if (apiRes.ok) {
+        const json = await apiRes.json().catch(() => null);
+        if (json && json.success && json.data) {
+          fetchedData = json.data;
         }
+      } else {
+        console.warn('[Middleware]: user-session fetch failed with response', apiRes);
       }
-    } else {
-      // Standalone mode: URL scoping is optional, just log it
-      if (urlAccountId || urlOrgId) {
-        console.log(
-          `[Auth Middleware] Standalone mode: URL scope detected (account:${urlAccountId}, org:${urlOrgId}) - validation skipped`
-        );
-      }
+    } catch (err) {
+      // network/fetch failed; we'll fall back to defaults below
+      console.warn('Middleware: user-session fetch failed', err);
     }
-    
-    // All validation passed - inject headers for downstream use
+
+    // Determine final values (prefer fetched data, then explicit request values, then defaults)
+    const accountId = fetchedData?.account?.id || accountFromQuery || accountFromHeader || accountFromCookie || 'groupize-demos';
+    const organizationObj = fetchedData?.currentOrganization || (orgFromQuery ? { id: orgFromQuery } : orgFromHeader ? { id: orgFromHeader } : orgFromCookie ? { id: orgFromCookie } : null);
+    const organizationId = organizationObj?.id || null;
+    const userObj = fetchedData?.user || null;
+
+    // Clone existing headers and inject our resolved values (overwriting if present)
     const requestHeaders = new Headers(request.headers);
-    
-    // Inject user context headers
-    requestHeaders.set('x-user-id', currentUser.userId);
-    requestHeaders.set('x-user-email', currentUser.email);
-    requestHeaders.set('x-user-first-name', currentUser.firstName);
-    requestHeaders.set('x-user-last-name', currentUser.lastName);
-    requestHeaders.set('x-user-full-name', currentUser.fullName);
-    requestHeaders.set('x-account-id', currentUser.accountId);
-    
-    if (currentUser.organizationId) {
-      requestHeaders.set('x-organization-id', currentUser.organizationId);
+    requestHeaders.set('x-account', accountId);
+    if (organizationId) {
+      requestHeaders.set('x-organization', organizationId);
+    } else {
+      requestHeaders.delete('x-organization');
     }
-    
-    // Inject URL-based scoping info (for API routes to use)
-    if (urlAccountId) {
-      requestHeaders.set('x-url-account-id', urlAccountId);
-    }
-    if (urlOrgId) {
-      requestHeaders.set('x-url-org-id', urlOrgId);
-    }
-    
-    // Pass authenticated and authorized request through
-    const response = NextResponse.next({
+
+    // Prefer user data from fetched response; otherwise use fallback mock
+    const finalUser = userObj
+      ? {
+          id: userObj.id ?? userObj.userId ?? '',
+          firstName: userObj.profile?.firstName ?? userObj.firstName ?? fallbackUser.firstName,
+          lastName: userObj.profile?.lastName ?? userObj.lastName ?? fallbackUser.lastName,
+          email: userObj.profile?.email ?? userObj.email ?? fallbackUser.email
+        }
+      : {
+          id: fallbackUser.userId,
+          firstName: fallbackUser.firstName,
+          lastName: fallbackUser.lastName,
+          email: fallbackUser.email
+        };
+
+    // Inject user headers for API consumers
+    requestHeaders.set('x-user-id', finalUser.id);
+    requestHeaders.set('x-user-first-name', finalUser.firstName);
+    requestHeaders.set('x-user-last-name', finalUser.lastName);
+    requestHeaders.set('x-user-email', finalUser.email);
+    requestHeaders.set('x-user-full-name', `${finalUser.firstName} ${finalUser.lastName}`);
+
+    // Return a response that includes the modified headers and a client-readable cookie
+    const res = NextResponse.next({
       request: {
-        headers: requestHeaders,
-      },
+        // Provide the modified headers so downstream API routes see them
+        headers: requestHeaders
+      }
     });
-    
-    const scope = urlOrgId 
-      ? `org:${urlOrgId}` 
-      : urlAccountId 
-        ? `account:${urlAccountId}` 
-        : env.isMockMode 
-          ? 'mock' 
-          : 'global';
-    console.log(
-      `[Auth Middleware] Authorized: ${currentUser.userId} (${currentUser.email}) - Scope: ${scope}${env.isMockMode ? ' (standalone)' : ''}`
-    );
-    
-    return response;
-  } catch (err) {
-    // Critical error in middleware - log and fail safely
-    console.error('[Auth Middleware] Critical error:', err);
-    
-    // In production, redirect to login on critical errors
-    if (env.isProduction && !env.isMockMode) {
-      const loginUrl = new URL('/', env.railsBaseUrl || 'http://localhost:3000');
-      return NextResponse.redirect(loginUrl);
+
+    // Store the user/account/org as JSON-encoded cookies so frontend JS can read them easily.
+    // Use encodeURIComponent to keep the cookie values safe. Non-httpOnly so client can read.
+    try {
+      res.cookies.set('user', encodeURIComponent(JSON.stringify(finalUser)), {
+        path: `/${basePath}`,
+        httpOnly: false,
+        sameSite: 'lax'
+      });
+      res.cookies.set('account', encodeURIComponent(JSON.stringify({ id: accountId })), {
+        path: `/${basePath}`,
+        httpOnly: false,
+        sameSite: 'lax'
+      });
+      if (organizationId) {
+        res.cookies.set('organization', encodeURIComponent(JSON.stringify({ id: organizationId })), {
+          path: `/${basePath}/`,
+          httpOnly: false,
+          sameSite: 'lax'
+        });
+      } else {
+        // remove cookie when no org
+        try {
+          // use single-arg delete to match ResponseCookies API in some runtimes
+          res.cookies.delete('organization');
+        } catch {
+          // some runtimes may not support delete; ignore
+        }
+      }
+    } catch (e) {
+      console.warn('Could not set user/account cookie in middleware', e);
     }
-    
-    // In development, allow through but log the error
+
+    return res;
+  } catch (err) {
+    // If anything goes wrong, continue without modification but log for debugging
+    // Avoid throwing to ensure middleware doesn't block requests in production
+    console.error('Middleware error injecting account/org headers', err);
     return NextResponse.next();
   }
 }
@@ -229,5 +205,5 @@ export async function middleware(request: NextRequest) {
 // Run middleware for all site paths. The middleware itself early-returns for internal/static
 // paths (see above) to avoid interfering with Next internals.
 export const config = {
-  matcher: ['/:path*']
+  matcher: [`/:path*`]
 };

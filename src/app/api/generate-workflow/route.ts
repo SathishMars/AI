@@ -4,7 +4,8 @@ import { AimeWorkflowConversationsRecord, WorkflowMessage } from '@/app/types/ai
 import { generateMermaidFromWorkflow } from '@/app/utils/MermaidGenerator';
 import ShortUniqueId from 'short-unique-id';
 import AimeWorkflowMessagesDBUtil from '@/app/utils/aimeWorkflowMessagesDBUtil';
-import { runAgentToGenerateWorkflow } from '@/app/utils/openAIAgent';
+import { runAgentToGenerateWorkflow } from '@/app/utils/aiSdkAgent';
+import WorkflowTemplateDbUtil from '@/app/utils/workflowTemplateDbUtil';
 // 10-char alphanumeric short id generator (reusable instance)
 const uid = new ShortUniqueId({ length: 10, dictionary: 'alphanum' });
 
@@ -26,7 +27,7 @@ type GenerateRequestBody = {
   messages: unknown; // should be WorkflowMessage[]
 };
 
-type GenerateResponseBody = {
+type GeneratedResponseBody = {
   messages: WorkflowMessage[]; // responses from aime
   workflowDefinition?: WorkflowDefinition; // optional modified definition
   mermaidDiagram?: string; // optional mermaid diagram text
@@ -169,7 +170,7 @@ export async function POST(req: NextRequest) {
     const mermaidDiagram: string | undefined = receivedWorkflowDefinition ? generateMermaidFromWorkflow(receivedWorkflowDefinition) : undefined;
     // console.log('[route] generated mermaid diagram', mermaidDiagram);
 
-    const responseBody: GenerateResponseBody = {
+    const responseBody: GeneratedResponseBody = {
       messages: result.messages,
       workflowDefinition: receivedWorkflowDefinition,
       mermaidDiagram,
@@ -180,6 +181,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(responseBody, { status: 200 });
   } catch (err: unknown) {
+    console.log("[route] Error:", err);
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: message }, { status: 500 });
   }

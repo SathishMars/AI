@@ -2,8 +2,17 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { DataGrid, GridColDef, GridRowParams, GridRowSelectionModel } from '@mui/x-data-grid';
-import { Box, Typography, Button } from '@mui/material';
+import { Loader2, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { useUnifiedUserContext } from '@/app/contexts/UnifiedUserContext';
 import { apiFetch } from '@/app/utils/api';
 import type { WorkflowTemplate } from '@/app/types/workflowTemplate';
@@ -15,6 +24,7 @@ interface TemplateRow {
     status: string;
     author?: string;
 }
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
 
 export default function TemplatesGrid() {
     const router = useRouter();
@@ -22,7 +32,7 @@ export default function TemplatesGrid() {
     const [rows, setRows] = useState<TemplateRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [selectionModel, setSelectionModel] = useState<GridRowSelectionModel>([]);
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [deleting, setDeleting] = useState(false);
 
     useEffect(() => {
@@ -61,17 +71,23 @@ export default function TemplatesGrid() {
         return () => { mounted = false; };
     }, []);
 
-    const columns: GridColDef<TemplateRow>[] = [
-        {
-            field: 'label',
-            headerName: 'Template',
-            flex: 1,
-            minWidth: 240
-        },
-        { field: 'version', headerName: 'Version', width: 110 },
-        { field: 'status', headerName: 'Status', width: 140 },
-        { field: 'author', headerName: 'Author', width: 180 }
-    ];
+    const toggleSelectAll = () => {
+        if (selectedIds.size === rows.length) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(rows.map(r => r.id)));
+        }
+    };
+
+    const toggleSelect = (id: string) => {
+        const newSelected = new Set(selectedIds);
+        if (newSelected.has(id)) {
+            newSelected.delete(id);
+        } else {
+            newSelected.add(id);
+        }
+        setSelectedIds(newSelected);
+    };
 
     const handleRowClick = (id: string) => {
         // Navigate to configure page for the template
@@ -79,20 +95,19 @@ export default function TemplatesGrid() {
     };
 
     const handleDeleteSelected = async () => {
-        if (!selectionModel || selectionModel.length === 0) return;
-        if (!confirm(`Delete ${selectionModel.length} selected template(s)? This cannot be undone.`)) return;
+        if (selectedIds.size === 0) return;
+        if (!confirm(`Delete ${selectedIds.size} selected template(s)? This cannot be undone.`)) return;
 
         try {
             setDeleting(true);
             const failures: string[] = [];
 
             // Build delete requests with template id and version from rows
-            const promises = selectionModel.map(async (id: string | number) => {
-                const sid = String(id);
-                const row = rows.find(r => r.id === sid);
+            const promises = Array.from(selectedIds).map(async (id) => {
+                const row = rows.find(r => r.id === id);
                 if (!row) return;
                 const version = row.version;
-                const url = `/api/workflow-templates/${encodeURIComponent(sid)}?version=${encodeURIComponent(version)}`;
+                const url = `${basePath}/api/workflow-templates/${encodeURIComponent(id)}?version=${encodeURIComponent(version)}`;
 
                 const headers: Record<string, string> = {};
                 if (account && typeof account === 'object') {
@@ -119,8 +134,8 @@ export default function TemplatesGrid() {
                 alert(`Some deletions failed:\n${failures.join('\n')}`);
             } else {
                 // refresh list
-                setRows(prev => prev.filter(r => !selectionModel.includes(r.id)));
-                setSelectionModel([]);
+                setRows(prev => prev.filter(r => !selectedIds.has(r.id)));
+                setSelectedIds(new Set());
             }
         } catch (err) {
             console.error('Failed to delete templates', err);
@@ -131,42 +146,103 @@ export default function TemplatesGrid() {
     };
 
     if (userLoading) {
-        return <Typography>Loading user context...</Typography>;
+        return (
+            <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Loading user context...</span>
+            </div>
+        );
     }
 
     if (error) {
-        return <Typography color="error">{error}</Typography>;
+        return <p className="text-sm text-destructive">{error}</p>;
     }
 
     return (
-        <Box sx={{ width: '100%', height: 480 }}>
-            <Box sx={{ mb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="h6">Workflow Templates</Typography>
-                <Typography variant="caption" color="text.secondary">{account?.name || currentOrganization?.name || user?.profile?.firstName}</Typography>
-            </Box>
-            <Box sx={{ mb: 1, display: 'flex', gap: 1 }}>
+        <div className="w-full space-y-4">
+            <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold">Workflow Templates</h2>
+                <span className="text-xs text-muted-foreground">
+                    {account?.name || currentOrganization?.name || user?.profile?.firstName}
+                </span>
+            </div>
+            
+            <div className="flex gap-2">
                 <Button
-                    variant="contained"
-                    color="error"
-                    disabled={selectionModel.length === 0 || deleting}
+                    variant="destructive"
+                    size="sm"
+                    disabled={selectedIds.size === 0 || deleting}
                     onClick={handleDeleteSelected}
                 >
-                    Delete selected
+                    {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete selected ({selectedIds.size})
                 </Button>
-            </Box>
-            <DataGrid<TemplateRow>
-                rows={rows}
-                columns={columns}
-                loading={loading}
-                getRowId={(row: TemplateRow) => row.id}
-                onRowClick={(params: GridRowParams<TemplateRow>) => handleRowClick(String(params.id))}
-                density="comfortable"
-                pageSizeOptions={[10, 25, 50]}
-                checkboxSelection
-                onRowSelectionModelChange={(newSelection: GridRowSelectionModel) => setSelectionModel(newSelection)}
-                rowSelectionModel={selectionModel}
-                initialState={{ pagination: { paginationModel: { pageSize: 10, page: 0 } } }}
-            />
-        </Box>
+            </div>
+
+            {loading ? (
+                <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Loading templates...</span>
+                </div>
+            ) : (
+                <div className="rounded-md border">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="w-12">
+                                    <Checkbox
+                                        checked={selectedIds.size === rows.length && rows.length > 0}
+                                        onCheckedChange={toggleSelectAll}
+                                        aria-label="Select all"
+                                    />
+                                </TableHead>
+                                <TableHead>Template</TableHead>
+                                <TableHead>Version</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Author</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {rows.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="text-center text-muted-foreground">
+                                        No templates found
+                                    </TableCell>
+                                </TableRow>
+                            ) : (
+                                rows.map((row) => (
+                                    <TableRow
+                                        key={row.id}
+                                        className="cursor-pointer hover:bg-muted/50"
+                                        onClick={() => handleRowClick(row.id)}
+                                    >
+                                        <TableCell onClick={(e) => e.stopPropagation()}>
+                                            <Checkbox
+                                                checked={selectedIds.has(row.id)}
+                                                onCheckedChange={() => toggleSelect(row.id)}
+                                                aria-label={`Select ${row.label}`}
+                                            />
+                                        </TableCell>
+                                        <TableCell className="font-medium">{row.label}</TableCell>
+                                        <TableCell>{row.version}</TableCell>
+                                        <TableCell>
+                                            <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                                                row.status === 'published' 
+                                                    ? 'bg-green-50 text-green-700 ring-1 ring-inset ring-green-600/20'
+                                                    : 'bg-yellow-50 text-yellow-700 ring-1 ring-inset ring-yellow-600/20'
+                                            }`}>
+                                                {row.status}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell>{row.author || '-'}</TableCell>
+                                    </TableRow>
+                                ))
+                            )}
+                        </TableBody>
+                    </Table>
+                </div>
+            )}
+        </div>
     );
 }

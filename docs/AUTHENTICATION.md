@@ -253,7 +253,7 @@ JWT_SECRET=dev-secret-change-me  # Only for dev HS256
 COOKIE_NAME=gpw_session
 
 # Application
-BASE_PATH=/aime/aimeworkflows
+NEXT_PUBLIC_BASE_PATH=/aime/aimeworkflows
 NODE_ENV=development
 ```
 

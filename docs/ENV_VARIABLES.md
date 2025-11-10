@@ -53,7 +53,7 @@ COOKIE_NAME=gpw_session
 # Application Configuration
 # -----------------------------------------------------------------------------
 # Base path for the Next.js app (must match next.config.ts)
-BASE_PATH=/aime/aimeworkflows
+NEXT_PUBLIC_BASE_PATH=/aime/aimeworkflows
 
 # Node environment
 NODE_ENV=development
@@ -108,7 +108,7 @@ In production:
 | `JWT_AUDIENCE` | No | `workflows` | JWT audience claim (must match Rails) |
 | `JWT_SECRET` | No | `dev-secret-change-me` | Shared secret for HS256 (mock mode only) |
 | `COOKIE_NAME` | No | `gpw_session` | JWT cookie name (must match Rails) |
-| `BASE_PATH` | No | `/aime/aimeworkflows` | Next.js base path |
+| `NEXT_PUBLIC_BASE_PATH` | No | `/aime/aimeworkflows` | Next.js base path |
 | `NODE_ENV` | No | `development` | Node environment |
 
 ## JWT Verification Strategy by Mode

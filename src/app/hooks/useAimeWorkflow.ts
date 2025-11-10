@@ -32,6 +32,8 @@ interface UseAimeWorkflowReturn {
     regenerateWorkflowDefinition: () => Promise<void>;
 }
 
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+
 const seedWelcomeMessage = (): WorkflowMessage => {
         return {
             id: generateShortId(),
@@ -40,10 +42,7 @@ const seedWelcomeMessage = (): WorkflowMessage => {
             userId: "system",
             userName: "aime workflows",
             content: {
-                text: `
-                Hello! I'm aime, your AI assistant. I can help you build and refine your workflow. Just type in what you want to do and when to kick off (trigger) this workflow.
-                Just provide some details about what you want to achieve with this workflow like "On receiving a request, I want to check if the initial budget exceeds $1000.".
-                `
+                text: "**Hey there! I'm aime Request — your AI sidekick for building smart workflows.**\nTell me what you'd like to create, and I'll guide you through it step by step — or jump right in with a preset."
             },
             timestamp: new Date().toISOString()
         };

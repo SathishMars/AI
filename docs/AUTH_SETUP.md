@@ -220,7 +220,7 @@ Check terminal logs for:
 | `JWT_AUDIENCE` | No | `workflows` | JWT audience claim |
 | `JWT_SECRET` | Yes (dev) | `dev-secret-change-me` | Shared secret for HS256 |
 | `COOKIE_NAME` | No | `gpw_session` | Cookie name |
-| `BASE_PATH` | No | `/aime/aimeworkflows` | Next.js basePath |
+| `NEXT_PUBLIC_BASE_PATH` | No | `/aime/aimeworkflows` | Next.js basePath |
 | `NODE_ENV` | No | `development` | Node environment |
 
 ## Common Issues

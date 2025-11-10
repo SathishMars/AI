@@ -1,444 +1,291 @@
 // src/app/components/WorkflowStepTree.tsx
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { Box, IconButton, Typography, Chip, Paper, Divider, Icon } from '@mui/material';
-import { SimpleTreeView } from '@mui/x-tree-view/SimpleTreeView';
-import { TreeItem } from '@mui/x-tree-view/TreeItem';
+import React, { useMemo, useState } from 'react';
+import { ChevronRight, ChevronDown, Edit, Check, X, ArrowRight } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 import { WorkflowStep } from '@/app/types/workflowTemplate';
 import { workflowFunctionTypeConfig } from '../data/workflow-step-definitions';
 import WorkflowStepTrigger from './WorkflowStepTrigger';
 import WorkflowStepDecision from './WorkflowStepDecision';
 import WorkflowStepApproval from './WorkflowStepApproval';
 import WorkflowStepGeneric from './WorkflowStepGeneric';
-// 'get' from 'http' was unused and removed
 import { getReferredSteps, getStepsLabelsMap } from '../utils/WorkflowStepUtils';
 import WorkflowStepSwitchCase from './WorkflowStepSwitchCase';
 import WorkflowStepNotify from './WorkflowStepNotify';
-import styles from "./WorkflowStepTree.module.scss"
-
-const MOCK_DATA: WorkflowStep[] = [
-  {
-    id: 'ght223nmop',  // replace with a generated unique step ID used as refernce in other steps where needed to chain the steps
-    label: 'On receiving the MRF', // human readable name for the step based on context of what the step does
-    type: 'trigger',
-    stepFunction: 'onMRF',
-    functionParams: {
-      mrfTemplateName: 'all' // if provided by the user in their description, match to the available MRF types from the api or use 'all' for any MRF. 
-    },
-    next: [{
-      id: '88nbbsq7n',
-      label: 'Send notification to manager',
-      type: 'task',
-      stepFunction: 'sendEmail',
-      functionParams: {
-        to: '${manager}',
-        subject: 'A new meeting request from John Doe was submitted',
-        notificationTemplateName: 'manager-meeting-request'
-      },
-      next: [
-        {
-          id: '7c8aScds7e',
-          label: 'Create the event for annual budget review',
-          type: 'task',
-          stepFunction: 'createEvent',
-          functionParams: {},
-          next: ['87snjhsw76']
-        }
-      ]
-    },
-    {
-      id: '3klmop4567',
-      label: 'Request approval from manager',
-      type: 'decision',
-      stepFunction: 'requestApproval',
-      functionParams: {
-        approver: '${manager}',
-        reason: 'Budget exceeds department threshold'
-      },
-      onConditionPass: '7c8aScds7e',
-      onConditionFail: '87snjhsw76',
-      onTimeout: 'jds7bbsq7n',
-      timeout: 86400,
-      retryCount: 2,
-      retryDelay: 3600
-    },
-    ] // next step ID to execute after this step
-  },
-  {
-    id: '87snjhsw76',
-    label: 'Terminate workflow',
-    type: 'terminate',
-    stepFunction: 'terminate',
-    functionParams: {},
-    next: []
-  }
-]
 
 interface WorkflowStepTreeProps {
-  workflowSteps: WorkflowStep[];
-  onStepSave?: (step: WorkflowStep) => void;
+  steps: WorkflowStep[];
+  editingStepId: string | null;
+  onStepEdit: (step: WorkflowStep) => void;
+  onStepSave: (step: WorkflowStep) => void;
+  onStepCancel: () => void;
 }
 
-/**
- * Workflow Step Tree using MUI X Tree View
- * 
- */
-export default function WorkflowStepTree({ workflowSteps, onStepSave }: WorkflowStepTreeProps) {
+interface TreeNodeProps {
+  step: WorkflowStep;
+  editingStepId: string | null;
+  workflowStepsMap: Record<string, string>;
+  onStepEdit: (step: WorkflowStep) => void;
+  onStepSave: (step: WorkflowStep) => void;
+  onStepCancel: () => void;
+}
 
+function TreeNode({ 
+  step, 
+  editingStepId, 
+  workflowStepsMap, 
+  onStepEdit, 
+  onStepSave, 
+  onStepCancel 
+}: TreeNodeProps) {
+  const [isExpanded, setIsExpanded] = useState(true);
 
-  const [steps, setSteps] = useState<WorkflowStep[]>(MOCK_DATA || []);
-  const [expanded, setExpanded] = useState<string[]>([]); //we plan to have all the nodes expanded by default
-  const [editingStepId, setEditingStepId] = useState<string | null>(null);
-  const workflowStepsMap = React.useMemo(() => {
-    return getStepsLabelsMap(workflowSteps);
-  }, [workflowSteps]);
+  // Get step type configuration
+  const config = workflowFunctionTypeConfig[step.type] || workflowFunctionTypeConfig['task'];
+  const typeColor = config.color;
+  const typeLabel = config.label;
+  const icon = config.icon;
 
-  console.log('WorkflowStepTree - rendering with steps:', steps);
+  // Get referred next steps
+  const referredNextSteps = step.next ? getReferredSteps(step.next) : [];
 
-  const expandAllNodes = (steps: WorkflowStep[]): string[] => {
-    const allIds: string[] = [];
+  // Collect all child steps from various branching properties
+  const children: WorkflowStep[] = [];
 
-    const traverse = (nodes: WorkflowStep[]) => {
-      nodes.forEach(node => {
-        allIds.push(node.id);
-        let children: Array<WorkflowStep> = [];
-        if (node.next && Array.isArray(node.next)) {
-          children = [...children, ...node.next.filter(child => typeof child === 'object') as WorkflowStep[]];
-        }
-        if (node.onConditionPass && typeof node.onConditionPass === 'object') {
-          children.push(node.onConditionPass);
-        }
-        if (node.onConditionFail && typeof node.onConditionFail === 'object') {
-          children.push(node.onConditionFail);
-        }
-        if (node.onError && typeof node.onError === 'object') {
-          children.push(node.onError);
-        }
-        if (node.onTimeout && typeof node.onTimeout === 'object') {
-          children.push(node.onTimeout);
-        }
-        if (children.length > 0) {
-          traverse(children);
-        }
-      });
-    };
-
-    traverse(steps);
-    return allIds;
-  };
-
-  const handleExpandedItemsChange = (event: React.SyntheticEvent | null, itemIds: string[]) => {
-    setExpanded(itemIds);
-  };
-
-  useEffect(() => {
-    console.log('WorkflowStepTree - workflowSteps prop changed:', workflowSteps);
-    if (workflowSteps) {
-      setSteps(JSON.parse(JSON.stringify(workflowSteps)) || []); // set it to a modifyable copy without affecting the original object
-      setExpanded(expandAllNodes(workflowSteps)); //expand all nodes by default
-      //for testing purposes let us temporarily assign mock data to steps
-      // setSteps(MOCK_DATA);
-      // setExpanded(expandAllNodes(MOCK_DATA)); //expand all nodes by default
-    }
-  }, [workflowSteps]);
-
-  // Get step type color
-  const getStepTypeColor = (type: string): string => {
-    return workflowFunctionTypeConfig[type]?.color || 'grey';
-  };
-
-  // Get step type label
-  const getStepTypeLabel = (type: string): string => {
-    if (!type) return 'Unknown';
-    return workflowFunctionTypeConfig[type]?.label || type;
-  };
-
-  const getStepTypeIcon = (type: string): string => {
-    return workflowFunctionTypeConfig[type]?.icon || 'help_outline';
+  // Add embedded children from 'next' array
+  if (step.next && Array.isArray(step.next)) {
+    step.next.forEach(nextStep => {
+      if (typeof nextStep === 'object' && nextStep !== null) {
+        children.push(nextStep);
+      }
+    });
   }
 
-  const handleStepEdit = (step: WorkflowStep) => {
-    // we should ideally check if any other step is being edited and warn the user.
-    setEditingStepId(step.id);
-  };
+  // Add embedded onConditionPass/Fail
+  if (step.onConditionPass && typeof step.onConditionPass === 'object') {
+    children.push(step.onConditionPass);
+  }
+  if (step.onConditionFail && typeof step.onConditionFail === 'object') {
+    children.push(step.onConditionFail);
+  }
 
-  // editing completion handled inline when saving/cancelling
+  // Add embedded onError/onTimeout
+  if (step.onError && typeof step.onError === 'object') {
+    children.push(step.onError);
+  }
+  if (step.onTimeout && typeof step.onTimeout === 'object') {
+    children.push(step.onTimeout);
+  }
 
-  // Render a single tree item with all its children
-  const renderTreeItem = (step: WorkflowStep): React.ReactNode => {
-    const typeColor = getStepTypeColor(step.type);
-    const typeLabel = getStepTypeLabel(step.type);
-    const icon: string = getStepTypeIcon(step.type);
-    const referredNextSteps = getReferredSteps(step.next || []);
-    let children: Array<WorkflowStep> = [];
-
-    if (step.next && Array.isArray(step.next)) {
-      //we need to add all the items that are not strings
-      children = [...children, ...step.next.filter(child => typeof child === 'object') as WorkflowStep[]];
-    }
-    if (step.onConditionPass && typeof step.onConditionPass === 'object') {
-      children.push(step.onConditionPass);
-    }
-    if (step.onConditionFail && typeof step.onConditionFail === 'object') {
-      children.push(step.onConditionFail);
-    }
-    if (step.onError && typeof step.onError === 'object') {
-      children.push(step.onError);
-    }
-    if (step.onTimeout && typeof step.onTimeout === 'object') {
-      children.push(step.onTimeout);
-    }
-
-    const onSave = (updated: WorkflowStep) => {
-      console.log("Step saved:", updated);
-      // Call optional prop to notify parent
-      if (onStepSave) {
-        onStepSave(updated);
+  // Add switch-case condition children
+  if (step.conditions && Array.isArray(step.conditions)) {
+    step.conditions.forEach(cond => {
+      if (typeof cond.next === 'object' && cond.next !== null) {
+        children.push(cond.next);
       }
-      // update the step in local state
-      setEditingStepId(null);
+    });
+  }
+
+  // Render editing form
+  const renderEditingForm = () => {
+    const onSave = (updatedStep: WorkflowStep) => onStepSave(updatedStep);
+    const onCancel = () => onStepCancel();
+
+    switch (step.type) {
+      case 'trigger':
+        return <WorkflowStepTrigger step={step} onSave={onSave} onCancel={onCancel} />;
+      case 'decision':
+        return <WorkflowStepDecision step={step} onSave={onSave} onCancel={onCancel} />;
+      case 'approval':
+        return <WorkflowStepApproval step={step} onSave={onSave} onCancel={onCancel} />;
+      case 'switch-case':
+        return <WorkflowStepSwitchCase step={step} stepIdMap={workflowStepsMap} onSave={onSave} onCancel={onCancel} />;
+      case 'notify':
+        return <WorkflowStepNotify step={step} onSave={onSave} onCancel={onCancel} />;
+      default:
+        return <WorkflowStepGeneric step={step} onSave={onSave} onCancel={onCancel} />;
     }
-
-    const onCancel = () => {
-      setEditingStepId(null);
-    }
-
-    const renderEditingForm = (step: WorkflowStep) => {
-      switch (step.stepFunction) {
-        case 'onMRF':
-          return (
-            <WorkflowStepTrigger
-              step={step}
-              onSave={onSave}
-              onCancel={onCancel}
-            />
-          );
-        case 'checkCondition':
-          return (
-            <WorkflowStepDecision
-              step={step}
-              onSave={onSave}
-              onCancel={onCancel}
-            />
-          );
-        case 'requestApproval':
-          return (
-            <WorkflowStepApproval
-              step={step}
-              onSave={onSave}
-              onCancel={onCancel}
-            />
-          );
-        case 'multiCheckCondition':
-          return (
-            <WorkflowStepSwitchCase
-              step={step}
-              stepIdMap={workflowStepsMap}
-              onSave={onSave}
-              onCancel={onCancel}
-            />
-          );
-        case 'notify':
-          return (
-            <WorkflowStepNotify
-              step={step}
-              onSave={onSave}
-              onCancel={onCancel}
-            />
-          );
-        default:
-          return (
-            <WorkflowStepGeneric
-              step={step}
-              onSave={onSave}
-              onCancel={onCancel}
-            />
-          );
-      }
-    };
-
-    console.log(`Rendering step ${step.id} with children:`, children);
-
-    return (
-      <TreeItem
-        key={step.id}
-        itemId={step.id}
-        label={(
-          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', width: '100%', p: 1 }} className={styles["tree-item"]}>
-            {(step.id !== editingStepId) ? (
-              <>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Icon baseClassName='material-icons-outlined' fontSize="small" sx={{ color: 'primary.main', opacity: 0.5 }}>{icon}</Icon>
-                  <Chip
-                    label={typeLabel}
-                    size="small"
-                    sx={{
-                      backgroundColor: typeColor,
-                      color: 'white',
-                      height: 20,
-                      fontSize: '0.75rem',
-                      fontWeight: 500
-                    }}
-                  />
-                  <Typography variant="body1" sx={{ fontWeight: 500, color: typeColor }}>
-                    {step.label || <i>(No label)</i>}
-                  </Typography>
-                  <Box sx={{ flexGrow: 1 }} />
-                  <IconButton
-                    size="small"
-                    disabled={editingStepId !== null}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleStepEdit(step);
-                    }}
-                  >
-                    <Icon baseClassName='material-icons' fontSize='small' sx={{ fontSize: "small" }} >edit</Icon>
-                  </IconButton>
-                </Box>
-
-                {((referredNextSteps && referredNextSteps.length > 0) || step.onConditionFail || step.onError || step.onTimeout || (step.conditions && step.conditions.length > 0)) && (
-                  <>
-                    <Divider sx={{ m: 1 }} />
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', ml: 1 }}>
-                      {(referredNextSteps && referredNextSteps.length > 0) && (
-                        <Chip label={
-                          <>
-                            {/* We will generate a comma separated list of next steps that are referred only by their ids and are not embedded objects */}
-                            Next: {referredNextSteps.map(id => workflowStepsMap[id]).join(', ')}
-                          </>
-                        }
-                          className={styles["tree-item-chip"]}
-                          sx={{
-                            height: 20,
-                            fontSize: '0.75rem',
-                            fontWeight: 500,
-                            p: 1,
-                            m: 1
-                          }} />
-                      )}
-                      {step.onConditionPass && (
-                        <Chip label={
-                          <>
-                            <Icon className={styles["tree-item-chip-icon"]}>check</Icon>
-                            Criteria Met: <Icon className={styles["tree-item-chip-icon"]}>arrow_right_alt</Icon>
-                            {(typeof step.onConditionPass === 'object') ? step.onConditionPass.label : workflowStepsMap[step.onConditionPass]}
-                          </>
-                        }
-                          className={styles["tree-item-chip"]}
-                          sx={{
-                            height: 20,
-                            fontSize: '0.75rem',
-                            fontWeight: 500,
-                            p: 1,
-                            m: 1
-                          }} />
-                      )}
-                      {step.onConditionFail && (
-                        <Chip label={
-                          <>
-                            <Icon className={styles["tree-item-chip-icon"]}>close</Icon>
-                            Otherwise: <Icon className={styles["tree-item-chip-icon"]}>arrow_right_alt</Icon>
-                            {(typeof step.onConditionFail === 'object') ? step.onConditionFail.label : workflowStepsMap[step.onConditionFail]}
-                          </>
-                        }
-                          className={styles["tree-item-chip"]}
-                          sx={{
-                            height: 20,
-                            fontSize: '0.75rem',
-                            fontWeight: 500,
-                            p: 1,
-                            m: 1
-                          }} />
-                      )}
-                      {step.onError && (
-                        <Chip label={
-                          <>
-                            On Error: {(typeof step.onError === 'object') ? step.onError.label : workflowStepsMap[step.onError]}
-                          </>
-                        }
-                          className={styles["tree-item-chip"]}
-                          sx={{
-                            height: 20,
-                            fontSize: '0.75rem',
-                            fontWeight: 500,
-                            p: 1,
-                            m: 1
-                          }} />
-                      )}
-                      {step.onTimeout && (
-                        <Chip label={
-                          <>
-                            On Timeout: {(typeof step.onTimeout === 'object') ? step.onTimeout.label : workflowStepsMap[step.onTimeout]}
-                          </>
-                        }
-                          className={styles["tree-item-chip"]}
-                          sx={{
-                            height: 20,
-                            fontSize: '0.75rem',
-                            fontWeight: 500,
-                            p: 1,
-                            m: 1
-                          }} />
-                      )}
-                      {(step.conditions && step.conditions.length > 0) && step.conditions.map((cond, idx) => (
-                        <Chip key={idx} label={
-                          <>
-                            {cond.value}: {workflowStepsMap[cond.next]}
-                          </>
-                        }
-                          className={styles["tree-item-chip"]}
-                          sx={{
-                            height: 20,
-                            fontSize: '0.75rem',
-                            fontWeight: 500,
-                            p: 1,
-                            m: 1
-                          }} />
-                      ))}
-                    </Box>
-                  </>
-                )}
-              </>
-            ) : (
-              <>
-                {renderEditingForm(step)}
-              </>
-            )}
-          </Box>
-        )}
-      >
-        {(children.length > 0) && (children.map((child) => renderTreeItem(child)))}
-      </TreeItem>
-    );
   };
 
   return (
-    <Box sx={{ width: '100%', minHeight: 200 }}>
-      <SimpleTreeView
-        expandedItems={expanded}
-        onExpandedItemsChange={handleExpandedItemsChange}
-      // sx={{
-      //   '& .MuiTreeItem-content': {
-      //     // padding: '4px 8px',
-      //     borderRadius: 1,
-      //     '&:hover': {
-      //       backgroundColor: 'action.hover'
-      //     },
-      //     '&.Mui-selected': {
-      //       backgroundColor: 'action.selected',
-      //       '&:hover': {
-      //         backgroundColor: 'action.selected'
-      //       }
-      //     }
-      //   },
-      //   '& .MuiTreeItem-label': {
-      //     // padding: 0
-      //   }
-      // }}
-      >
-        {steps.map((step) => renderTreeItem(step))}
-      </SimpleTreeView>
-    </Box>
+    <div className="relative">
+      <div className="flex flex-col items-stretch w-full border-2 rounded-2xl bg-card p-2 mb-2">
+        {editingStepId !== step.id ? (
+          <>
+            <div className="flex items-center gap-2">
+              {/* Expand/Collapse */}
+              {children.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0"
+                  onClick={() => setIsExpanded(!isExpanded)}
+                >
+                  {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </Button>
+              )}
+
+              {/* Icon */}
+              <span className="text-primary/50 text-sm">{icon}</span>
+
+              {/* Type Badge */}
+              <Badge
+                style={{ backgroundColor: typeColor, color: 'white' }}
+                className="h-5 text-xs font-medium"
+              >
+                {typeLabel}
+              </Badge>
+
+              {/* Step Label */}
+              <span className="font-medium text-sm" style={{ color: typeColor }}>
+                {step.label || <i>(No label)</i>}
+              </span>
+
+              <div className="flex-grow" />
+
+              {/* Edit Button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={editingStepId !== null}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onStepEdit(step);
+                }}
+                className="h-8"
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Flow control badges */}
+            {(referredNextSteps.length > 0 || step.onConditionFail || step.onError || step.onTimeout || (step.conditions && step.conditions.length > 0)) && (
+              <>
+                <Separator className="my-2" />
+                <div className="flex flex-col items-end gap-2 ml-2">
+                  {referredNextSteps.length > 0 && (
+                    <Badge
+                      variant="outline"
+                      className="h-5 text-xs font-medium m-1"
+                    >
+                      Next: {referredNextSteps.map(id => workflowStepsMap[id]).join(', ')}
+                    </Badge>
+                  )}
+
+                  {step.onConditionPass && (
+                    <Badge
+                      variant="outline"
+                      className="h-5 text-xs font-medium flex items-center gap-1 m-1"
+                    >
+                      <Check className="h-3 w-3" />
+                      <span>Criteria Met:</span>
+                      <ArrowRight className="h-3 w-3" />
+                      <span>
+                        {typeof step.onConditionPass === 'object'
+                          ? step.onConditionPass.label
+                          : workflowStepsMap[step.onConditionPass]}
+                      </span>
+                    </Badge>
+                  )}
+
+                  {step.onConditionFail && (
+                    <Badge
+                      variant="outline"
+                      className="h-5 text-xs font-medium flex items-center gap-1 m-1"
+                    >
+                      <X className="h-3 w-3" />
+                      <span>Otherwise:</span>
+                      <ArrowRight className="h-3 w-3" />
+                      <span>
+                        {typeof step.onConditionFail === 'object'
+                          ? step.onConditionFail.label
+                          : workflowStepsMap[step.onConditionFail]}
+                      </span>
+                    </Badge>
+                  )}
+
+                  {step.onError && (
+                    <Badge
+                      variant="outline"
+                      className="h-5 text-xs font-medium m-1"
+                    >
+                      On Error: {typeof step.onError === 'object' ? step.onError.label : workflowStepsMap[step.onError]}
+                    </Badge>
+                  )}
+
+                  {step.onTimeout && (
+                    <Badge
+                      variant="outline"
+                      className="h-5 text-xs font-medium m-1"
+                    >
+                      On Timeout: {typeof step.onTimeout === 'object' ? step.onTimeout.label : workflowStepsMap[step.onTimeout]}
+                    </Badge>
+                  )}
+
+                  {step.conditions && step.conditions.map((cond, idx) => (
+                    <Badge
+                      key={idx}
+                      variant="outline"
+                      className="h-5 text-xs font-medium m-1"
+                    >
+                      {cond.value}: {workflowStepsMap[cond.next]}
+                    </Badge>
+                  ))}
+                </div>
+              </>
+            )}
+          </>
+        ) : (
+          <>{renderEditingForm()}</>
+        )}
+      </div>
+
+      {/* Render children */}
+      {isExpanded && children.length > 0 && (
+        <div className="ml-6 border-l-2 border-muted pl-4">
+          {children.map((child) => (
+            <TreeNode
+              key={child.id}
+              step={child}
+              editingStepId={editingStepId}
+              workflowStepsMap={workflowStepsMap}
+              onStepEdit={onStepEdit}
+              onStepSave={onStepSave}
+              onStepCancel={onStepCancel}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function WorkflowStepTree({
+  steps,
+  editingStepId,
+  onStepEdit,
+  onStepSave,
+  onStepCancel
+}: WorkflowStepTreeProps) {
+  // Build workflow steps map for labels
+  const workflowStepsMap = useMemo(() => getStepsLabelsMap(steps), [steps]);
+
+  return (
+    <div className="w-full min-h-[200px]">
+      {steps.map((step) => (
+        <TreeNode
+          key={step.id}
+          step={step}
+          editingStepId={editingStepId}
+          workflowStepsMap={workflowStepsMap}
+          onStepEdit={onStepEdit}
+          onStepSave={onStepSave}
+          onStepCancel={onStepCancel}
+        />
+      ))}
+    </div>
   );
 }

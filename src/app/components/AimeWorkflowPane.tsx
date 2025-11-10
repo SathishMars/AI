@@ -1,11 +1,15 @@
-import { Alert, Avatar, Box, Chip, LinearProgress, List, ListItem, ListItemAvatar, ListItemText, Paper, Typography } from "@mui/material";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { WorkflowDefinition } from "../types/workflowTemplate";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { FollowUpOption, WorkflowMessage } from "../types/aimeWorkflowMessages";
-import styles from "./AimeWorkflowPane.module.scss";
 import SmartAutocomplete from "./SmartAutocomplete";
-import { BASE_PATH } from "../utils/api";
-
+import { cn } from "@/lib/utils";
+import Image from "next/image";
+import Markdown from "react-markdown";
+import remarkBreaks from "remark-breaks";
 
 
 
@@ -53,9 +57,13 @@ function formatRelativeTime(date: Date | string): string {
 
 // Memoized message item component to prevent unnecessary re-renders
 const MessageItem = memo(({ message, isFirst, onOptionSelected }: { message: WorkflowMessage, isFirst: boolean, onOptionSelected?: (option: FollowUpOption, forKey: string) => void  }) => {
-    const listItemClassName = message.sender === 'aime' ? styles['aime-message'] : styles['user-message'];
-    let timestampSX: Record<string, unknown> = { opacity: 0.7, whiteSpace: 'nowrap', position: 'absolute', top: 3 };
-    timestampSX = (message.sender === 'aime') ? { ...timestampSX, right: 8 } : { ...timestampSX, left: 8 };
+    const listItemClassName = message.sender === 'aime' 
+        ? 'rounded-lg bg-transparent pt-4' 
+        : 'rounded-lg bg-gray-100 p-[12px] pt-4';
+    const timestampClassName = cn(
+        "text-xs opacity-70 whitespace-nowrap absolute",
+        message.sender === 'aime' ? 'top-0 left-0' : 'top-1 left-[12px]'
+    );
 
     const handleFollowUpOptionClick = (option: FollowUpOption, forKey: string) => {
         // Handle follow-up option click
@@ -68,70 +76,60 @@ const MessageItem = memo(({ message, isFirst, onOptionSelected }: { message: Wor
     console.log('Rendering MessageItem:', message.id, 'isFirst:', isFirst);
 
     return (
-        <>
-            {/* {(!isFirst) && (<Divider variant="middle" sx={{ my: 2 }} />)} */}
-            <ListItem key={message.id} sx={{ alignItems: 'normal', justifySelf: message.sender === 'aime' ? 'flex-start' : 'flex-end', width: 'calc(100% - 30px)' }} className={listItemClassName}>
-                {(message.sender === 'aime') && (
-                    <ListItemAvatar sx={{ justifySelf: "flex-start" }}>
-                        <Avatar alt="aime" src={`${BASE_PATH}/aime-workflow-chat.png`} sx={{ borderRadius: 0, backgroundColor: 'transparent' }}>aime</Avatar>
-                    </ListItemAvatar>
-                )}
-                <Typography variant="caption" sx={timestampSX}>
-                    {formatRelativeTime(message.timestamp)}
-                </Typography>
+        <div 
+            key={message.id} 
+            className={cn(
+                "flex items-end gap-3 py-2",                
+            )}
+        >            
+            <div className="flex-1">
+                <div className={cn("space-y-1 relative", listItemClassName)}>
+                    <span className={timestampClassName}>
+                        {formatRelativeTime(message.timestamp)}
+                    </span>
+                    <Markdown remarkPlugins={[remarkBreaks]}>{message.content.text}</Markdown>
+                </div>
 
-                <ListItemText
-                    sx={{ mt: 2 }}
-                    slots={{ primary: 'div', secondary: 'div' }}
-                    primary={
-                        <>
-                            {message.content.text
-                                .replace(/^\s*\n/, '')                // strip leading newline(s)
-                                .replace(/\s*\n\s*$/, '')             // strip trailing newline(s)
-                                .split('\n')
-                                .map((line, index) => (
-                                    <Typography key={index} variant="body1" sx={{ mb: '5px' }}>
-                                        {line}
-                                    </Typography>
-                                ))}
-                        </>
-                    }
-                    secondary={
-                        <>
-                            {message.content.followUpQuestions && message.content.followUpQuestions.length > 0 && (
-                                <Box key={message.id + '-questions'}>
-                                    {message.content.followUpQuestions.map((question, index) => (
-                                        <Typography key={index} variant="subtitle2" color="text.info">
-                                            Q. {question}
-                                        </Typography>
-                                    ))}
-                                </Box>
-                            )}
-                            {message.content.followUpOptions && Object.keys(message.content.followUpOptions).length > 0 && (
-                                <Box key={message.id + '-options-parent'}>
-                                    Select one:
-                                    {Object.entries(message.content.followUpOptions).map(([forKey, options]) => (
-                                        <Box key={forKey + '-options'}>
-                                            <Box sx={{ fontWeight: 'bold' }}>{forKey}:</Box>
-                                            {options.map((option, index) => (
-                                                <Box key={forKey + index}>
-                                                    <Chip size="small" color="info" label={option.label} sx={{ m: 0.5 }} onClick={() => handleFollowUpOptionClick(option, forKey)} />
-                                                </Box>
-                                            ))}
-                                        </Box>
-                                    ))}
-                                </Box>
-                            )}
-                        </>
-                    }
-                />
-                {(message.sender !== 'aime') && (
-                    <ListItemAvatar>
-                        <Avatar alt="John Doe" sx={{ bgcolor: 'primary.main' }}>JD</Avatar>
-                    </ListItemAvatar>
+                {message.content.followUpQuestions && message.content.followUpQuestions.length > 0 && (
+                    <div key={message.id + '-questions'} className="mt-2">
+                        {message.content.followUpQuestions.map((question, index) => (
+                            <p key={index} className="text-sm text-blue-600">
+                                Q. {question}
+                            </p>
+                        ))}
+                    </div>
                 )}
-            </ListItem>
-        </>
+                
+                {message.content.followUpOptions && Object.keys(message.content.followUpOptions).length > 0 && (
+                    <div key={message.id + '-options-parent'} className="mt-2">
+                        <div className="text-sm mb-1">Select one:</div>
+                        {Object.entries(message.content.followUpOptions).map(([forKey, options]) => (
+                            <div key={forKey + '-options'} className="mb-2">
+                                <div className="font-bold text-sm">{forKey}:</div>
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                    {options.map((option, index) => (
+                                        <Badge 
+                                            key={forKey + index}
+                                            variant="secondary"
+                                            className="cursor-pointer hover:bg-primary hover:text-primary-foreground"
+                                            onClick={() => handleFollowUpOptionClick(option, forKey)}
+                                        >
+                                            {option.label}
+                                        </Badge>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {message.sender !== 'aime' && (
+                <Avatar className="bg-gray-300">
+                    <AvatarFallback className="bg-gray-300">JD</AvatarFallback>
+                </Avatar>
+            )}
+        </div>
     );
 });
 
@@ -204,45 +202,34 @@ export default function AimeWorkflowPane({
 
 
     return (
-        <Box sx={{ p: 1, pl: 0, flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div className="p-0 pt-2 flex-1 flex flex-col h-full max-h-full">
             {error && (
-                <Alert severity="error" sx={{ mb: 2 }}>
-                    {error}
+                <Alert variant="destructive" className="mb-2">
+                    <AlertDescription>{error}</AlertDescription>
                 </Alert>
             )}
 
             {!error && workflowTemplateId && (
-                <Paper sx={{ alignSelf: 'stretch', height: '100%', p: 1, display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}>
-                    <Box sx={{ mb: 1, fontWeight: 'bold' }}>
-                        Ask aime
-                    </Box>
-                    <Box
+                <div className="flex-1 p-[20px] max-h-full flex flex-col items-stretch rounded-none bg-card">
+                    <div className="mb-1 font-bold flex items-center gap-2">
+                        <Image src="/aime-request-100x100.png" alt="aime Request" width={48} height={48} />
+                        Ask aime Request
+                    </div>
+                    <div
                         ref={messagesContainerRef}
-                        sx={{
-                            border: 1,
-                            borderColor: 'divider',
-                            borderRadius: 1,
-                            p: 2,
-                            flex: 1,
-                            mb: 1,
-                            minHeight: 0,
-                            overflowY: 'auto',
-                            maxHeight: '100%',
-                        }}
+                        className="border border-border rounded-md p-4 flex-1 mb-1 overflow-y-auto"
                     >
-                        <List sx={{ width: '100%', minHeight: 0, overflow: 'visible' }}>
                             {(messages?.length === 0) ? (
-                                <Box sx={{ textAlign: 'center', color: 'text.secondary' }}>
+                                <div className="text-center text-muted-foreground">
                                     No messages yet. Start the conversation!
-                                </Box>
+                                </div>
                             ) : (
                                 messages?.map((message, index) => (
                                     <MessageItem key={message.id} message={message} isFirst={(index === 0)} onOptionSelected={onOptionSelected} />
                                 ))
                             )}
-                        </List>
-                    </Box>
-                    {isLoading && (<LinearProgress sx={{ width: '100%' }} />)}
+                    </div>
+                    {isLoading && (<Progress value={100} className="w-full animate-pulse" />)}
                     <SmartAutocomplete
                         value={userInput}
                         autoFocus={true}
@@ -252,9 +239,9 @@ export default function AimeWorkflowPane({
                         handleSendToAime={handleSendToAime}
                         workflowDefinition={workflowDefinition}
                     />
-                </Paper>
+                </div>
             )}
-        </Box>
+        </div>
     );
 }
 
