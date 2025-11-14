@@ -6,6 +6,10 @@ const config = {
     '^@/(.*)$': '<rootDir>/src/$1',
     // Mock MongoDB to avoid ES module issues
     '^mongodb$': '<rootDir>/src/test/__mocks__/mongodb.ts',
+    // Mock jose to avoid ES module issues
+    '^jose$': '<rootDir>/src/test/__mocks__/jose.ts',
+    // Mock next/server for NextRequest/NextResponse
+    '^next/server$': '<rootDir>/src/test/__mocks__/next-server.ts',
   },
   collectCoverageFrom: [
     'src/**/*.{js,jsx,ts,tsx}',

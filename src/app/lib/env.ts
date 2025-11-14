@@ -68,9 +68,10 @@ function buildConfig(): EnvironmentConfig {
   const authMode = getAuthMode();
   const isStandalone = authMode === 'standalone';
   
+  // Allow client-side access via NEXT_PUBLIC_ prefix, fallback to server-side env
   const railsBaseUrl = getEnv(
-    'RAILS_BASE_URL',
-    isDevelopment ? 'http://groupize.local' : ''
+    'NEXT_PUBLIC_RAILS_BASE_URL',
+    getEnv('RAILS_BASE_URL', isDevelopment ? 'http://groupize.local' : '')
   );
   
   // JWKS endpoint and JWT configuration only used in embedded mode

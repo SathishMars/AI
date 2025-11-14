@@ -15,6 +15,7 @@ export async function UserSessionProvider({
   const email = headersList.get('x-user-email');
   const accountId = headersList.get('x-account-id');
   const organizationId = headersList.get('x-organization-id');
+  const expiresAt = headersList.get('x-session-expires-at');
 
   const currentUser: CurrentUser | undefined = userId && firstName && lastName && email && accountId
     ? {
@@ -24,6 +25,7 @@ export async function UserSessionProvider({
         email,
         accountId,
         organizationId: organizationId || undefined,
+        expiresAt: expiresAt || undefined,
         isAuthenticated: true,
       }
     : undefined;

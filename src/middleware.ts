@@ -27,6 +27,7 @@ function getRailsAppUrl(): URL {
 }
 
 
+
 function buildApiUrl(request: NextRequest, accountFromQuery: string | null, orgFromQuery: string | null): URL {
   try {
     const apiUrl = new URL(`${env.basePath}/api/user-session/`, request.nextUrl.origin);
@@ -108,18 +109,23 @@ export async function middleware(request: NextRequest) {
 }
 
 
+/**
+ * Handle embedded mode authentication
+ * 
+ * Architecture:
+ * - Client-side hook (useJwtRenewal) handles proactive renewal 5 minutes before token expiry
+ * - Middleware only verifies tokens and redirects if expired/invalid
+ * - This separation ensures renewal happens proactively in the browser, not reactively in middleware
+ */
 async function handleEmbeddedMode(request: NextRequest, pathname: string) {
   const token = request.cookies.get(env.cookieName)?.value;
   
   if (!token) {
     const railsUrl = getRailsAppUrl();
-    console.log('[Auth Middleware] Redirecting to rails app:', railsUrl.toString());
+    console.log('[Auth Middleware] No token found, redirecting to rails app:', railsUrl.toString());
     return NextResponse.redirect(railsUrl);
   }
 
-  console.log('[Auth Middleware] Token found, length:', token.length);
-  
-  // Verify JWT token using shared verifier (Rails JWKS)
   let claims: UserJWTClaims;
   try {
     claims = await verifyUserToken(token);
@@ -131,10 +137,20 @@ async function handleEmbeddedMode(request: NextRequest, pathname: string) {
       console.error('[Auth Middleware] Unexpected verification error:', error);
     }
     
-    console.log('[Auth Middleware] Token invalid, redirecting to rails app');
     return NextResponse.redirect(getRailsAppUrl());
   }
 
+  return buildAuthorizedResponse(request, pathname, claims);
+}
+
+/**
+ * Build an authorized response with user context headers
+ */
+async function buildAuthorizedResponse(
+  request: NextRequest,
+  pathname: string,
+  claims: UserJWTClaims
+): Promise<NextResponse> {
   const fullName = `${claims.context.user_first_name} ${claims.context.user_last_name}`.trim();
   
   const currentUser = {
@@ -145,6 +161,7 @@ async function handleEmbeddedMode(request: NextRequest, pathname: string) {
     firstName: claims.context.user_first_name,
     lastName: claims.context.user_last_name,
     fullName,
+    expiresAt: claims.exp ? new Date(claims.exp * 1000).toISOString() : undefined,
   };
   
   const pathSegments = pathname.split('/').filter(Boolean);
@@ -204,6 +221,10 @@ async function handleEmbeddedMode(request: NextRequest, pathname: string) {
   
   if (currentUser.organizationId) {
     requestHeaders.set('x-organization-id', currentUser.organizationId);
+  }
+  
+  if (currentUser.expiresAt) {
+    requestHeaders.set('x-session-expires-at', currentUser.expiresAt);
   }
   
   if (urlAccountId) {

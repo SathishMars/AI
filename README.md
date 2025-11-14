@@ -160,19 +160,64 @@ NEXT_PUBLIC_ENABLE_MOCK_DATA=true
 
 ### 4. Development Server
 
-Start the development server:
+The application supports two development modes:
+
+#### Standalone Mode (Frontend-Only Development)
+
+Perfect for UI/component development without Rails:
 
 ```bash
 npm run dev
 ```
 
-The app runs on port **3001**.
+**Features:**
+- Runs on **port 3000**
+- **Skips JWT verification** - uses mocked API responses
+- No Rails connection needed
+- No authentication required
+- Perfect for frontend-only development
 
-**Access URLs:**
-- **Development (standalone)**: `http://localhost:3001`
-- **Integrated with Rails (via nginx)**: `http://groupize.local/app/aimeworkflows` (requires nginx setup below)
+**Access:** `http://localhost:3000/aime/aimeworkflows/`
 
-> **Note**: The app runs at root (`/`) internally. When accessed via nginx proxy, nginx rewrites `/app/aimeworkflows/*` to `/*` before forwarding to Next.js.
+**Environment Variables (Optional):**
+```bash
+AUTH_MODE=standalone  # Set automatically by npm run dev
+```
+
+#### Embedded Mode (Full Stack Development)
+
+For development with Rails authentication and JWT verification:
+
+```bash
+npm run dev:embedded
+```
+
+**Features:**
+- Runs on **port 3001**
+- **Verifies JWT tokens** via JWKS endpoint from Rails
+- Requires Rails running at `RAILS_BASE_URL`
+- Full SSO experience with Rails
+- Redirects to Rails login if unauthorized
+
+**Access:** `http://groupize.local/aime/aimeworkflows/` (requires nginx setup)
+
+**Environment Variables (Required):**
+```bash
+AUTH_MODE=embedded
+RAILS_BASE_URL=http://groupize.local
+NEXT_PUBLIC_RAILS_BASE_URL=http://groupize.local
+JWT_ISSUER=groupize
+JWT_AUDIENCE=workflows
+COOKIE_NAME=gpw_session
+```
+
+**Setup Steps:**
+1. Start Rails: `cd reg_app && rails s -p 3000`
+2. Start Next.js: `cd Workflows && npm run dev:embedded`
+3. Configure nginx (see section 5 below)
+4. Access via: `http://groupize.local/aime/aimeworkflows/`
+
+> **Note**: See `docs/ENV_VARIABLES.md` for complete environment variable reference.
 
 ### 5. Nginx Proxy Setup (Integration with Rails)
 
@@ -235,9 +280,9 @@ See `nginx.example.conf` for the complete configuration with detailed comments.
 #### Development Workflow
 
 1. Start Rails: `cd /path/to/reg_app && rails s` (runs on port 3000)
-2. Start Next.js: `cd /path/to/Workflows && npm run dev` (runs on port 3001)
+2. Start Next.js: `cd /path/to/Workflows && npm run dev:embedded` (runs on port 3001)
 3. Start nginx: `brew services start nginx`
-4. Access via: `http://groupize.local/app/aimeworkflows`
+4. Access via: `http://groupize.local/aime/aimeworkflows/`
 
 ## 🧪 Testing
 

@@ -11,7 +11,7 @@
    * 2. Service Tokens (aud="workflows-api") - Rails → Next.js /api/internal/**
 */
 
-import { createRemoteJWKSet, jwtVerify, JWTPayload, JWTVerifyResult } from 'jose';
+import { createRemoteJWKSet, jwtVerify, decodeJwt, JWTPayload, JWTVerifyResult } from 'jose';
 import { env } from '@/app/lib/env';
 
 const JWKS_CACHE_TTL = 5 * 60 * 1000;
@@ -186,6 +186,20 @@ export async function verifyServiceToken(token: string): Promise<ServiceJWTClaim
     }
     
     throw new JWTVerificationError('TOKEN_INVALID', 'Service token verification failed', error);
+  }
+}
+
+/**
+ * Decode JWT token without verification to check expiration
+ * Used to determine if expired token is within grace period for renewal
+ */
+export function decodeTokenWithoutVerification(token: string): { exp?: number; iat?: number } | null {
+  try {
+    const decoded = decodeJwt(token);
+    return decoded;
+  } catch (error) {
+    console.error('[JWTVerifier] Failed to decode token:', error);
+    return null;
   }
 }
 

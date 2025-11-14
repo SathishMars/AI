@@ -14,6 +14,7 @@ export interface CurrentUser {
   organizationId?: string;
   fullName?: string;
   isAuthenticated?: boolean;
+  expiresAt?: string; // ISO 8601 timestamp from JWT exp claim
 }
 
 export interface UserProfile {

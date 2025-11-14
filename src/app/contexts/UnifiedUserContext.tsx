@@ -4,6 +4,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { apiFetch } from '@/app/utils/api';
 import { env } from '@/app/lib/env';
+import { useJwtRenewal } from '@/app/hooks/useJwtRenewal';
 import { 
   User,
   Account,
@@ -38,6 +39,9 @@ export function UnifiedUserProvider({ children, initialCurrentUser }: UnifiedUse
   const [session, setSession] = useState<UserSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [userError, setUserError] = useState<string | null>(null);
+  const [sessionExpiresAt, setSessionExpiresAt] = useState<string | undefined>(
+    initialCurrentUser?.expiresAt
+  );
 
   // Base URL for API calls
   const baseUrl = typeof window !== 'undefined' 
@@ -136,10 +140,14 @@ export function UnifiedUserProvider({ children, initialCurrentUser }: UnifiedUse
     }
     
     // Create minimal session from current user
+    const expiresAt = currentUser.expiresAt 
+      ? new Date(currentUser.expiresAt)
+      : new Date(Date.now() + 24 * 60 * 60 * 1000);
+    
     const initializedSession: UserSession = {
       sessionId: `session-${currentUser.userId}-${Date.now()}`,
       token: '', // Not needed for embedded mode (JWT in cookie)
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      expiresAt,
       device: {
         type: 'web',
       },
@@ -150,6 +158,11 @@ export function UnifiedUserProvider({ children, initialCurrentUser }: UnifiedUse
     setCurrentOrganization(initializedOrg);
     setAvailableOrganizations(initializedOrg ? [initializedOrg] : []);
     setSession(initializedSession);
+    
+    // Update session expiry for JWT renewal
+    if (currentUser.expiresAt) {
+      setSessionExpiresAt(currentUser.expiresAt);
+    }
   }, []);
 
   /**
@@ -318,17 +331,16 @@ export function UnifiedUserProvider({ children, initialCurrentUser }: UnifiedUse
   }, [user]);
 
   /**
-   * Logout user and clear all session data
+   * Logout user and clear all session data (standalone mode only)
    */
   const logout = useCallback(async () => {
     try {
-      // TODO: Call API to invalidate session
       setUser(null);
       setAccount(null);
       setCurrentOrganization(null);
       setAvailableOrganizations([]);
       setSession(null);
-      
+      setSessionExpiresAt(undefined);
     } catch (error) {
       console.error('Failed to logout:', error);
       setUserError(error instanceof Error ? error.message : 'Failed to logout');
@@ -348,6 +360,44 @@ export function UnifiedUserProvider({ children, initialCurrentUser }: UnifiedUse
   const clearErrors = useCallback(() => {
     setUserError(null);
   }, []);
+
+  /**
+   * Handle successful JWT renewal
+   */
+  const handleRenewalSuccess = useCallback((newExpiresAt: string) => {
+    console.log('[UnifiedUserContext] JWT renewed successfully, new expiry:', newExpiresAt);
+    setSessionExpiresAt(newExpiresAt);
+    
+    // Update session object if it exists
+    if (session) {
+      setSession({
+        ...session,
+        expiresAt: new Date(newExpiresAt),
+      });
+    }
+  }, [session]);
+
+  /**
+   * Handle JWT renewal failure
+   */
+  const handleRenewalFailure = useCallback((error: { code: string; message: string; shouldRedirect: boolean }) => {
+    console.error('[UnifiedUserContext] JWT renewal failed:', error);  
+    if (error.shouldRedirect) {
+      window.location.href = env.railsBaseUrl;
+    } else {
+      setUserError(`Session renewal failed: ${error.message}`);
+    }
+  }, []);
+
+  /**
+   * Setup JWT auto-renewal (only in embedded mode)
+   */
+  useJwtRenewal({
+    expiresAt: sessionExpiresAt,
+    onRenewalSuccess: handleRenewalSuccess,
+    onRenewalFailure: handleRenewalFailure,
+    enabled: env.authMode === 'embedded' && !!sessionExpiresAt,
+  });
 
   // Permission helper functions
   const hasRole = useCallback((roleName: string): boolean => {
