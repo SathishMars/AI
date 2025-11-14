@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { env } from '@/app/lib/env';
 
 /**
  * Health check endpoint for Docker container monitoring
@@ -9,7 +10,7 @@ export async function GET() {
     { 
       status: 'ok',
       timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV || 'unknown'
+      environment: env.nodeEnv
     },
     { status: 200 }
   );

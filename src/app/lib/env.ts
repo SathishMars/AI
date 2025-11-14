@@ -1,13 +1,3 @@
-/**
- * Environment Configuration
- * 
- * Centralized environment variable management with type safety and validation.
- * Supports both embedded (Rails proxy) and standalone (dev mock) modes.
- */
-
-/**
- * Authentication mode
- */
 export type AuthMode = 'embedded' | 'standalone';
 
 /**
@@ -31,6 +21,16 @@ interface EnvironmentConfig {
   // App configuration
   basePath: string;
   nodeEnv: string;
+  appUrl: string;
+  
+  // AI/LLM Configuration
+  anthropicApiKey: string | undefined;
+  anthropicModel: string;
+  
+  // Database Configuration
+  databaseEnvironment: string;
+  documentDbUri: string | undefined;
+  mongoDbUri: string | undefined;
   
   // Feature flags
   isDevelopment: boolean;
@@ -38,27 +38,19 @@ interface EnvironmentConfig {
   isStandalone: boolean;
 }
 
-/**
- * Get environment variable with fallback
- */
+
 function getEnv(key: string, defaultValue: string): string {
   return process.env[key] || defaultValue;
 }
 
 /**
- * Get required environment variable (throws if missing)
+ * Get optional environment variable (returns undefined if not set)
+ * Use for sensitive values like API keys that should not have defaults
  */
-function getRequiredEnv(key: string): string {
-  const value = process.env[key];
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${key}`);
-  }
-  return value;
+function getOptionalEnv(key: string): string | undefined {
+  return process.env[key];
 }
 
-/**
- * Determine authentication mode from environment
- */
 function getAuthMode(): AuthMode {
   const mode = process.env.AUTH_MODE?.toLowerCase();
   
@@ -66,13 +58,9 @@ function getAuthMode(): AuthMode {
     return 'standalone';
   }
   
-  // Default to embedded mode
   return 'embedded';
 }
 
-/**
- * Build environment configuration
- */
 function buildConfig(): EnvironmentConfig {
   const nodeEnv = getEnv('NODE_ENV', 'development');
   const isDevelopment = nodeEnv === 'development';
@@ -82,24 +70,27 @@ function buildConfig(): EnvironmentConfig {
   
   const railsBaseUrl = getEnv(
     'RAILS_BASE_URL',
-    isDevelopment ? 'http://127.0.0.1' : ''
+    isDevelopment ? 'http://groupize.local' : ''
   );
   
-  // JWKS endpoint (only used in embedded mode)
+  // JWKS endpoint and JWT configuration only used in embedded mode
   const jwksUrl = getEnv(
     'JWKS_URL',
-    `${railsBaseUrl}/api/v1/.well-known/jwks.json`
+    `${railsBaseUrl}/.well-known/jwks.json`
   );
   
-  // JWT configuration (only used in embedded mode)
   const jwtIssuer = getEnv('JWT_ISSUER', 'groupize');
   const jwtAudience = getEnv('JWT_AUDIENCE', 'workflows');
-  
-  // Cookie name (must match Rails in embedded mode)
   const cookieName = getEnv('COOKIE_NAME', 'gpw_session');
+  const basePath = getEnv('NEXT_PUBLIC_BASE_PATH', '/aime/aimeworkflows');
+  const appUrl = getEnv('NEXT_PUBLIC_APP_URL', 'http://localhost:3000');
   
-  // App configuration
-  const basePath = getEnv('BASE_PATH', '/aime/aimeworkflows');
+  const anthropicApiKey = getOptionalEnv('ANTHROPIC_API_KEY');
+  const anthropicModel = getEnv('ANTHROPIC_MODEL_WORKFLOW', 'claude-3-5-sonnet-20241022');
+  
+  const databaseEnvironment = getEnv('DATABASE_ENVIRONMENT', 'local');
+  const documentDbUri = getOptionalEnv('DOCUMENTDB_URI');
+  const mongoDbUri = getOptionalEnv('MONGODB_URI');
   
   return {
     authMode,
@@ -110,33 +101,18 @@ function buildConfig(): EnvironmentConfig {
     cookieName,
     basePath,
     nodeEnv,
+    appUrl,
+    anthropicApiKey,
+    anthropicModel,
+    databaseEnvironment,
+    documentDbUri,
+    mongoDbUri,
     isDevelopment,
     isProduction,
     isStandalone,
   };
 }
 
-/**
- * Environment configuration singleton
- */
 export const env = buildConfig();
 
-/**
- * Log environment configuration (for debugging)
- */
-export function logEnvConfig(): void {
-  if (env.isDevelopment) {
-    console.log('[ENV] Configuration:', {
-      authMode: env.authMode,
-      railsBaseUrl: env.railsBaseUrl,
-      jwksUrl: env.jwksUrl,
-      jwtIssuer: env.jwtIssuer,
-      jwtAudience: env.jwtAudience,
-      cookieName: env.cookieName,
-      basePath: env.basePath,
-      nodeEnv: env.nodeEnv,
-      isStandalone: env.isStandalone,
-    });
-  }
-}
 

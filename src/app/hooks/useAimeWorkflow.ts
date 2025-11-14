@@ -32,8 +32,6 @@ interface UseAimeWorkflowReturn {
     regenerateWorkflowDefinition: () => Promise<void>;
 }
 
-const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-
 const seedWelcomeMessage = (): WorkflowMessage => {
         return {
             id: generateShortId(),

@@ -40,8 +40,6 @@ interface UseWorkflowTemplateReturn {
   reset: () => void;
 }
 
-const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-
 export function useWorkflowTemplate(options: UseWorkflowTemplateOptions = {}): UseWorkflowTemplateReturn {
   const {
     templateId,

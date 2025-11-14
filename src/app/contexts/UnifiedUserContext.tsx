@@ -3,6 +3,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { apiFetch } from '@/app/utils/api';
+import { env } from '@/app/lib/env';
 import { 
   User,
   Account,
@@ -12,12 +13,13 @@ import {
   UnifiedUserProviderProps,
   UserPreferences,
   UserProfile,
-  UserRole
+  UserRole,
+  CurrentUser
 } from '@/app/types/unified-user-context';
 
 // Create the context
 const UnifiedUserContext = createContext<UnifiedUserContextState | undefined>(undefined);
-const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+
 /**
  * Unified User Context Provider
  * Provides complete user session context including user, account, and organization data
@@ -40,13 +42,13 @@ export function UnifiedUserProvider({ children, initialCurrentUser }: UnifiedUse
   // Base URL for API calls
   const baseUrl = typeof window !== 'undefined' 
     ? window.location.origin 
-    : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    : env.appUrl;
 
   /**
    * Initialize user data from current user (SSR initial data)
    * Creates minimal user/account/org data from current user for immediate use
    */
-  const initializeFromCurrentUser = useCallback((currentUser: import('@/app/types/auth').CurrentUser) => {
+  const initializeFromCurrentUser = useCallback((currentUser: CurrentUser) => {
     // Create minimal user from current user
     const initializedUser: User = {
       id: currentUser.userId,

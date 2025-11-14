@@ -24,7 +24,6 @@ interface TemplateRow {
     status: string;
     author?: string;
 }
-const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
 
 export default function TemplatesGrid() {
     const router = useRouter();

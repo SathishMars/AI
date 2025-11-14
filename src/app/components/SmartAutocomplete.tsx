@@ -26,7 +26,6 @@ interface SmartAutocompleteProps {
 interface VirtualAnchor {
   getBoundingClientRect: () => DOMRect;
 }
-const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
 
 const getWorkflowSteps = (workflowDefinition: WorkflowDefinition | undefined): Array<WorkflowAutocompleteItem> => {
   if (!workflowDefinition || !workflowDefinition.steps) return [];

@@ -82,7 +82,15 @@ export async function GET(
       return NextResponse.json({ success: true, data: starter });
     }
 
-    const result = await WorkflowTemplateDbUtil.get(account, organization, decodedTemplateId);
+    // Try to get template with the provided organization context
+    let result = await WorkflowTemplateDbUtil.get(account, organization, decodedTemplateId);
+
+    // If not found and we're looking for an org-specific template, also try account-level
+    // (account-level templates should be accessible from any org context)
+    if (!result && organization !== null) {
+      console.log(`[GET] Template not found with org=${organization}, trying account-level (org=null)`);
+      result = await WorkflowTemplateDbUtil.get(account, null, decodedTemplateId);
+    }
 
     if (!result) {
       return NextResponse.json({ error: 'Template not found' }, { status: 404 });
@@ -124,11 +132,23 @@ export async function PUT(
     }
 
     // Validate against Zod schema
+    console.log('[PUT] Validating template:', {
+      id: (parsedBody as any)?.id,
+      account: (parsedBody as any)?.account,
+      createdAt: (parsedBody as any)?.metadata?.createdAt,
+      updatedAt: (parsedBody as any)?.metadata?.updatedAt,
+    });
+    
     try {
       WorkflowTemplateSchema.parse(parsedBody);
     } catch (e) {
+      console.error('[PUT] Validation failed:', e);
       const msg = e instanceof Error ? e.message : 'Invalid template data';
-      return NextResponse.json({ error: 'Invalid template data', details: msg }, { status: 400 });
+      return NextResponse.json({ 
+        error: 'Invalid template data', 
+        details: msg,
+        received: parsedBody
+      }, { status: 400 });
     }
 
   const template = parsedBody as WorkflowTemplate;
@@ -185,11 +205,23 @@ export async function POST(
     console.log('[POST /api/workflow-templates/[templateId]] Parsed the request body:', parsedBody);
 
     // Validate against schema
+    console.log('[POST] Validating template:', {
+      id: (parsedBody as any)?.id,
+      account: (parsedBody as any)?.account,
+      createdAt: (parsedBody as any)?.metadata?.createdAt,
+      updatedAt: (parsedBody as any)?.metadata?.updatedAt,
+    });
+    
     try {
       WorkflowTemplateSchema.parse(parsedBody);
     } catch (err) {
+      console.error('[POST] Validation failed:', err);
       const msg = err instanceof Error ? err.message : 'Invalid template data';
-      return NextResponse.json({ error: 'Invalid template data', details: msg }, { status: 400 });
+      return NextResponse.json({ 
+        error: 'Invalid template data', 
+        details: msg,
+        received: parsedBody
+      }, { status: 400 });
     }
     console.log('[POST /api/workflow-templates/[templateId]] validated against workflowTemplateSchema');
 

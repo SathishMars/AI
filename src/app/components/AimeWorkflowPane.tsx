@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import Image from "next/image";
 import Markdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
-
+import { env } from '@/app/lib/env';
 
 
 interface AimeWorkflowPaneProps {
@@ -212,7 +212,7 @@ export default function AimeWorkflowPane({
             {!error && workflowTemplateId && (
                 <div className="flex-1 p-[20px] max-h-full flex flex-col items-stretch rounded-none bg-card">
                     <div className="mb-1 font-bold flex items-center gap-2">
-                        <Image src="/aime-request-100x100.png" alt="aime Request" width={48} height={48} />
+                        <Image src={`${env.basePath}/aime-request-100x100.png`} alt="aime Request" width={48} height={48} />
                         Ask aime Request
                     </div>
                     <div

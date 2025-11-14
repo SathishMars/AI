@@ -1,8 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyJWT } from '@/app/lib/jwt';
+import { verifyUserToken, JWTVerificationError, UserJWTClaims } from '@/app/lib/jwt-verifier';
 import { env } from '@/app/lib/env';
 
-const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+const MIDDLEWARE_SKIP_HEADER = 'x-middleware-skip';
+const MIDDLEWARE_SKIP_VALUE = '1';
+
+// standalone mode
+type DemoUser = {
+  id?: string;
+  userId?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  profile?: { firstName?: string; lastName?: string; email?: string };
+};
+
+type UserSessionData = {
+  user?: DemoUser;
+  account?: { id?: string };
+  currentOrganization?: { id?: string } | null;
+} | null;
+
+
+function getRailsAppUrl(): URL {
+  return new URL('/', env.railsBaseUrl || 'http://groupize.local');
+}
+
+
+function buildApiUrl(request: NextRequest, accountFromQuery: string | null, orgFromQuery: string | null): URL {
+  try {
+    const apiUrl = new URL(`${env.basePath}/api/user-session/`, request.nextUrl.origin);
+    if (accountFromQuery) apiUrl.searchParams.set('account', accountFromQuery);
+    if (orgFromQuery) apiUrl.searchParams.set('organization', orgFromQuery);
+    return apiUrl;
+  } catch {
+    const host = request.headers.get('host') || 'localhost:3000';
+    const apiUrl = new URL(`http://${host}${env.basePath}/api/user-session/`);
+    if (accountFromQuery) apiUrl.searchParams.set('account', accountFromQuery);
+    if (orgFromQuery) apiUrl.searchParams.set('organization', orgFromQuery);
+    return apiUrl;
+  }
+}
 
 /**
  * Authentication Middleware
@@ -25,9 +63,8 @@ const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
 export async function middleware(request: NextRequest) {
   try {
     const pathname = request.nextUrl.pathname;
-    console.log("[middleware] pathname:", pathname, 'basePath:', basePath, 'mode:', env.authMode);
+    console.log('[Auth Middleware] pathname:', pathname, 'basePath:', env.basePath, 'mode:', env.authMode);
 
-    // Skip Next.js internals and static assets
     if (
       pathname.startsWith('/_next') ||
       pathname.startsWith('/static') ||
@@ -38,7 +75,7 @@ export async function middleware(request: NextRequest) {
     }
 
     // Skip if already processed by middleware (prevent recursion)
-    if (request.headers.get('x-middleware-skip') === '1') {
+    if (request.headers.get(MIDDLEWARE_SKIP_HEADER) === MIDDLEWARE_SKIP_VALUE) {
       return NextResponse.next();
     }
 
@@ -47,65 +84,69 @@ export async function middleware(request: NextRequest) {
       return NextResponse.next();
     }
 
-    // ==========================================
-    // EMBEDDED MODE: JWT Verification Required
-    // ==========================================
+    // Skip internal API routes - they use service token auth via withServiceAuth wrapper
+    if (pathname.startsWith('/api/internal/') || pathname.startsWith(`${env.basePath}/api/internal/`)) {
+      console.log('[Auth Middleware] Skipping internal API route (uses service auth)');
+      return NextResponse.next();
+    }
+
     if (env.authMode === 'embedded') {
       return await handleEmbeddedMode(request, pathname);
     }
 
-    // ==========================================
-    // STANDALONE MODE: Use Mocked User API
-    // ==========================================
-    return await handleStandaloneMode(request, pathname);
+    return await handleStandaloneMode(request);
 
   } catch (err) {
     console.error('[Auth Middleware] Critical error:', err);
     
-    // In production embedded mode, redirect to login on critical errors
     if (env.isProduction && env.authMode === 'embedded') {
-      const loginUrl = new URL('/', env.railsBaseUrl || 'http://localhost:3000');
-      return NextResponse.redirect(loginUrl);
+      return NextResponse.redirect(getRailsAppUrl());
     }
     
-    // In development/standalone, allow through but log the error
     return NextResponse.next();
   }
 }
 
-/**
- * Handle embedded mode: verify JWT token from cookie
- */
+
 async function handleEmbeddedMode(request: NextRequest, pathname: string) {
-  // Get JWT token from cookie
   const token = request.cookies.get(env.cookieName)?.value;
   
   if (!token) {
-    console.warn('[Auth Middleware] Embedded mode: No token found in cookie:', env.cookieName);
-    const loginUrl = new URL('/', env.railsBaseUrl || 'http://localhost:3000');
-    console.log('[Auth Middleware] Redirecting to login:', loginUrl.toString());
-    return NextResponse.redirect(loginUrl);
+    const railsUrl = getRailsAppUrl();
+    console.log('[Auth Middleware] Redirecting to rails app:', railsUrl.toString());
+    return NextResponse.redirect(railsUrl);
   }
 
   console.log('[Auth Middleware] Token found, length:', token.length);
   
-  // Verify JWT token
-  const verification = await verifyJWT(token);
-  
-  if (!verification.success) {
-    console.error('[Auth Middleware] Token verification failed:', verification.error.code);
-    console.error('[Auth Middleware] Error details:', verification.error.message);
+  // Verify JWT token using shared verifier (Rails JWKS)
+  let claims: UserJWTClaims;
+  try {
+    claims = await verifyUserToken(token);
+  } catch (error) {
+    if (error instanceof JWTVerificationError) {
+      console.error('[Auth Middleware] Token verification failed:', error.code);
+      console.error('[Auth Middleware] Error details:', error.message);
+    } else {
+      console.error('[Auth Middleware] Unexpected verification error:', error);
+    }
     
-    const loginUrl = new URL('/', env.railsBaseUrl || 'http://localhost:3000');
-    console.log('[Auth Middleware] Token invalid, redirecting to login');
-    return NextResponse.redirect(loginUrl);
+    console.log('[Auth Middleware] Token invalid, redirecting to rails app');
+    return NextResponse.redirect(getRailsAppUrl());
   }
 
-  // Token is valid - validate URL-based scoping
-  const { currentUser } = verification;
+  const fullName = `${claims.context.user_first_name} ${claims.context.user_last_name}`.trim();
   
-  // Parse account and org from URL path
-  // URL format: /accounts/:accountId/orgs/:orgId/... or /accounts/:accountId/...
+  const currentUser = {
+    userId: claims.context.user_id,
+    accountId: claims.context.account_id,
+    organizationId: claims.context.organization_id,
+    email: claims.context.email,
+    firstName: claims.context.user_first_name,
+    lastName: claims.context.user_last_name,
+    fullName,
+  };
+  
   const pathSegments = pathname.split('/').filter(Boolean);
   let urlAccountId: string | null = null;
   let urlOrgId: string | null = null;
@@ -120,7 +161,6 @@ async function handleEmbeddedMode(request: NextRequest, pathname: string) {
     }
   }
   
-  // Validate account ID from URL matches JWT claims
   if (urlAccountId && urlAccountId !== currentUser.accountId) {
     console.error(
       `[Auth Middleware] Account ID mismatch. URL: ${urlAccountId}, JWT: ${currentUser.accountId}`
@@ -131,7 +171,6 @@ async function handleEmbeddedMode(request: NextRequest, pathname: string) {
     );
   }
   
-  // Validate organization ID from URL matches JWT claims (if present)
   if (urlOrgId) {
     if (!currentUser.organizationId) {
       console.error(
@@ -154,10 +193,8 @@ async function handleEmbeddedMode(request: NextRequest, pathname: string) {
     }
   }
   
-  // All validation passed - inject headers for downstream use
   const requestHeaders = new Headers(request.headers);
   
-  // Inject user context headers
   requestHeaders.set('x-user-id', currentUser.userId);
   requestHeaders.set('x-user-email', currentUser.email);
   requestHeaders.set('x-user-first-name', currentUser.firstName);
@@ -169,7 +206,6 @@ async function handleEmbeddedMode(request: NextRequest, pathname: string) {
     requestHeaders.set('x-organization-id', currentUser.organizationId);
   }
   
-  // Inject URL-based scoping info (for API routes to use)
   if (urlAccountId) {
     requestHeaders.set('x-url-account-id', urlAccountId);
   }
@@ -183,7 +219,6 @@ async function handleEmbeddedMode(request: NextRequest, pathname: string) {
     requestHeaders.set('x-organization', currentUser.organizationId);
   }
   
-  // Pass authenticated and authorized request through
   const response = NextResponse.next({
     request: {
       headers: requestHeaders,
@@ -202,13 +237,8 @@ async function handleEmbeddedMode(request: NextRequest, pathname: string) {
   return response;
 }
 
-/**
- * Handle standalone mode: use mocked user API
- */
-async function handleStandaloneMode(request: NextRequest, pathname: string) {
+async function handleStandaloneMode(request: NextRequest) {
   const url = request.nextUrl;
-
-  // Resolve account/org candidates from common sources (query/header/cookie)
   const accountFromQuery = url.searchParams.get('account');
   const accountFromHeader = request.headers.get('x-account');
   const accountFromCookie = request.cookies.get('account')?.value;
@@ -216,21 +246,7 @@ async function handleStandaloneMode(request: NextRequest, pathname: string) {
   const orgFromHeader = request.headers.get('x-organization');
   const orgFromCookie = request.cookies.get('organization')?.value;
 
-  // Build API URL to fetch full user/session context
-  let apiUrl: URL;
-  try {
-    apiUrl = new URL(`${basePath}/api/user-session/`, request.nextUrl.origin);
-    if (accountFromQuery) apiUrl.searchParams.set('account', accountFromQuery);
-    if (orgFromQuery) apiUrl.searchParams.set('organization', orgFromQuery);
-  } catch {
-    // Fallback when origin isn't available
-    const host = request.headers.get('host') || 'localhost:3000';
-    apiUrl = new URL(`http://${host}${basePath}/api/user-session/`);
-    if (accountFromQuery) apiUrl.searchParams.set('account', accountFromQuery);
-    if (orgFromQuery) apiUrl.searchParams.set('organization', orgFromQuery);
-  }
-
-  // Default mock fallback
+  const apiUrl = buildApiUrl(request, accountFromQuery, orgFromQuery);
   const fallbackUser = {
     userId: 'john.doe',
     firstName: 'John',
@@ -239,29 +255,14 @@ async function handleStandaloneMode(request: NextRequest, pathname: string) {
     fullName: 'John Doe'
   };
 
-  type DemoUser = {
-    id?: string;
-    userId?: string;
-    firstName?: string;
-    lastName?: string;
-    email?: string;
-    profile?: { firstName?: string; lastName?: string; email?: string };
-  };
-
-  type UserSessionData = {
-    user?: DemoUser;
-    account?: { id?: string };
-    currentOrganization?: { id?: string } | null;
-  } | null;
-
   let fetchedData: UserSessionData = null;
   try {
-    console.log("[middleware] fetching user session from", apiUrl.toString());
+    console.log('[Auth Middleware] Fetching user session from', apiUrl.toString());
     const apiRes = await fetch(apiUrl.toString(), {
       method: 'GET',
       headers: {
         accept: 'application/json',
-        'x-middleware-skip': '1'
+        [MIDDLEWARE_SKIP_HEADER]: MIDDLEWARE_SKIP_VALUE
       }
     });
 
@@ -271,19 +272,27 @@ async function handleStandaloneMode(request: NextRequest, pathname: string) {
         fetchedData = json.data;
       }
     } else {
-      console.warn('[Middleware]: user-session fetch failed with response', apiRes.status);
+      console.warn('[Auth Middleware] User-session fetch failed with response', apiRes.status);
     }
   } catch (err) {
-    console.warn('Middleware: user-session fetch failed', err);
+    console.warn('[Auth Middleware] User-session fetch failed', err);
   }
 
-  // Determine final values
   const accountId = fetchedData?.account?.id || accountFromQuery || accountFromHeader || accountFromCookie || 'groupize-demos';
-  const organizationObj = fetchedData?.currentOrganization || (orgFromQuery ? { id: orgFromQuery } : orgFromHeader ? { id: orgFromHeader } : orgFromCookie ? { id: orgFromCookie } : null);
+  
+  let organizationObj = fetchedData?.currentOrganization || null;
+  if (!organizationObj) {
+    if (orgFromQuery) {
+      organizationObj = { id: orgFromQuery };
+    } else if (orgFromHeader) {
+      organizationObj = { id: orgFromHeader };
+    } else if (orgFromCookie) {
+      organizationObj = { id: orgFromCookie };
+    }
+  }
   const organizationId = organizationObj?.id || null;
   const userObj = fetchedData?.user || null;
 
-  // Clone existing headers and inject resolved values
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-account', accountId);
   requestHeaders.set('x-account-id', accountId);
@@ -295,7 +304,6 @@ async function handleStandaloneMode(request: NextRequest, pathname: string) {
     requestHeaders.delete('x-organization-id');
   }
 
-  // Prefer user data from fetched response; otherwise use fallback
   const finalUser = userObj
     ? {
         id: userObj.id ?? userObj.userId ?? '',
@@ -310,35 +318,33 @@ async function handleStandaloneMode(request: NextRequest, pathname: string) {
         email: fallbackUser.email
       };
 
-  // Inject user headers
   requestHeaders.set('x-user-id', finalUser.id);
   requestHeaders.set('x-user-first-name', finalUser.firstName);
   requestHeaders.set('x-user-last-name', finalUser.lastName);
   requestHeaders.set('x-user-email', finalUser.email);
   requestHeaders.set('x-user-full-name', `${finalUser.firstName} ${finalUser.lastName}`);
 
-  // Return response with modified headers
   const res = NextResponse.next({
     request: {
       headers: requestHeaders
     }
   });
 
-  // Store user/account/org as JSON-encoded cookies for frontend
+  const cookiePath = env.basePath ? `/${env.basePath}` : '/';
   try {
     res.cookies.set('user', encodeURIComponent(JSON.stringify(finalUser)), {
-      path: `/${basePath}`,
+      path: cookiePath,
       httpOnly: false,
       sameSite: 'lax'
     });
     res.cookies.set('account', encodeURIComponent(JSON.stringify({ id: accountId })), {
-      path: `/${basePath}`,
+      path: cookiePath,
       httpOnly: false,
       sameSite: 'lax'
     });
     if (organizationId) {
       res.cookies.set('organization', encodeURIComponent(JSON.stringify({ id: organizationId })), {
-        path: `/${basePath}/`,
+        path: cookiePath,
         httpOnly: false,
         sameSite: 'lax'
       });
@@ -346,13 +352,11 @@ async function handleStandaloneMode(request: NextRequest, pathname: string) {
       try {
         res.cookies.delete('organization');
       } catch {
-        // ignore delete errors
       }
     }
   } catch (e) {
-    console.warn('Could not set user/account cookie in middleware', e);
+    console.warn('[Auth Middleware] Could not set user/account cookie', e);
   }
-
   console.log(
     `[Auth Middleware] Authorized (standalone): ${finalUser.id} (${finalUser.email}) - Account: ${accountId}${organizationId ? `, Org: ${organizationId}` : ''}`
   );
@@ -360,7 +364,6 @@ async function handleStandaloneMode(request: NextRequest, pathname: string) {
   return res;
 }
 
-// Run middleware for all site paths
 export const config = {
   matcher: [`/:path*`]
 };
