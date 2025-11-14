@@ -120,16 +120,16 @@ return { success: true, context };
 }
 
 export function withServiceAuth(
-handler: (request: NextRequest, context: ServiceContext) => Promise<NextResponse>
-): (request: NextRequest) => Promise<NextResponse> {
-return async (request: NextRequest): Promise<NextResponse> => {
-  const verification = await verifyServiceAuth(request);
-  
-  if (!verification.success) {
-    return verification.response;
-  }
-  
-  return handler(request, verification.context);
-};
+  handler: (request: NextRequest, context: ServiceContext) => Promise<NextResponse>
+  ): (request: NextRequest) => Promise<NextResponse> {
+  return async (request: NextRequest): Promise<NextResponse> => {
+    const verification = await verifyServiceAuth(request);
+    
+    if (!verification.success) {
+      return verification.response;
+    }
+    
+    return handler(request, verification.context);
+  };
 }
 

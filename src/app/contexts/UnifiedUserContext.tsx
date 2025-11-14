@@ -135,10 +135,21 @@ export function UnifiedUserProvider({ children, initialCurrentUser }: UnifiedUse
       };
     }
     
+    // Create minimal session from current user
+    const initializedSession: UserSession = {
+      sessionId: `session-${currentUser.userId}-${Date.now()}`,
+      token: '', // Not needed for embedded mode (JWT in cookie)
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      device: {
+        type: 'web',
+      },
+    };
+    
     setUser(initializedUser);
     setAccount(initializedAccount);
     setCurrentOrganization(initializedOrg);
     setAvailableOrganizations(initializedOrg ? [initializedOrg] : []);
+    setSession(initializedSession);
   }, []);
 
   /**

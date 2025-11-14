@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import TopNavigation from './components/TopNavigation';
-import { UnifiedUserProvider } from './contexts/UnifiedUserContext';
+import { UserSessionProvider } from './components/UserSessionProvider';
 import { Open_Sans, Roboto, Lato } from 'next/font/google';
 import { ThemeProvider } from "./components/ThemeProvider";
 
@@ -44,9 +44,6 @@ export const viewport: Viewport = {
   maximumScale: 1,
 };
 
-/**
- * Root Layout
- */
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -62,12 +59,12 @@ export default function RootLayout({
           disableTransitionOnChange
           storageKey="groupize-theme"
         >
-          <UnifiedUserProvider>
+          <UserSessionProvider>
             <TopNavigation />
             <div className="w-full h-[calc(100vh-64px)]">
             {children}
             </div>
-          </UnifiedUserProvider>
+          </UserSessionProvider>
         </ThemeProvider>
         {/* Hidden SVG filter that creates a subtle liquid distortion */}
         <svg width="0" height="0" style={{ position: "absolute", pointerEvents: "none" }}>

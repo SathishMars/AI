@@ -11,6 +11,7 @@ import Image from "next/image";
 import Markdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import { env } from '@/app/lib/env';
+import { useUnifiedUserContext } from '@/app/contexts/UnifiedUserContext';
 
 
 interface AimeWorkflowPaneProps {
@@ -56,7 +57,7 @@ function formatRelativeTime(date: Date | string): string {
 
 
 // Memoized message item component to prevent unnecessary re-renders
-const MessageItem = memo(({ message, isFirst, onOptionSelected }: { message: WorkflowMessage, isFirst: boolean, onOptionSelected?: (option: FollowUpOption, forKey: string) => void  }) => {
+const MessageItem = memo(({ message, isFirst, onOptionSelected, userInitials, userAvatar, displayName }: { message: WorkflowMessage, isFirst: boolean, onOptionSelected?: (option: FollowUpOption, forKey: string) => void, userInitials?: string, userAvatar?: string, displayName?: string }) => {
     const listItemClassName = message.sender === 'aime' 
         ? 'rounded-lg bg-transparent pt-4' 
         : 'rounded-lg bg-gray-100 p-[12px] pt-4';
@@ -126,7 +127,8 @@ const MessageItem = memo(({ message, isFirst, onOptionSelected }: { message: Wor
 
             {message.sender !== 'aime' && (
                 <Avatar className="bg-gray-300">
-                    <AvatarFallback className="bg-gray-300">JD</AvatarFallback>
+                    <AvatarImage src={userAvatar} alt={displayName} />
+                    <AvatarFallback className="bg-gray-300">{userInitials || 'U'}</AvatarFallback>
                 </Avatar>
             )}
         </div>
@@ -142,11 +144,14 @@ export default function AimeWorkflowPane({
     workflowTemplateId,
     sendMessage,    
 }: AimeWorkflowPaneProps) {
+    const { user, displayName } = useUnifiedUserContext();
     const [userInput, setUserInput] = useState<string>('');
     const autocompleteRef = useRef<HTMLTextAreaElement | null>(null);
     const messagesContainerRef = useRef<HTMLDivElement | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
+    const userInitials = user ? `${user.profile.firstName[0]}${user.profile.lastName[0]}` : "";
+    const userAvatar = user?.profile.avatar;
 
     useEffect(() => {
         // Focus the input on mount
@@ -225,7 +230,15 @@ export default function AimeWorkflowPane({
                                 </div>
                             ) : (
                                 messages?.map((message, index) => (
-                                    <MessageItem key={message.id} message={message} isFirst={(index === 0)} onOptionSelected={onOptionSelected} />
+                                    <MessageItem 
+                                        key={message.id} 
+                                        message={message} 
+                                        isFirst={(index === 0)} 
+                                        onOptionSelected={onOptionSelected}
+                                        userInitials={userInitials}
+                                        userAvatar={userAvatar}
+                                        displayName={displayName}
+                                    />
                                 ))
                             )}
                     </div>
