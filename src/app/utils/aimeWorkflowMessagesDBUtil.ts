@@ -37,12 +37,30 @@ export default class AimeWorkflowMessagesDBUtil {
         const db = await getMongoDatabase();
         const coll = db.collection(COLLECTION_NAME);
         const query: Record<string, unknown> = { account, templateId };
-        if (organization !== undefined) query.organization = organization;
+        
+0
+        if (organization !== undefined) {
+            if (organization && organization.trim() !== '') {
+                query.organization = organization;
+            } else {
+                query.$or = [
+                    { organization: null },
+                    { organization: '' },
+                    { organization: { $exists: false } }
+                ];
+            }
+        }
+        
         // Sort by timestamp ascending to get chronological order
         const options = { sort: { timestamp: 1 as const } };
-        console.log('[AimeWorkflowMessagesDBUtil] Listing messages for:', account, organization, templateId);
-        const docs = await coll.find(query, options).toArray() as Document[];
-        return docs.map((d) => d as unknown as AimeWorkflowConversationsRecord);
+        
+        try {
+            const docs = await coll.find(query, options).toArray() as Document[];
+            return docs.map((d) => d as unknown as AimeWorkflowConversationsRecord);
+        } catch (error) {
+            console.error('[AimeWorkflowMessagesDBUtil] MongoDB query error:', error);
+            throw error;
+        }
     }
 
     static async upsertMessage(record: AimeWorkflowConversationsRecord): Promise<{ message: AimeWorkflowConversationsRecord; created: boolean }> {

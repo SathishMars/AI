@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import AimeWorkflowMessagesDBUtil from '@/app/utils/aimeWorkflowMessagesDBUtil';
+import WorkflowTemplateDbUtil from '@/app/utils/workflowTemplateDbUtil';
 import type { AimeWorkflowConversationsRecord, WorkflowMessage } from '@/app/types/aimeWorkflowMessages';
 
 export async function GET(
@@ -10,8 +11,41 @@ export async function GET(
     const account = req.headers.get('x-account') || 'groupize-demos';
     const organizationHeader = req.headers.get('x-organization');
     const organization = organizationHeader === null ? null : organizationHeader;
+    
     try {
-        const records = await AimeWorkflowMessagesDBUtil.listMessages(account, organization, templateId);
+        // First, try to get the template to find its organization
+        // Messages should be stored with the same organization as the template
+        // Normalize organization: empty string becomes null (matching main route logic)
+        const normalizedOrg = organization === '' ? null : organization;
+        
+        let templateOrg: string | null | undefined = normalizedOrg;
+        
+        try {
+            // Try to get template with the provided organization context (matching main route logic)
+            let template = await WorkflowTemplateDbUtil.get(account, normalizedOrg, templateId);
+            if (!template && normalizedOrg === null) {
+                template = await WorkflowTemplateDbUtil.get(account, undefined, templateId);
+            }
+            if (!template && normalizedOrg !== null) {
+                template = await WorkflowTemplateDbUtil.get(account, null, templateId);
+            }
+            
+            if (template) {
+                templateOrg = template.organization;
+                console.log('[AimeMessagesAPI] Template found, using organization:', templateOrg);
+            }
+        } catch (templateError) {
+            console.error('[AimeMessagesAPI] Error fetching template:', templateError);
+        }
+        
+        // Try querying with the template's organization first
+        let records = await AimeWorkflowMessagesDBUtil.listMessages(account, templateOrg ?? null, templateId);
+        
+        // If no messages found and we tried a different org than provided, try with the normalized org
+        if (records.length === 0 && templateOrg !== normalizedOrg) {
+            records = await AimeWorkflowMessagesDBUtil.listMessages(account, normalizedOrg, templateId);
+        }
+        
         // Strip internal fields before returning to clients
         const messages = records.map((r: AimeWorkflowConversationsRecord) => {
             const copy = { ...(r as unknown as Record<string, unknown>) } as Record<string, unknown>;
@@ -21,9 +55,10 @@ export async function GET(
             if ('templateId' in copy) delete copy.templateId;
             return copy as unknown as WorkflowMessage;
         });
+        
         return NextResponse.json(messages as WorkflowMessage[], { status: 200 });
     } catch (error) {
-        console.error('GET aimeMessages error:', error);
+        console.error('[AimeMessagesAPI] GET aimeMessages error:', error);
         return NextResponse.json({ error: 'Failed to fetch messages' }, { status: 500 });
     }
 }
