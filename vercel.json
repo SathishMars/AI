@@ -1,4 +1,4 @@
 {
-  "buildCommand": "npm run build",
+  "buildCommand": "AUTH_MODE=standalone npm run build",
   "installCommand": "npm install --legacy-peer-deps"
 }
