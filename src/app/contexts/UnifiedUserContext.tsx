@@ -43,10 +43,7 @@ export function UnifiedUserProvider({ children, initialCurrentUser }: UnifiedUse
     initialCurrentUser?.expiresAt
   );
 
-  // Base URL for API calls
-  const baseUrl = typeof window !== 'undefined' 
-    ? window.location.origin 
-    : env.appUrl;
+  const baseUrl = env.appUrl;
 
   /**
    * Initialize user data from current user (SSR initial data)
