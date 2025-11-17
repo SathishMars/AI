@@ -84,7 +84,6 @@ export async function GET(
 
     // Try to get template with the provided organization context
     let result = await WorkflowTemplateDbUtil.get(account, organization, decodedTemplateId);
-\
     if (!result && organization === null) {
       console.log(`[GET] Template not found at account level, trying all templates (org=undefined)`);
       result = await WorkflowTemplateDbUtil.get(account, undefined, decodedTemplateId);
