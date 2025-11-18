@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Send } from "lucide-react";
 import { WorkflowAutocompleteItem } from '@/app/types/workflowAutocomplete';
 import { WorkflowDefinition, WorkflowStep } from '../types/workflowTemplate';
+import { apiFetch } from '@/app/utils/api';
 
 
 interface SmartAutocompleteProps {
@@ -25,7 +26,6 @@ interface SmartAutocompleteProps {
 interface VirtualAnchor {
   getBoundingClientRect: () => DOMRect;
 }
-const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
 
 const getWorkflowSteps = (workflowDefinition: WorkflowDefinition | undefined): Array<WorkflowAutocompleteItem> => {
   if (!workflowDefinition || !workflowDefinition.steps) return [];
@@ -108,7 +108,7 @@ export default function SmartAutocomplete({
     const loadAutocompleteItems = async () => {
       let isMounted = true;
       setLoading(true);
-      const response = await fetch(`${basePath}/api/workflow-autocomplete`);
+      const response = await apiFetch('/api/workflow-autocomplete');
       if (response.ok) {
         const data = await response.json();
         if (isMounted && Array.isArray(data)) {

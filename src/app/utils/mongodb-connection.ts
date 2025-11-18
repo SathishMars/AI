@@ -1,4 +1,5 @@
 import { MongoClient, MongoClientOptions, Db } from 'mongodb';
+import { env } from '@/app/lib/env';
 
 /**
  * MongoDB Connection Pool Utility
@@ -39,7 +40,7 @@ class MongoDBConnectionPool {
 
   private constructor() {
     // Determine database environment
-    this.environment = (process.env.DATABASE_ENVIRONMENT as DatabaseEnvironment) || 'local';
+    this.environment = env.databaseEnvironment as DatabaseEnvironment;
     
     // Get connection string from environment
     this.connectionString = this.getConnectionString();
@@ -55,22 +56,18 @@ class MongoDBConnectionPool {
   private getConnectionString(): string {
     if (this.environment === 'documentdb') {
       // AWS DocumentDB connection
-      const docdbUri = process.env.DOCUMENTDB_URI;
-      
-      if (!docdbUri) {
+      if (!env.documentDbUri) {
         throw new Error('AWS DocumentDB connection requires DOCUMENTDB_URI environment variable');
       }
       
-      return docdbUri;
+      return env.documentDbUri;
     } else {
       // Local MongoDB connection
-      const mongoUri = process.env.MONGODB_URI;
-      
-      if (!mongoUri) {
+      if (!env.mongoDbUri) {
         throw new Error('Local MongoDB connection requires MONGODB_URI environment variable');
       }
       
-      return mongoUri;
+      return env.mongoDbUri;
     }
   }
 

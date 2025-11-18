@@ -1,6 +1,22 @@
 // Unified User Context Types
 // Combines user, account, and organization data in a single coherent context
 
+/**
+ * CurrentUser type for SSR/initial authentication data
+ * Used for bootstrapping user context from middleware/JWT claims
+ */
+export interface CurrentUser {
+  userId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  accountId: string;
+  organizationId?: string;
+  fullName?: string;
+  isAuthenticated?: boolean;
+  expiresAt?: string; // ISO 8601 timestamp from JWT exp claim
+}
+
 export interface UserProfile {
   firstName: string;
   lastName: string;
@@ -158,4 +174,5 @@ export interface UnifiedUserContextState {
 
 export interface UnifiedUserProviderProps {
   children: React.ReactNode;
+  initialCurrentUser?: CurrentUser;  // Optional current user from SSR
 }

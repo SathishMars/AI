@@ -4,6 +4,7 @@ import ShortUniqueId from 'short-unique-id';
 import { WorkflowDefinition } from "../types/workflowTemplate";
 // removed unused import 'text'
 import { useUnifiedUserContext } from "../contexts/UnifiedUserContext";
+import { apiFetch } from "../utils/api";
 
 // 10-char alphanumeric short id generator (reusable instance)
 const uid = new ShortUniqueId({ length: 10, dictionary: 'alphanum' });
@@ -31,8 +32,6 @@ interface UseAimeWorkflowReturn {
     regenerateWorkflowDefinition: () => Promise<void>;
 }
 
-const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-
 const seedWelcomeMessage = (): WorkflowMessage => {
         return {
             id: generateShortId(),
@@ -56,55 +55,53 @@ export function useAimeWorkflow({
     const sessionIDRef = useRef<string>(generateShortId());
     const sessionId = sessionIDRef.current;
     const [messages, setMessages] = useState<WorkflowMessage[]>([]);
-    const { user } = useUnifiedUserContext();
+    const { user, account, currentOrganization, isLoading: contextLoading } = useUnifiedUserContext();
+    const accountId = account?.id;
+    const organizationId = currentOrganization?.id || null;
 
     useEffect(() => {
         if (!workflowTemplateId || workflowTemplateId.trim()==="new") {
                 // this is a new conversation. So seed it with a welcome message from aime
                 setMessages([seedWelcomeMessage()]);
-                // setting some dummy messages for now. Aime will always start the conversation. User will respond.
-                // setMessages([
-                //     { id: 'msg1', sender: 'aime', content: { text: `Hello! I'm aime, your AI assistant for the "${workflowTemplateLabel}" workflow. How can I assist you today?` }, timestamp: '2025-10-11T21:00:23.032Z' },
-                //     { id: 'msg2', sender: 'user', content: { text: 'Hi aime! Can you help me get started with this workflow?' }, timestamp: '2025-10-11T21:00:24.002Z' },
-                //     {
-                //         id: 'msg3',
-                //         sender: 'aime',
-                //         content: {
-                //             text: 'Of course! To get started, please provide some details about what you want to achieve with this workflow.',
-                //             followUpQuestions: ['What is the main goal of this workflow?', 'Are there specific tasks you want to automate?'],
-                //             followUpOptions: { tone: [{ label: 'formal', value: 'formal' }, { label: 'casual', value: 'casual' }, { label: 'humorous', value: 'humorous' }] }
-                //         },
-                //         timestamp: new Date().toISOString()
-                //     }
-                // ]);   
                 return;           
         }
+
+        // Wait for context to load before fetching messages
+        if (contextLoading || !accountId) {
+            return;
+        }
+
+        const url = '/api/workflow-templates/' + encodeURIComponent(workflowTemplateId) + '/aime-messages';
+        const headers = {
+            'Content-Type': 'application/json',
+            'x-account': accountId,
+            'x-organization': organizationId || ''
+        };
+
         // Reset messages when workflowTemplateId changes
-        fetch(`${basePath}/api/workflow-templates/` + encodeURIComponent(workflowTemplateId) + '/aime-messages', {
+        apiFetch(url, {
             method: 'GET',
-            headers: {
-                'Content-Type': 'application/json'
-            }
+            headers
         })
         .then(async (response) => {
             if (!response.ok) {
                 throw new Error(`API error: ${response.status} ${response.statusText}`);
             }
+            
             const data = await response.json();
-            console.log('Fetched messages for template:', workflowTemplateId, data);
+
             if (data && Array.isArray(data) && data.length > 0) {
                 setMessages(data);
-                console.log('Set messages from fetched data:', data);
             } else {
                 //  new chat. So seed it with a welcome message from aime
                 setMessages([seedWelcomeMessage()]);            
             }
         })
         .catch((error) => {
-            console.error('Error fetching messages:', error);
+            console.error('[useAimeWorkflow] Error fetching messages:', error);
             setMessages([]);
         });
-    }, [workflowTemplateId]);
+    }, [workflowTemplateId, accountId, organizationId, contextLoading, account, currentOrganization]);
 
     const sendMessage = useCallback(async (message: string) => {
         const newMessage: WorkflowMessage = {
@@ -131,7 +128,7 @@ export function useAimeWorkflow({
             workflowDefinition: workflowDefinition
         };
 
-        const response = await fetch(`${basePath}/api/generate-workflow`, {
+        const response = await apiFetch('/api/generate-workflow', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -174,7 +171,7 @@ export function useAimeWorkflow({
             workflowDefinition
         };
 
-        const response = await fetch(`${basePath}/api/generate-mermaid`, {
+        const response = await apiFetch('/api/generate-mermaid', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -206,7 +203,7 @@ export function useAimeWorkflow({
             workflowDefinition
         };
 
-        const response = await fetch(`${basePath}/api/regenerate-workflow-definition`, {
+        const response = await apiFetch('/api/regenerate-workflow-definition', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

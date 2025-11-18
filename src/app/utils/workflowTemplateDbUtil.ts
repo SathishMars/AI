@@ -15,22 +15,23 @@ export type ListFilters = {
 
 export class WorkflowTemplateDbUtil {
   static async create(template: WorkflowTemplate): Promise<WorkflowTemplate> {
-    // Validate and normalize timestamps (allow ISO strings)
+    // Validate shape using Zod BEFORE normalizing (schema expects ISO strings)
+    WorkflowTemplateSchema.parse(template);
+    
+    // Normalize timestamps for DB storage (ISO strings → Date objects)
     const normalized = WorkflowTemplateDbUtil.normalizeForDb(template);
-    // Validate shape using Zod (result not needed beyond validation)
-    WorkflowTemplateSchema.parse(normalized);
 
     const db = await getMongoDatabase();
     const collection = db.collection<Document>(COLLECTION);
 
     await collection.insertOne(normalized as unknown as Document);
 
-    // Build returned object from normalized
-    const insertedObj = { ...(normalized as unknown as Record<string, unknown>) } as Record<string, unknown>;
+    // Return with dates converted back to ISO strings
+    const stored = { ...(normalized as unknown as Record<string, unknown>) } as Record<string, unknown>;
     // Do not expose MongoDB internal _id to API consumers
-    if ('_id' in insertedObj) delete insertedObj._id;
+    if ('_id' in stored) delete stored._id;
 
-    return insertedObj as unknown as WorkflowTemplate;
+    return WorkflowTemplateDbUtil.normalizeFromDb(stored);
   }
 
   static async get(account: string, organization: string | null | undefined, id: string, version?: string): Promise<WorkflowTemplate | null> {
@@ -51,6 +52,7 @@ export class WorkflowTemplateDbUtil {
     const collection = db.collection<Document>(COLLECTION);
 
     const match: Record<string, unknown> = { account };
+    // Only filter by organization if explicitly provided (undefined = all orgs, null = account-level only, "id" = specific org)
     if (filters.organization !== undefined) match.organization = filters.organization;
     if (filters.status) match['metadata.status'] = Array.isArray(filters.status) ? { $in: filters.status } : filters.status;
     if (filters.tags && filters.tags.length) match['metadata.tags'] = { $in: filters.tags };
@@ -73,7 +75,10 @@ export class WorkflowTemplateDbUtil {
       { $sort: { 'metadata.label': 1 } }
     ];
 
-    const all = await collection.aggregate(pipeline as Document[]).toArray();
+    // Use case-insensitive collation for proper alphabetical sorting
+    const all = await collection.aggregate(pipeline as Document[], {
+      collation: { locale: 'en', strength: 2 }
+    }).toArray();
     const totalCount = all.length;
     const start = (page - 1) * pageSize;
     const pageItems = all.slice(start, start + pageSize).map((d: unknown) => WorkflowTemplateDbUtil.normalizeFromDb(d));

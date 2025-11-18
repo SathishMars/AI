@@ -1,8 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import TemplatesGrid from './components/TemplatesGrid';
-
-const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+import { env } from '@/app/lib/env';
 
 export default function Home() {
   return (
@@ -10,7 +9,7 @@ export default function Home() {
       <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
         <Image
           className="dark:invert"
-          src={`${basePath}/next.svg`}
+          src={`${env.basePath}/next.svg`}
           alt="Next.js logo"
           width={180}
           height={38}

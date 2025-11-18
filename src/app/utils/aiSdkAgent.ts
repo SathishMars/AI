@@ -16,6 +16,7 @@ import { getListOfApprovalTemplatesTool } from './aiSdkTools/GetListOfApprovalTe
 import { getMrfFactsTool } from './aiSdkTools/GetMRFFacts';
 import { getRequestFactsTool } from './aiSdkTools/GetRequestFacts';
 import { isWorkflowDefinitionReadyForPublishToolExport } from './aiSdkTools/IsWorkflowDefinitionReadyForPublish';
+import { env } from '@/app/lib/env';
 
 const loadMarkdownInstructionsFromFile = (content: string, replace?: Record<string, string>): string => {
     try {
@@ -212,12 +213,12 @@ ${JSON.stringify(existingWorkflow, null, 2)}
 
         // Step 2: Set up Anthropic API key (via environment variable ANTHROPIC_API_KEY)
         // The anthropic provider will automatically use the ANTHROPIC_API_KEY env var
-        if (!process.env.ANTHROPIC_API_KEY) {
+        if (!env.anthropicApiKey) {
             throw new Error('ANTHROPIC_API_KEY environment variable is not set');
         }
 
         // Step 3: Determine model to use
-        const modelName = process.env.ANTHROPIC_MODEL_WORKFLOW || 'claude-3-5-sonnet-20241022';
+        const modelName = env.anthropicModel;
 
         // Step 4: Create AI SDK Agent with Anthropic provider
         const agent = new Agent({

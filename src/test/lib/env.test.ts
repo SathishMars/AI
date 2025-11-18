@@ -1,0 +1,202 @@
+import * as envModule from '@/app/lib/env';
+
+describe('Environment Configuration', () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    jest.resetModules();
+    process.env = { ...originalEnv };
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  describe('Auth Mode', () => {
+    it('should default to embedded mode when AUTH_MODE is not set', () => {
+      delete process.env.AUTH_MODE;
+      jest.resetModules();
+      const { env } = require('@/app/lib/env');
+      expect(env.authMode).toBe('embedded');
+    });
+
+    it('should use standalone mode when AUTH_MODE=standalone', () => {
+      process.env.AUTH_MODE = 'standalone';
+      jest.resetModules();
+      const { env } = require('@/app/lib/env');
+      expect(env.authMode).toBe('standalone');
+      expect(env.isStandalone).toBe(true);
+    });
+
+    it('should use embedded mode when AUTH_MODE=embedded', () => {
+      process.env.AUTH_MODE = 'embedded';
+      jest.resetModules();
+      const { env } = require('@/app/lib/env');
+      expect(env.authMode).toBe('embedded');
+      expect(env.isStandalone).toBe(false);
+    });
+
+    it('should be case insensitive', () => {
+      process.env.AUTH_MODE = 'STANDALONE';
+      jest.resetModules();
+      const { env } = require('@/app/lib/env');
+      expect(env.authMode).toBe('standalone');
+    });
+  });
+
+  describe('Rails Base URL', () => {
+    it('should use NEXT_PUBLIC_RAILS_BASE_URL when set', () => {
+      process.env.NEXT_PUBLIC_RAILS_BASE_URL = 'https://app.groupize.com';
+      jest.resetModules();
+      const { env } = require('@/app/lib/env');
+      expect(env.railsBaseUrl).toBe('https://app.groupize.com');
+    });
+
+    it('should fallback to RAILS_BASE_URL when NEXT_PUBLIC_RAILS_BASE_URL is not set', () => {
+      delete process.env.NEXT_PUBLIC_RAILS_BASE_URL;
+      process.env.RAILS_BASE_URL = 'https://rails.groupize.com';
+      jest.resetModules();
+      const { env } = require('@/app/lib/env');
+      expect(env.railsBaseUrl).toBe('https://rails.groupize.com');
+    });
+
+    it('should default to http://groupize.local in development', () => {
+      delete process.env.NEXT_PUBLIC_RAILS_BASE_URL;
+      delete process.env.RAILS_BASE_URL;
+      process.env.NODE_ENV = 'development';
+      jest.resetModules();
+      const { env } = require('@/app/lib/env');
+      expect(env.railsBaseUrl).toBe('http://groupize.local');
+    });
+  });
+
+  describe('JWKS URL', () => {
+    it('should use JWKS_URL when set', () => {
+      process.env.JWKS_URL = 'https://custom.jwks.url/jwks.json';
+      jest.resetModules();
+      const { env } = require('@/app/lib/env');
+      expect(env.jwksUrl).toBe('https://custom.jwks.url/jwks.json');
+    });
+
+    it('should default to ${RAILS_BASE_URL}/.well-known/jwks.json', () => {
+      delete process.env.JWKS_URL;
+      process.env.RAILS_BASE_URL = 'https://app.groupize.com';
+      jest.resetModules();
+      const { env } = require('@/app/lib/env');
+      expect(env.jwksUrl).toBe('https://app.groupize.com/.well-known/jwks.json');
+    });
+  });
+
+  describe('JWT Configuration', () => {
+    it('should use JWT_ISSUER when set', () => {
+      process.env.JWT_ISSUER = 'custom-issuer';
+      jest.resetModules();
+      const { env } = require('@/app/lib/env');
+      expect(env.jwtIssuer).toBe('custom-issuer');
+    });
+
+    it('should default JWT_ISSUER to groupize', () => {
+      delete process.env.JWT_ISSUER;
+      jest.resetModules();
+      const { env } = require('@/app/lib/env');
+      expect(env.jwtIssuer).toBe('groupize');
+    });
+
+    it('should use JWT_AUDIENCE when set', () => {
+      process.env.JWT_AUDIENCE = 'custom-audience';
+      jest.resetModules();
+      const { env } = require('@/app/lib/env');
+      expect(env.jwtAudience).toBe('custom-audience');
+    });
+
+    it('should default JWT_AUDIENCE to workflows', () => {
+      delete process.env.JWT_AUDIENCE;
+      jest.resetModules();
+      const { env } = require('@/app/lib/env');
+      expect(env.jwtAudience).toBe('workflows');
+    });
+  });
+
+  describe('Cookie Configuration', () => {
+    it('should use COOKIE_NAME when set', () => {
+      process.env.COOKIE_NAME = 'custom-cookie';
+      jest.resetModules();
+      const { env } = require('@/app/lib/env');
+      expect(env.cookieName).toBe('custom-cookie');
+    });
+
+    it('should default COOKIE_NAME to gpw_session', () => {
+      delete process.env.COOKIE_NAME;
+      jest.resetModules();
+      const { env } = require('@/app/lib/env');
+      expect(env.cookieName).toBe('gpw_session');
+    });
+  });
+
+  describe('Base Path', () => {
+    it('should use NEXT_PUBLIC_BASE_PATH when set', () => {
+      process.env.NEXT_PUBLIC_BASE_PATH = '/custom/path';
+      jest.resetModules();
+      const { env } = require('@/app/lib/env');
+      expect(env.basePath).toBe('/custom/path');
+    });
+
+    it('should default NEXT_PUBLIC_BASE_PATH to /aime/aimeworkflows', () => {
+      delete process.env.NEXT_PUBLIC_BASE_PATH;
+      jest.resetModules();
+      const { env } = require('@/app/lib/env');
+      expect(env.basePath).toBe('/aime/aimeworkflows');
+    });
+  });
+
+  describe('Node Environment', () => {
+    it('should detect production environment', () => {
+      process.env.NODE_ENV = 'production';
+      jest.resetModules();
+      const { env } = require('@/app/lib/env');
+      expect(env.nodeEnv).toBe('production');
+      expect(env.isProduction).toBe(true);
+      expect(env.isDevelopment).toBe(false);
+    });
+
+    it('should detect development environment', () => {
+      process.env.NODE_ENV = 'development';
+      jest.resetModules();
+      const { env } = require('@/app/lib/env');
+      expect(env.nodeEnv).toBe('development');
+      expect(env.isProduction).toBe(false);
+      expect(env.isDevelopment).toBe(true);
+    });
+  });
+
+  describe('Optional Environment Variables', () => {
+    it('should return undefined for ANTHROPIC_API_KEY when not set', () => {
+      delete process.env.ANTHROPIC_API_KEY;
+      jest.resetModules();
+      const { env } = require('@/app/lib/env');
+      expect(env.anthropicApiKey).toBeUndefined();
+    });
+
+    it('should return ANTHROPIC_API_KEY when set', () => {
+      process.env.ANTHROPIC_API_KEY = 'sk-ant-test-key';
+      jest.resetModules();
+      const { env } = require('@/app/lib/env');
+      expect(env.anthropicApiKey).toBe('sk-ant-test-key');
+    });
+
+    it('should return undefined for DOCUMENTDB_URI when not set', () => {
+      delete process.env.DOCUMENTDB_URI;
+      jest.resetModules();
+      const { env } = require('@/app/lib/env');
+      expect(env.documentDbUri).toBeUndefined();
+    });
+
+    it('should return undefined for MONGODB_URI when not set', () => {
+      delete process.env.MONGODB_URI;
+      jest.resetModules();
+      const { env } = require('@/app/lib/env');
+      expect(env.mongoDbUri).toBeUndefined();
+    });
+  });
+});
+

@@ -7,6 +7,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Loader2, Plus } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { WorkflowTemplate } from '@/app/types/workflowTemplate';
+import { apiFetch } from '@/app/utils/api';
 
 
 
@@ -21,7 +22,6 @@ interface WorkflowTemplateSelectorProps {
   currentTemplateMenuItem?: workflowTemplateSelectorMenuItem;
   onTemplateChange?: (templateId: string, templateName: string) => void;
 }
-const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
 
 export default function WorkflowTemplateSelector({
   currentTemplateMenuItem
@@ -48,10 +48,10 @@ export default function WorkflowTemplateSelector({
           // No status filter - backend returns latest version per template (draft/published preferred)
         });
 
-        const url = `${basePath}/api/workflow-templates?${params}`;
+        const url = `/api/workflow-templates?${params}`;
         console.log('🌐 Fetching templates from:', url);
 
-        const response = await fetch(url);
+        const response = await apiFetch(url);
 
         if (!response.ok) {
           console.error('❌ Failed to fetch templates:', response.status, response.statusText);

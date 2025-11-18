@@ -3,9 +3,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: 'standalone', // this for the creation of a docker image
-
-  basePath: '/aime', // Set your desired base path here oif you want to change from default
-  /* config options here */
+  basePath: '/aime/aimeworkflows',
+  assetPrefix: '/aime/aimeworkflows',
+  trailingSlash: true,
   typescript: {
     // !! WARN !!
     // Temporarily allow production builds to complete even with type errors
@@ -13,14 +13,25 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   
-  // Redirects for backward compatibility with old URL structure
-  // The [id] route now handles both "new"/"create" and existing template IDs
   async redirects() {
     return [
       {
         source: '/configureMyWorkflow/:id',
         destination: '/workflows/configure/:id',
         permanent: true,
+      },
+    ];
+  },
+
+  async rewrites() {
+    return [
+      {
+        source: '/accounts/:accountId/orgs/:orgId/:rest*',
+        destination: '/:rest*',
+      },
+      {
+        source: '/accounts/:accountId/:rest*',
+        destination: '/:rest*',
       },
     ];
   },

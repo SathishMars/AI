@@ -2,6 +2,9 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { apiFetch } from '@/app/utils/api';
+import { env } from '@/app/lib/env';
+import { useJwtRenewal } from '@/app/hooks/useJwtRenewal';
 import { 
   User,
   Account,
@@ -11,17 +14,23 @@ import {
   UnifiedUserProviderProps,
   UserPreferences,
   UserProfile,
-  UserRole
+  UserRole,
+  CurrentUser
 } from '@/app/types/unified-user-context';
 
 // Create the context
 const UnifiedUserContext = createContext<UnifiedUserContextState | undefined>(undefined);
-const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+
 /**
  * Unified User Context Provider
  * Provides complete user session context including user, account, and organization data
+ * 
+ * Updated to work with new JWT authentication:
+ * - Accepts initialCurrentUser from SSR (prevents hydration mismatch)
+ * - Can bootstrap user data from current user
+ * - Maintains backward compatibility with API-based loading
  */
-export function UnifiedUserProvider({ children }: UnifiedUserProviderProps) {
+export function UnifiedUserProvider({ children, initialCurrentUser }: UnifiedUserProviderProps) {
   // State for all user-related data
   const [user, setUser] = useState<User | null>(null);
   const [account, setAccount] = useState<Account | null>(null);
@@ -30,6 +39,128 @@ export function UnifiedUserProvider({ children }: UnifiedUserProviderProps) {
   const [session, setSession] = useState<UserSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [userError, setUserError] = useState<string | null>(null);
+  const [sessionExpiresAt, setSessionExpiresAt] = useState<string | undefined>(
+    initialCurrentUser?.expiresAt
+  );
+
+  const baseUrl = env.appUrl;
+
+  /**
+   * Initialize user data from current user (SSR initial data)
+   * Creates minimal user/account/org data from current user for immediate use
+   */
+  const initializeFromCurrentUser = useCallback((currentUser: CurrentUser) => {
+    // Create minimal user from current user
+    const initializedUser: User = {
+      id: currentUser.userId,
+      profile: {
+        firstName: currentUser.firstName,
+        lastName: currentUser.lastName,
+        email: currentUser.email,
+        timezone: 'UTC',
+        locale: 'en-US',
+      },
+      preferences: {
+        theme: 'system',
+        language: 'en',
+        notifications: {
+          email: true,
+          push: false,
+          workflowUpdates: true,
+          systemAlerts: true,
+        },
+        workflowDefaults: {
+          autoSave: true,
+          defaultView: 'visual',
+          showAdvancedOptions: false,
+        },
+      },
+      roles: [],
+      status: 'active',
+      metadata: {
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        loginCount: 0,
+      },
+    };
+    
+    // Create minimal account from current user
+    const initializedAccount: Account = {
+      id: currentUser.accountId,
+      name: 'Account',
+      type: 'professional',
+      permissions: [],
+      features: {
+        workflowBuilder: true,
+        aiGeneration: true,
+        templateSharing: true,
+      },
+      subscription: {
+        plan: 'professional',
+        status: 'active',
+      },
+      organizations: [],
+    };
+    
+    // Create minimal organization if available
+    let initializedOrg: Organization | null = null;
+    if (currentUser.organizationId) {
+      initializedOrg = {
+        id: currentUser.organizationId,
+        name: 'Organization',
+        type: 'department',
+        settings: {
+          workflowDefaults: {},
+          permissions: {
+            canCreateWorkflows: true,
+            canEditSharedWorkflows: true,
+            canPublishWorkflows: true,
+            canManageUsers: false,
+            canViewAnalytics: true,
+            canExportData: true,
+          },
+          features: {
+            aiGeneration: true,
+            advancedRules: true,
+            customIntegrations: true,
+            analyticsReporting: true,
+            ssoIntegration: true,
+            auditLogging: true,
+          },
+        },
+        metadata: {
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          createdBy: currentUser.userId,
+        },
+      };
+    }
+    
+    // Create minimal session from current user
+    const expiresAt = currentUser.expiresAt 
+      ? new Date(currentUser.expiresAt)
+      : new Date(Date.now() + 24 * 60 * 60 * 1000);
+    
+    const initializedSession: UserSession = {
+      sessionId: `session-${currentUser.userId}-${Date.now()}`,
+      token: '', // Not needed for embedded mode (JWT in cookie)
+      expiresAt,
+      device: {
+        type: 'web',
+      },
+    };
+    
+    setUser(initializedUser);
+    setAccount(initializedAccount);
+    setCurrentOrganization(initializedOrg);
+    setAvailableOrganizations(initializedOrg ? [initializedOrg] : []);
+    setSession(initializedSession);
+    
+    // Update session expiry for JWT renewal
+    if (currentUser.expiresAt) {
+      setSessionExpiresAt(currentUser.expiresAt);
+    }
+  }, []);
 
   /**
    * Load complete user session data from unified API
@@ -39,15 +170,29 @@ export function UnifiedUserProvider({ children }: UnifiedUserProviderProps) {
       setIsLoading(true);
       setUserError(null);
 
-      const response = await fetch(`${basePath}/api/user-session`);
+      const response = await apiFetch('/api/user-session');
       
       if (!response.ok) {
+        // If API fails but we have current user data, that's okay
+        if (initialCurrentUser && initialCurrentUser.isAuthenticated) {
+          console.log('[UnifiedUserContext] API failed, initializing from current user data');
+          initializeFromCurrentUser(initialCurrentUser);
+          setIsLoading(false);
+          return;
+        }
         throw new Error(`User Session API error: ${response.status}`);
       }
 
       const data = await response.json();
       
       if (!data.success || !data.data) {
+        // If API returns invalid data but we have current user, use it
+        if (initialCurrentUser && initialCurrentUser.isAuthenticated) {
+          console.log('[UnifiedUserContext] Invalid API response, initializing from current user data');
+          initializeFromCurrentUser(initialCurrentUser);
+          setIsLoading(false);
+          return;
+        }
         throw new Error('Invalid user session response format');
       }
 
@@ -104,11 +249,18 @@ export function UnifiedUserProvider({ children }: UnifiedUserProviderProps) {
 
     } catch (error) {
       console.error('Failed to load user session:', error);
-      setUserError(error instanceof Error ? error.message : 'Failed to load user session');
+      
+      // Fall back to current user data if available
+      if (initialCurrentUser && initialCurrentUser.isAuthenticated) {
+        console.log('[UnifiedUserContext] Error loading session, initializing from current user data');
+        initializeFromCurrentUser(initialCurrentUser);
+      } else {
+        setUserError(error instanceof Error ? error.message : 'Failed to load user session');
+      }
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [baseUrl, initialCurrentUser, initializeFromCurrentUser]);
 
   /**
    * Switch to a different organization
@@ -176,17 +328,16 @@ export function UnifiedUserProvider({ children }: UnifiedUserProviderProps) {
   }, [user]);
 
   /**
-   * Logout user and clear all session data
+   * Logout user and clear all session data (standalone mode only)
    */
   const logout = useCallback(async () => {
     try {
-      // TODO: Call API to invalidate session
       setUser(null);
       setAccount(null);
       setCurrentOrganization(null);
       setAvailableOrganizations([]);
       setSession(null);
-      
+      setSessionExpiresAt(undefined);
     } catch (error) {
       console.error('Failed to logout:', error);
       setUserError(error instanceof Error ? error.message : 'Failed to logout');
@@ -206,6 +357,44 @@ export function UnifiedUserProvider({ children }: UnifiedUserProviderProps) {
   const clearErrors = useCallback(() => {
     setUserError(null);
   }, []);
+
+  /**
+   * Handle successful JWT renewal
+   */
+  const handleRenewalSuccess = useCallback((newExpiresAt: string) => {
+    console.log('[UnifiedUserContext] JWT renewed successfully, new expiry:', newExpiresAt);
+    setSessionExpiresAt(newExpiresAt);
+    
+    // Update session object if it exists
+    if (session) {
+      setSession({
+        ...session,
+        expiresAt: new Date(newExpiresAt),
+      });
+    }
+  }, [session]);
+
+  /**
+   * Handle JWT renewal failure
+   */
+  const handleRenewalFailure = useCallback((error: { code: string; message: string; shouldRedirect: boolean }) => {
+    console.error('[UnifiedUserContext] JWT renewal failed:', error);  
+    if (error.shouldRedirect) {
+      window.location.href = env.railsBaseUrl;
+    } else {
+      setUserError(`Session renewal failed: ${error.message}`);
+    }
+  }, []);
+
+  /**
+   * Setup JWT auto-renewal (only in embedded mode)
+   */
+  useJwtRenewal({
+    expiresAt: sessionExpiresAt,
+    onRenewalSuccess: handleRenewalSuccess,
+    onRenewalFailure: handleRenewalFailure,
+    enabled: env.authMode === 'embedded' && !!sessionExpiresAt,
+  });
 
   // Permission helper functions
   const hasRole = useCallback((roleName: string): boolean => {
@@ -253,10 +442,21 @@ export function UnifiedUserProvider({ children }: UnifiedUserProviderProps) {
   const isAuthenticated = !!session && !!user;
   const isSessionExpired = session ? new Date() > session.expiresAt : true;
 
-  // Load user session on mount
+  // Initialize user data on mount
   useEffect(() => {
-    loadUserSession();
-  }, [loadUserSession]);
+    // If we have initialCurrentUser from SSR, initialize immediately
+    if (initialCurrentUser && initialCurrentUser.isAuthenticated) {
+      console.log('[UnifiedUserContext] Initializing from SSR current user');
+      initializeFromCurrentUser(initialCurrentUser);
+      setIsLoading(false);
+      
+      // Optionally load full data in background (comment out if not needed)
+      // loadUserSession();
+    } else {
+      // Otherwise load from API
+      loadUserSession();
+    }
+  }, [initialCurrentUser, initializeFromCurrentUser, loadUserSession]);
 
   // Context value
   const contextValue: UnifiedUserContextState = {

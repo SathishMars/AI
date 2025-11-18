@@ -14,6 +14,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useUnifiedUserContext } from '@/app/contexts/UnifiedUserContext';
+import { apiFetch } from '@/app/utils/api';
 import type { WorkflowTemplate } from '@/app/types/workflowTemplate';
 
 interface TemplateRow {
@@ -23,7 +24,6 @@ interface TemplateRow {
     status: string;
     author?: string;
 }
-const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
 
 export default function TemplatesGrid() {
     const router = useRouter();
@@ -42,7 +42,7 @@ export default function TemplatesGrid() {
                 setError(null);
 
                 const params = new URLSearchParams({ page: '1', pageSize: '100', status: 'draft,published' });
-                const res = await fetch(`${basePath}/api/workflow-templates?${params}`);
+                const res = await apiFetch(`/api/workflow-templates?${params}`);
                 if (!res.ok) throw new Error(`Failed to fetch templates: ${res.status}`);
                 const data = await res.json();
                 const fetched: WorkflowTemplate[] = data.data?.templates || data.templates || [];
@@ -106,7 +106,7 @@ export default function TemplatesGrid() {
                 const row = rows.find(r => r.id === id);
                 if (!row) return;
                 const version = row.version;
-                const url = `${basePath}/api/workflow-templates/${encodeURIComponent(id)}?version=${encodeURIComponent(version)}`;
+                const url = `/api/workflow-templates/${encodeURIComponent(id)}?version=${encodeURIComponent(version)}`;
 
                 const headers: Record<string, string> = {};
                 if (account && typeof account === 'object') {
@@ -120,7 +120,7 @@ export default function TemplatesGrid() {
                     headers['x-organization'] = String(orgRec['id'] ?? orgRec['name'] ?? orgRec as unknown as string);
                 }
 
-                const res = await fetch(url, { method: 'DELETE', headers });
+                const res = await apiFetch(url, { method: 'DELETE', headers });
                 if (!res.ok) {
                     const body = await res.json().catch(() => ({}));
                     failures.push(`${id}: ${res.status} ${body?.error ?? body?.message ?? res.statusText}`);
