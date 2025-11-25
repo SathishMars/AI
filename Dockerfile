@@ -16,6 +16,10 @@ COPY . .
 FROM base AS builder
 ENV NODE_ENV=production
 
+# optout of tracking telemetry from nextjs
+RUN npx next telemetry disable
+ENV NEXT_TELEMETRY_DISABLED=1
+
 # Build the Next.js app (ensure next.config.js has output: 'standalone')
 RUN npm run build
 
@@ -48,6 +52,10 @@ RUN apk add --no-cache ca-certificates \
 
 # Path to DocumentDB CA bundle available to the application
 ENV DOCUMENTDB_CA_FILE_PATH=/app/rds-combined-ca-bundle.pem
+
+# optout of tracking telemetry from nextjs
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN npx next telemetry disable
 
 # Healthcheck (optional)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
