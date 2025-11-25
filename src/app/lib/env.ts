@@ -30,6 +30,7 @@ interface EnvironmentConfig {
   // Database Configuration
   databaseEnvironment: string;
   documentDbUri: string | undefined;
+  documentDBCaFilePath: string | undefined;
   mongoDbUri: string | undefined;
   
   // Feature flags
@@ -91,6 +92,7 @@ function buildConfig(): EnvironmentConfig {
   
   const databaseEnvironment = getEnv('DATABASE_ENVIRONMENT', 'local');
   const documentDbUri = getOptionalEnv('DOCUMENTDB_URI');
+  const documentDBCaFilePath = getOptionalEnv('DOCUMENTDB_CA_FILE_PATH');
   const mongoDbUri = getOptionalEnv('MONGODB_URI');
   
   return {
@@ -107,6 +109,7 @@ function buildConfig(): EnvironmentConfig {
     anthropicModel,
     databaseEnvironment,
     documentDbUri,
+    documentDBCaFilePath,
     mongoDbUri,
     isDevelopment,
     isProduction,

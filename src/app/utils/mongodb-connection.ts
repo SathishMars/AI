@@ -148,15 +148,12 @@ class MongoDBConnectionPool {
         retryWrites: false,
         // Use secondary preferred for read operations in DocumentDB
         readPreference: 'secondaryPreferred',
-        // SSL is required for DocumentDB
-        ssl: true,
         tlsAllowInvalidCertificates: true, // DocumentDB uses self-signed certificates
+        tlsCAFile: env.documentDBCaFilePath, // Path to CA file for DocumentDB
         // Write concern for DocumentDB
         writeConcern: { w: 'majority', j: false }, // DocumentDB doesn't support journal
         // Read concern
         readConcern: { level: 'majority' },
-        // DocumentDB connection options
-        replicaSet: 'rs0',
         // Longer timeouts for DocumentDB
         connectTimeoutMS: 30000,
         socketTimeoutMS: 60000,

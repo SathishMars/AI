@@ -66,19 +66,19 @@ export class WorkflowTemplateDbUtil {
       match['metadata.label'] = { $regex: filters.label, $options: 'i' };
     }
 
-    // Aggregate to deduplicate by id keeping latest updatedAt
+    // Aggregate to deduplicate by id keeping latest updatedAt and perform case-insensitive label sort (DocumentDB compatible, no collation)
     const pipeline: unknown[] = [
       { $match: match },
       { $sort: { 'metadata.updatedAt': -1 } },
       { $group: { _id: '$id', doc: { $first: '$$ROOT' } } },
       { $replaceRoot: { newRoot: '$doc' } },
-      { $sort: { 'metadata.label': 1 } }
+      // Case-insensitive sort key with null/undefined label fallback (DocumentDB compatible)
+      { $addFields: { sortKey: { $toLower: { $ifNull: ['$metadata.label', ''] } } } },
+      { $sort: { sortKey: 1 } },
+      { $project: { sortKey: 0 } }
     ];
 
-    // Use case-insensitive collation for proper alphabetical sorting
-    const all = await collection.aggregate(pipeline as Document[], {
-      collation: { locale: 'en', strength: 2 }
-    }).toArray();
+    const all = await collection.aggregate(pipeline as Document[]).toArray();
     const totalCount = all.length;
     const start = (page - 1) * pageSize;
     const pageItems = all.slice(start, start + pageSize).map((d: unknown) => WorkflowTemplateDbUtil.normalizeFromDb(d));
