@@ -38,6 +38,17 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/static ./.next/static
 
+# Install curl and certificates, download AWS RDS combined CA bundle for DocumentDB TLS
+# Store it at /app/rds-combined-ca-bundle.pem and make it readable by the app
+# Ensure certificates are available, download AWS RDS combined CA bundle with wget
+# Store it at /app/rds-combined-ca-bundle.pem and make it readable by the app
+RUN apk add --no-cache ca-certificates \
+  && wget -qO /app/rds-combined-ca-bundle.pem "https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem" \
+  && chmod 0444 /app/rds-combined-ca-bundle.pem
+
+# Path to DocumentDB CA bundle available to the application
+ENV DOCUMENTDB_CA_FILE_PATH=/app/rds-combined-ca-bundle.pem
+
 # Healthcheck (optional)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
