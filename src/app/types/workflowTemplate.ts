@@ -43,7 +43,7 @@ export interface WorkflowStep {
     label: string;                                        // human readable step name
     type: string;                                         // Step type (e.g., task, decision, condition, etc.)
     stepFunction?: string | null;                                // Optional tool or service associated with the step
-    functionParams?: Record<string, string|boolean|number|object|any[]> | null;             // Optional parameters for the tool (supports arrays for json-rules-engine)
+    functionParams?: Record<string, string|boolean|number|object|unknown[]> | null;             // Optional parameters for the tool (supports arrays for json-rules-engine)
     next?: Array<string | WorkflowStep> | null;                  // Optional next steps (for branching)
     conditions?: Array<{ value: string; next: string }>; // Optional conditions for switch case branching steps
     onConditionPass?: string | WorkflowStep | null;              // Optional steps if condition passes

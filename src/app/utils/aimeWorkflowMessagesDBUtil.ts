@@ -21,7 +21,7 @@ const COLLECTION_NAME = 'aimeWorkflowConversations';
 // ... existing types are imported from `src/app/types/aimeWorkflowMessages.ts`
 
 // Helper to safely remove MongoDB internal _id if present
-function removeInternalId(obj: unknown) {
+function removeInternalId(obj: unknown): void {
     if (obj && typeof obj === 'object' && Object.prototype.hasOwnProperty.call(obj, '_id')) {
         try {
             const o = obj as Record<string, unknown>;
@@ -37,8 +37,6 @@ export default class AimeWorkflowMessagesDBUtil {
         const db = await getMongoDatabase();
         const coll = db.collection(COLLECTION_NAME);
         const query: Record<string, unknown> = { account, templateId };
-        
-0
         if (organization !== undefined) {
             if (organization && organization.trim() !== '') {
                 query.organization = organization;
