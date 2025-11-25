@@ -84,7 +84,7 @@ function buildConfig(): EnvironmentConfig {
   const jwtIssuer = getEnv('JWT_ISSUER', 'groupize');
   const jwtAudience = getEnv('JWT_AUDIENCE', 'workflows');
   const cookieName = getEnv('COOKIE_NAME', 'gpw_session');
-  const basePath = getEnv('NEXT_PUBLIC_BASE_PATH', '/aime/aimeworkflows');
+  const basePath = getEnv('NEXT_PUBLIC_BASE_PATH', '/aime');
   const appUrl = getEnv('NEXT_PUBLIC_APP_URL', 'http://localhost:3000');
   
   const anthropicApiKey = getOptionalEnv('ANTHROPIC_API_KEY');

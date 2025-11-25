@@ -65,7 +65,7 @@ The application uses a **single-issuer JWT architecture** where Rails is the sol
    └─► Rails generates user JWT (aud="workflows")
        └─► Rails sets HttpOnly cookie: gpw_session
        
-2. User navigates to /aime/aimeworkflows
+2. User navigates to /aime
    │
    ├─► Browser sends gpw_session cookie
    │

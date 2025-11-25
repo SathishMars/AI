@@ -3,8 +3,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: 'standalone', // this for the creation of a docker image
-  basePath: '/aime/aimeworkflows',
-  assetPrefix: '/aime/aimeworkflows',
+  basePath: '/aime',
+  assetPrefix: '/aime',
   trailingSlash: true,
   typescript: {
     // !! WARN !!

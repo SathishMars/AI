@@ -60,7 +60,7 @@ Embedded mode is the **default and production mode**. It provides full integrati
    - User logs into Rails at `groupize.local` (or production domain)
    - Rails generates JWT with user/account/org claims
    - Rails sets `gpw_session` cookie (HttpOnly, Secure, SameSite=Lax)
-   - User navigates to `/aime/aimeworkflows/*`
+   - User navigates to `/aime/*`
    - Nginx proxies request to Next.js with cookies forwarded
    - Next.js middleware verifies JWT and injects user headers
    - On failure: Redirects to Rails login
@@ -92,7 +92,7 @@ JWKS_URL=https://app.groupize.com/.well-known/jwks.json
 JWT_ISSUER=groupize
 JWT_AUDIENCE=workflows
 COOKIE_NAME=gpw_session
-NEXT_PUBLIC_BASE_PATH=/aime/aimeworkflows
+NEXT_PUBLIC_BASE_PATH=/aime
 NODE_ENV=production
 ```
 
@@ -177,7 +177,7 @@ Standalone mode is a **development-only mode** that allows frontend development 
 ```bash
 # .env.local
 AUTH_MODE=standalone
-NEXT_PUBLIC_BASE_PATH=/aime/aimeworkflows
+NEXT_PUBLIC_BASE_PATH=/aime
 NODE_ENV=development
 ```
 

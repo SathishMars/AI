@@ -141,11 +141,11 @@ describe('Environment Configuration', () => {
       expect(env.basePath).toBe('/custom/path');
     });
 
-    it('should default NEXT_PUBLIC_BASE_PATH to /aime/aimeworkflows', () => {
+    it('should default NEXT_PUBLIC_BASE_PATH to /aime', () => {
       delete process.env.NEXT_PUBLIC_BASE_PATH;
       jest.resetModules();
       const { env } = require('@/app/lib/env');
-      expect(env.basePath).toBe('/aime/aimeworkflows');
+      expect(env.basePath).toBe('/aime');
     });
   });
 
