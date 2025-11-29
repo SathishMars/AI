@@ -1,15 +1,15 @@
 import * as envModule from '@/app/lib/env';
 
 describe('Environment Configuration', () => {
-  const originalEnv = process.env;
+  const originalEnv = { ...process.env };
 
   beforeEach(() => {
     jest.resetModules();
-    process.env = { ...originalEnv };
+    (process.env as any) = { ...originalEnv };
   });
 
   afterEach(() => {
-    process.env = originalEnv;
+    (process.env as any) = originalEnv;
   });
 
   describe('Auth Mode', () => {
@@ -63,7 +63,7 @@ describe('Environment Configuration', () => {
     it('should default to http://groupize.local in development', () => {
       delete process.env.NEXT_PUBLIC_RAILS_BASE_URL;
       delete process.env.RAILS_BASE_URL;
-      process.env.NODE_ENV = 'development';
+      (process.env as any).NODE_ENV = 'development';
       jest.resetModules();
       const { env } = require('@/app/lib/env');
       expect(env.railsBaseUrl).toBe('http://groupize.local');
@@ -151,7 +151,7 @@ describe('Environment Configuration', () => {
 
   describe('Node Environment', () => {
     it('should detect production environment', () => {
-      process.env.NODE_ENV = 'production';
+      (process.env as any).NODE_ENV = 'production';
       jest.resetModules();
       const { env } = require('@/app/lib/env');
       expect(env.nodeEnv).toBe('production');
@@ -160,7 +160,7 @@ describe('Environment Configuration', () => {
     });
 
     it('should detect development environment', () => {
-      process.env.NODE_ENV = 'development';
+      (process.env as any).NODE_ENV = 'development';
       jest.resetModules();
       const { env } = require('@/app/lib/env');
       expect(env.nodeEnv).toBe('development');

@@ -127,7 +127,7 @@ export const WorkflowStepSchema: z.ZodType<WorkflowStep> = z.lazy(() =>
                 z.number(),
                 z.boolean(),
                 z.array(ParamValue), // Support arrays for json-rules-engine (all/any conditions)
-                z.record(ParamValue),
+                z.record(z.string(), ParamValue),
             ])
         );
 
@@ -136,7 +136,7 @@ export const WorkflowStepSchema: z.ZodType<WorkflowStep> = z.lazy(() =>
             label: z.string(),
             type: z.string(),
             stepFunction: z.string().optional().nullable(),
-            functionParams: z.record(ParamValue).optional().nullable(),
+            functionParams: z.record(z.string(), ParamValue).optional().nullable(),
         next: z.array(z.union([z.string(), WorkflowStepSchema])).optional().nullable(),
         // The interface uses a single step reference (string id or nested step) for these handlers
         onConditionPass: z.union([z.string(), WorkflowStepSchema]).optional().nullable(),
@@ -148,7 +148,7 @@ export const WorkflowStepSchema: z.ZodType<WorkflowStep> = z.lazy(() =>
             retryDelay: z.number().optional().nullable(),
         })
     })()
-);
+) as unknown as z.ZodType<WorkflowStep>;
 
 export const WorkflowDefinitionSchema = z.object({
     steps: z.array(WorkflowStepSchema),
@@ -189,7 +189,7 @@ export function validateWorkflowDefinition(obj: unknown): ValidationSuccess<Work
     if (result.success) return { valid: true, data: result.data };
 
     // Flatten Zod errors to readable messages
-    const errors = (result.error.errors || []).map(e => {
+    const errors = (result.error?.issues || []).map(e => {
         const path = e.path && e.path.length ? e.path.join('.') : '<root>';
         return `${path}: ${e.message}`;
     });
@@ -200,7 +200,7 @@ export function validateWorkflowTemplate(obj: unknown): ValidationSuccess<Workfl
     const result = WorkflowTemplateSchema.safeParse(obj);
     if (result.success) return { valid: true, data: result.data };
 
-    const errors = (result.error.errors || []).map(e => {
+    const errors = (result.error?.issues || []).map(e => {
         const path = e.path && e.path.length ? e.path.join('.') : '<root>';
         return `${path}: ${e.message}`;
     });

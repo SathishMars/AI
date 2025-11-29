@@ -99,7 +99,7 @@ export async function createTemplate(params: CreateTemplateParams) {
   // Validate against schema
   const validationResult = WorkflowTemplateSchema.safeParse(inputWithContext);
   if (!validationResult.success) {
-    const errorMessages = validationResult.error.errors.map(e => e.message).join(', ');
+    const errorMessages = (validationResult.error?.issues || []).map(e => e.message).join(', ');
     throw new Error(`Invalid template data: ${errorMessages}`);
   }
   

@@ -16,9 +16,10 @@ src/test
 # Next.js
 .next/
 out/
+dist/
 
 # Production
-/build
+build/
 
 # Misc
 .DS_Store
@@ -68,3 +69,5 @@ docker-compose.yml
 
 # Database scripts
 db-scripts/
+certs
+reports/
