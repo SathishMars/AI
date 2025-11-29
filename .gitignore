@@ -16,6 +16,7 @@
 # next.js
 /.next/
 /out/
+/dist/
 
 # production
 /build
@@ -54,3 +55,8 @@ ai-implementation-summaries/
 
 # User stories and epics (development planning)
 user-stories/
+
+# cert files
+/certs/
+
+/reports/

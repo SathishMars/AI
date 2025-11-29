@@ -6,6 +6,8 @@
 
 // Simple Headers implementation
 class MockHeaders {
+  // Add an index signature to be compatible with Record<string, string>
+  [key: string]: any;
   public headers: Map<string, string>;
 
   constructor(init?: HeadersInit) {

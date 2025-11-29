@@ -1,4 +1,4 @@
-import { useEffect, useState, ChangeEvent } from "react";
+import { useEffect, useState } from "react";
 import { WorkflowStep } from "../types/workflowTemplate";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";

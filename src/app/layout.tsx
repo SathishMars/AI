@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   title: "Groupize Workflows",
   description: "Workflow automation for event management",
   icons: {
-    icon: [{ url: "/aime/aimeworkflows/favicon-16x16.png", type: "image/png" }],
+    icon: [{ url: "/aime/favicon-16x16.png", type: "image/png" }],
   },
 };
 //👇 Import our second font

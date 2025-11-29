@@ -33,7 +33,7 @@ describe('useJwtRenewal', () => {
     jest.clearAllTimers();
     
     // Default env mock
-    mockEnv.env = {
+    (mockEnv as any).env = {
       authMode: 'embedded',
       railsBaseUrl: mockRailsBaseUrl,
     } as any;

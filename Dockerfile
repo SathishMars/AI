@@ -1,26 +1,33 @@
 # ---- Stage 1: Base ----
-FROM node:22-alpine AS base
+FROM node:22-slim AS base
 WORKDIR /app
 ENV NODE_ENV=development
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies for build and dev
-RUN npm install
 
 # Copy source files
 COPY . .
+# Clear any stale modules and reinstall (just to be safe)
+RUN rm -rf node_modules 
+
+# Install dependencies for build and dev
+RUN npm install
+
 
 # ---- Stage 2: Build for Production ----
 FROM base AS builder
 ENV NODE_ENV=production
 
+# optout of tracking telemetry from nextjs
+ENV NEXT_TELEMETRY_DISABLED=1
+
 # Build the Next.js app (ensure next.config.js has output: 'standalone')
 RUN npm run build
 
 # ---- Stage 3: Production Runtime ----
-FROM node:22-alpine AS runner
+FROM node:22-slim AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
@@ -38,23 +45,25 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/static ./.next/static
 
-# Install curl and certificates, download AWS RDS combined CA bundle for DocumentDB TLS
-# Store it at /app/rds-combined-ca-bundle.pem and make it readable by the app
 # Ensure certificates are available, download AWS RDS combined CA bundle with wget
 # Store it at /app/rds-combined-ca-bundle.pem and make it readable by the app
-RUN apk add --no-cache ca-certificates \
-  && wget -qO /app/rds-combined-ca-bundle.pem "https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem" \
+RUN apt-get update && apt-get install -y ca-certificates wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Download RDS CA bundle
+RUN wget -qO /app/rds-combined-ca-bundle.pem "https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem" \
   && chmod 0444 /app/rds-combined-ca-bundle.pem
 
 # Path to DocumentDB CA bundle available to the application
 ENV DOCUMENTDB_CA_FILE_PATH=/app/rds-combined-ca-bundle.pem
 
+
 # Healthcheck (optional)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# Start Next.js standalone server
-CMD ["node", "server.js"]
-
 EXPOSE 3000
 USER nextjs
+
+# Start Next.js standalone server
+CMD ["node", "server.js"]
