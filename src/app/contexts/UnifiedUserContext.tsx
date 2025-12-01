@@ -43,7 +43,7 @@ export function UnifiedUserProvider({ children, initialCurrentUser }: UnifiedUse
     initialCurrentUser?.expiresAt
   );
 
-  const baseUrl = env.appUrl;
+  // baseUrl intentionally not used in this provider
 
   /**
    * Initialize user data from current user (SSR initial data)
@@ -260,7 +260,7 @@ export function UnifiedUserProvider({ children, initialCurrentUser }: UnifiedUse
     } finally {
       setIsLoading(false);
     }
-  }, [baseUrl, initialCurrentUser, initializeFromCurrentUser]);
+  }, [initialCurrentUser, initializeFromCurrentUser]);
 
   /**
    * Switch to a different organization

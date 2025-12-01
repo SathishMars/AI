@@ -69,7 +69,7 @@ export const WorkflowMessageContentSchema = z.object({
             z.object({
                 type: z.enum(["api_call", "workflow_step", "external_tool"]),
                 name: z.string(),
-                params: z.record(z.union([
+                params: z.record(z.string(), z.union([
                     z.string(),
                     z.number(),
                     z.boolean(),
@@ -80,7 +80,7 @@ export const WorkflowMessageContentSchema = z.object({
         .optional().nullable(),
     followUpQuestions: z.array(z.string()).optional().nullable(),
     followUpOptions: z
-        .record(z.array(FollowUpOptionSchema))
+        .record(z.string(), z.array(FollowUpOptionSchema))
         .optional().nullable(),
     workflowDefinition: WorkflowDefinitionSchema.optional().nullable(),
 });
@@ -95,7 +95,7 @@ export const WorkflowMessageSchema = z.object({
     content: WorkflowMessageContentSchema,
     timestamp: z.string(),
     type: z.enum(["text", "image", "file"]).optional().nullable(),
-    metadata: z.record(z.union([
+    metadata: z.record(z.string(), z.union([
         z.string(),
         z.number(),
         z.boolean(),

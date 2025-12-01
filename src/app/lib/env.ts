@@ -26,6 +26,7 @@ interface EnvironmentConfig {
   // Database Configuration
   databaseEnvironment: string;
   documentDbUri: string | undefined;
+  documentDBCaFilePath: string | undefined;
   mongoDbUri: string | undefined;
   
   // Feature flags
@@ -73,13 +74,14 @@ function buildConfig(): EnvironmentConfig {
   const jwksUrl = `${railsBaseUrl}/.well-known/jwks.json`;
   const cookieName = getEnv('COOKIE_NAME', 'gpw_session');
   const basePath = getEnv('NEXT_PUBLIC_BASE_PATH', '/aime');
-  const appUrl = getEnv('NEXT_PUBLIC_APP_URL', 'http://localhost:3000'); // :3001 for embedded mode
+  const appUrl = getEnv('NEXT_PUBLIC_APP_URL', 'http://localhost:3000');
   
   const anthropicApiKey = getOptionalEnv('ANTHROPIC_API_KEY');
   const anthropicModel = getEnv('ANTHROPIC_MODEL_WORKFLOW', 'claude-3-5-sonnet-20241022');
   
   const databaseEnvironment = getEnv('DATABASE_ENVIRONMENT', 'local');
   const documentDbUri = getOptionalEnv('DOCUMENTDB_URI');
+  const documentDBCaFilePath = getOptionalEnv('DOCUMENTDB_CA_FILE_PATH');
   const mongoDbUri = getOptionalEnv('MONGODB_URI');
   
   return {
@@ -94,6 +96,7 @@ function buildConfig(): EnvironmentConfig {
     anthropicModel,
     databaseEnvironment,
     documentDbUri,
+    documentDBCaFilePath,
     mongoDbUri,
     isDevelopment,
     isProduction,

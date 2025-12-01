@@ -156,7 +156,7 @@ describe('UnifiedUserContext', () => {
     jest.resetAllMocks();
     
     // Default env mock
-    mockEnv.env = {
+    (mockEnv as any).env = {
       authMode: 'embedded',
       appUrl: 'http://localhost:3000',
       basePath: '/aime',

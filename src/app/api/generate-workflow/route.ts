@@ -5,7 +5,6 @@ import { generateMermaidFromWorkflow } from '@/app/utils/MermaidGenerator';
 import ShortUniqueId from 'short-unique-id';
 import AimeWorkflowMessagesDBUtil from '@/app/utils/aimeWorkflowMessagesDBUtil';
 import { runAgentToGenerateWorkflow } from '@/app/utils/aiSdkAgent';
-import WorkflowTemplateDbUtil from '@/app/utils/workflowTemplateDbUtil';
 
 // Increase timeout for AI workflow generation (can take 5+ minutes)
 export const maxDuration = 300; // 5 minutes

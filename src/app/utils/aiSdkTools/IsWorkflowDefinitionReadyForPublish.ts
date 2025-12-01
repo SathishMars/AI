@@ -52,7 +52,7 @@ const isWorkflowDefinitionReadyForPublishTool = async (
 const isWorkflowDefinitionReadyForPublishSchema = z.object({
     account: z.string().min(1).describe('Account identifier (required)'),
     organization: z.string().optional().nullable().describe('Organization identifier (optional)'),
-    workflowDefinition: z.object({}).describe('The workflow template object to validate for publish readiness (required)'),
+    workflowDefinition: WorkflowDefinitionSchema.describe('The workflow template object to validate for publish readiness (required)'),
 });
 
 /**

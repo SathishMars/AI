@@ -86,7 +86,7 @@ export default function ResponsiveWorkflowConfigurator({
 
   // Template naming state
   const [showNameDialog, setShowNameDialog] = useState(false);
-  const [isTemplateValid] = useState(false); // placeholder to prevent accidental publish; setter intentionally unused
+  const [_isTemplateValid] = useState(false); // placeholder to prevent accidental publish; setter intentionally unused
   const [workflowTemplateSelectorItem, setWorkflowTemplateSelectorItem] = useState<workflowTemplateSelectorMenuItem | null>(null);
 
 
@@ -152,11 +152,11 @@ export default function ResponsiveWorkflowConfigurator({
 
   // Workflow actions
   const handlePublish = useCallback(() => {
-    if (isTemplateValid) {
+    if (_isTemplateValid) {
       // WorkflowJSON only has steps - status is handled at template level
       onWorkflowDefinitionChange(workflowTemplate.workflowDefinition);
     }
-  }, [workflowTemplate, isTemplateValid, onWorkflowDefinitionChange]);
+  }, [workflowTemplate, _isTemplateValid, onWorkflowDefinitionChange]);
 
   // Handle template naming
   const handleTemplateNameSubmit = useCallback(async (name: string) => {
@@ -290,7 +290,7 @@ export default function ResponsiveWorkflowConfigurator({
       className={cn(
         "relative flex items-center justify-center min-h-full",
         "transition-colors duration-200",
-        // isDragging ? "bg-primary/30" : "bg-border hover:bg-primary/30"
+        isDragging ? "bg-primary/30" : "bg-border hover:bg-primary/30"
       )}
     >
       <DragIcon className="h-4 w-4 cursor-col-resize text-muted-foreground" onMouseDown={handleMouseDown} />

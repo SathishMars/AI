@@ -6,13 +6,17 @@ const nextConfig: NextConfig = {
   basePath: '/aime',
   assetPrefix: '/aime',
   trailingSlash: true,
+  env: {
+    NEXT_TELEMETRY_DISABLED: '1',
+    NEXT_PUBLIC_BASE_PATH: '/aime',
+  },
   typescript: {
     // !! WARN !!
     // Temporarily allow production builds to complete even with type errors
     // TODO: Fix pre-existing TypeScript errors in legacy workflow visualization code
     ignoreBuildErrors: true,
   },
-  
+
   async redirects() {
     return [
       {
@@ -42,7 +46,7 @@ const nextConfig: NextConfig = {
         as: '*.js',
       },
     },
-  },  
+  },
 };
 
 export default nextConfig;
