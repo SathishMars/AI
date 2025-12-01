@@ -3,63 +3,118 @@
 
 import { tool } from 'ai';
 import { z } from 'zod';
+import { serverApiFetch } from '../server-api';
 
 export interface ListOfRequestFactsInput {
-    account: string;
-    // organization is optional; when present it may be `null` or a non-empty string
-    organization?: string | null;
-    requestTemplateId: string;
+  account: string;
+  organization?: string | null;
+  requestTemplateId: string;
 }
 
 export interface RequestFactsSummary {
-    id: string;
-    label: string;
-    description?: string | null;
+  id: string;
+  label: string;
+  description?: string | null;
 }
 
 export interface ListOfRequestFactsOutput {
-    facts: RequestFactsSummary[];
+  facts: RequestFactsSummary[];
 }
 
 export const getListOfRequestFacts = async (
-    input: ListOfRequestFactsInput
+  input: ListOfRequestFactsInput
 ): Promise<ListOfRequestFactsOutput> => {
-    const { account, organization, requestTemplateId } = input;
-    console.log('[GetListOfRequestFacts] Fetching request facts for account:', account, 'organization:', organization, 'requestTemplateId:', requestTemplateId);
-    
-    // Defensive: ensure account present
-    if (!account || typeof account !== 'string') {
-        throw new Error('account is required and must be a string');
-    }
-    // Defensive: ensure requestTemplateId present
-    if (!requestTemplateId || typeof requestTemplateId !== 'string') {
-        throw new Error('requestTemplateId is required and must be a string');
-    }
+  const { account, organization, requestTemplateId } = input;
+  
+  if (!account || typeof account !== 'string') {
+    throw new Error('account is required and must be a string');
+  }
+  if (!requestTemplateId || typeof requestTemplateId !== 'string') {
+    throw new Error('requestTemplateId is required and must be a string');
+  }
 
-    // This is a placeholder and needs to be modified to use a helper that fetches notification templates from the DB
-    const facts: RequestFactsSummary[] = [
-        { id: 'label001', label: 'Request form Name', description: 'Name of this Request template' },
-        { id: 'numTravelBookings', label: 'Number of Travel Bookings', description: 'The number of travel bookings required for the event' },
-        { id: 'estimatedBudget', label: 'Estimated Budget', description: 'The estimated budget for the event' },
-        { id: 'startDate', label: 'Start Date', description: 'The starting date of the event' },
-        { id: 'endDate', label: 'End Date', description: 'The ending date of the event' },
-        { id: 'locationCity', label: 'Event City', description: 'The city where the event will be held' },
-        { id: 'locationCountry', label: 'Event Country', description: 'The country of the event location' },
-        { id: 'requestorUserId', label: 'Requestor User ID', description: 'The user ID of the person requesting the MRF' },
-        { id: 'isUrgent', label: 'Urgent', description: 'If this is an expedited request' },
-    ];
-    
-    console.log('[GetListOfRequestFacts] returning the list of request facts.', facts.length);
-    return { facts };
+  try {
+      const response = await serverApiFetch(`/api/request-templates/${encodeURIComponent(requestTemplateId)}`, {
+          method: 'GET',
+          headers: {
+              'x-account': account,
+              'x-organization': organization || ''
+          }
+      });
+
+      if (!response.ok) {
+          // Handle errors gracefully - don't expose HTTP status codes to the AI (Return empty array instead of throwing to allow workflow to continue)
+          return { facts: [] };
+      }
+
+      const data = await response.json();
+      const facts: RequestFactsSummary[] = [];
+      
+      if (data.name) {
+          facts.push({
+              id: 'requestFormName',
+              label: 'Request form Name',
+              description: 'Name of this Request template'
+          });
+      }
+      
+      // Extract questions from all sections
+      if (data.sections && Array.isArray(data.sections)) {
+          for (const section of data.sections) {
+              if (section.questions && Array.isArray(section.questions)) {
+                  for (const question of section.questions) {
+                      // Skip if question is deleted
+                      if (question.deletedAt) {
+                          continue;
+                      }
+                      
+                      // Use internalKey as id, or generate one if missing
+                      const questionId = question.internalKey || `question_${question.name?.replace(/\s+/g, '_').toLowerCase() || 'unknown'}`;
+                      
+                      facts.push({
+                          id: questionId,
+                          label: question.name || 'Unnamed Question',
+                          description: question.description || question.fieldType || null
+                      });
+                      
+                      // Also include sub-questions if present
+                      if (question.sub_questions && Array.isArray(question.sub_questions)) {
+                          for (const subQuestion of question.sub_questions) {
+                              if (subQuestion.deletedAt) {
+                                  continue;
+                              }
+                              
+                              const subQuestionId = subQuestion.internalKey || `subquestion_${subQuestion.name?.replace(/\s+/g, '_').toLowerCase() || 'unknown'}`;
+                              
+                              facts.push({
+                                  id: subQuestionId,
+                                  label: subQuestion.name || 'Unnamed Sub-Question',
+                                  description: subQuestion.description || subQuestion.fieldType || null
+                              });
+                          }
+                      }
+                  }
+              }
+          }
+      }
+      
+      console.log('[GetListOfRequestFacts] returning the list of request facts.', facts.length);
+      return { facts };
+      
+  } catch (error) {
+      console.error('[GetListOfRequestFacts] Error:', error);
+      // If there's an error, return empty facts array rather than throwing - This allows the system to continue even if the request form has no questions
+      console.log('[GetListOfRequestFacts] Error fetching facts, returning empty array');
+      return { facts: [] };
+  }
 };
 
 const nonEmptyStringOrNull = z.union([z.string().min(1), z.null()]);
 
 const getListOfRequestFactsSchema = z.object({
-    account: z.string().min(1).describe('Account identifier (required)'),
-    // organization may be omitted, null, or a non-empty string
-    organization: nonEmptyStringOrNull.optional().nullable().describe('Organization identifier (optional)'),
-    requestTemplateId: z.string().min(1).describe('Request template identifier (required)'),
+  account: z.string().min(1).describe('Account identifier (required)'),
+  organization: nonEmptyStringOrNull.optional().nullable().describe('Organization identifier (optional)'),
+  requestTemplateId: z.string().min(1).describe('Request template identifier (required)'),
 });
 
 /**
@@ -85,24 +140,25 @@ const getListOfRequestFactsSchema = z.object({
  * ```
  */
 export const getRequestFactsTool = tool({
-    description:
-        'Returns a structured object containing published request facts for a given account and optional organization. ' +
-        'This tool expects an object input with account (required), requestTemplateId (required), and organization (optional). ' +
-        'Returns an object with a facts array containing request fact details. ' +
-        'Use this tool to discover available facts in the selected request template.',
-    
-    inputSchema: getListOfRequestFactsSchema,
-    
-    execute: async ({ account, organization, requestTemplateId }) => {
-        try {
-            const result = await getListOfRequestFacts({ account, organization, requestTemplateId });
-            return result;
-        } catch (err) {
-            // Provide clear error messages for debugging
-            if (err instanceof Error) {
-                throw new Error(`getListOfRequestFacts: ${err.message}`);
-            }
-            throw new Error(`getListOfRequestFacts: unexpected error - ${String(err)}`);
-        }
-    },
+  description:
+      'Returns a structured object containing published request facts for a given account and optional organization. ' +
+      'This tool expects an object input with account (required), requestTemplateId (required), and organization (optional). ' +
+      'Returns an object with a facts array containing request fact details. ' +
+      'Use this tool to discover available facts in the selected request template. ' +
+      'IMPORTANT: When displaying facts to users in content.text, show only the label (e.g., "Budget", "Start Date") - NEVER display the ID. ' +
+      'The ID is for internal reference only when constructing workflow conditions. ' +
+      'NEVER display HTTP error statuses or technical error messages to users. If no facts are available, simply state that no facts were found.',
+  
+  inputSchema: getListOfRequestFactsSchema,
+  
+  execute: async ({ account, organization, requestTemplateId }) => {
+      try {
+          const result = await getListOfRequestFacts({ account, organization, requestTemplateId });
+          return result;
+      } catch (err) {
+          // Never expose errors to the AI - return empty array instead - This prevents HTTP status codes and technical errors from being displayed
+          console.error('[getRequestFactsTool] Error in execute:', err);
+          return { facts: [] };
+      }
+  },
 });

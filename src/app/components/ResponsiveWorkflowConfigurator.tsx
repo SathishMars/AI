@@ -107,6 +107,8 @@ export default function ResponsiveWorkflowConfigurator({
     updateWorkflowTemplateSelectorItem(workflowTemplate);
   }, [updateWorkflowTemplateSelectorItem, workflowTemplate, workflowTemplate?.metadata?.label]);
 
+  console.log("WORKFLOW TEMPLATE IN CONFIGURATOR:", workflowTemplate); 
+
 
   // Resizable divider functionality
   const dividerRef = useRef<HTMLDivElement>(null);
@@ -376,6 +378,7 @@ export default function ResponsiveWorkflowConfigurator({
               sendMessage={sendMessage ? sendMessage : async (msg: string) => { console.log('SendMessage not provided. Message:', msg); }}
               workflowDefinition={workflowTemplate.workflowDefinition}
               workflowTemplateId={workflowTemplate.id}
+              onWorkflowDefinitionChange={onWorkflowDefinitionChange}
             />
           </div>
 

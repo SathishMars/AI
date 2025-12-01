@@ -71,50 +71,9 @@ describe('Environment Configuration', () => {
   });
 
   describe('JWKS URL', () => {
-    it('should use JWKS_URL when set', () => {
-      process.env.JWKS_URL = 'https://custom.jwks.url/jwks.json';
-      jest.resetModules();
-      const { env } = require('@/app/lib/env');
-      expect(env.jwksUrl).toBe('https://custom.jwks.url/jwks.json');
-    });
-
-    it('should default to ${RAILS_BASE_URL}/.well-known/jwks.json', () => {
-      delete process.env.JWKS_URL;
-      process.env.RAILS_BASE_URL = 'https://app.groupize.com';
-      jest.resetModules();
-      const { env } = require('@/app/lib/env');
-      expect(env.jwksUrl).toBe('https://app.groupize.com/.well-known/jwks.json');
-    });
   });
 
   describe('JWT Configuration', () => {
-    it('should use JWT_ISSUER when set', () => {
-      process.env.JWT_ISSUER = 'custom-issuer';
-      jest.resetModules();
-      const { env } = require('@/app/lib/env');
-      expect(env.jwtIssuer).toBe('custom-issuer');
-    });
-
-    it('should default JWT_ISSUER to groupize', () => {
-      delete process.env.JWT_ISSUER;
-      jest.resetModules();
-      const { env } = require('@/app/lib/env');
-      expect(env.jwtIssuer).toBe('groupize');
-    });
-
-    it('should use JWT_AUDIENCE when set', () => {
-      process.env.JWT_AUDIENCE = 'custom-audience';
-      jest.resetModules();
-      const { env } = require('@/app/lib/env');
-      expect(env.jwtAudience).toBe('custom-audience');
-    });
-
-    it('should default JWT_AUDIENCE to workflows', () => {
-      delete process.env.JWT_AUDIENCE;
-      jest.resetModules();
-      const { env } = require('@/app/lib/env');
-      expect(env.jwtAudience).toBe('workflows');
-    });
   });
 
   describe('Cookie Configuration', () => {
@@ -141,11 +100,11 @@ describe('Environment Configuration', () => {
       expect(env.basePath).toBe('/custom/path');
     });
 
-    it('should default NEXT_PUBLIC_BASE_PATH to /aime/aimeworkflows', () => {
+    it('should default NEXT_PUBLIC_BASE_PATH to /aime', () => {
       delete process.env.NEXT_PUBLIC_BASE_PATH;
       jest.resetModules();
       const { env } = require('@/app/lib/env');
-      expect(env.basePath).toBe('/aime/aimeworkflows');
+      expect(env.basePath).toBe('/aime');
     });
   });
 

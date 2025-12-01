@@ -263,7 +263,10 @@ const workflowOnRequestStepLLMInstructions: string = `### This step function is 
 ** \`functionParams\`:**
 - \`requestTemplateId\` *(string, required)* — Must be one of the **valid request types** available from the getListOfRequestTemplates tool.  
 **Rules:**
-- \`requestTemplateId\` is **mandatory**; match based on user input or ask via \`followUpOptions\`. Never invent new request template ids.  
+- \`requestTemplateId\` is **mandatory**; you MUST call getListOfRequestTemplates first to get available templates.
+- If the user mentions a request template name, show ALL available templates as \`followUpOptions\` (using label for display, id in value) so the user can select the correct one.
+- NEVER try to get facts (getRequestFacts) until AFTER the user has selected a specific template from the options.
+- Match based on user input only if there's an exact, unambiguous match. Otherwise, always show options via \`followUpOptions\`. Never invent new request template ids.  
 **Minimal Example:**
 \`\`\`json
 {

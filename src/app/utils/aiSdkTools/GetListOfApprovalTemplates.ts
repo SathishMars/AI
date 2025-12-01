@@ -92,7 +92,12 @@ export const getListOfApprovalTemplatesTool = tool({
         'Returns a structured object containing published approval templates for a given account and optional organization. ' +
         'This tool expects an object input with account (required) and organization (optional). ' +
         'Returns an object with a templates array containing approval template details. ' +
-        'Use this tool to discover available approval templates for an account before taking template-specific actions.',
+        'Use this tool to discover available approval templates for an account before taking template-specific actions. ' +
+        'IMPORTANT: When displaying templates to users in content.text or followUpOptions, show only the label (e.g., "Finance Approval", "Manager Approval") - NEVER display the ID. ' +
+        'CRITICAL: When presenting these templates as followUpOptions, you MUST include category: "template_approval" in each option object. ' +
+        'Example format: {"label": "Finance Approval Request", "value": "approve001", "category": "template_approval", "metadata": {"templateId": "approve001", "version": "1.0.0"}}. ' +
+        'This category triggers immediate submission when the user selects the option. ' +
+        'NEVER display HTTP error statuses or technical error messages to users.',
     
     inputSchema: getListOfApprovalTemplatesSchema,
     

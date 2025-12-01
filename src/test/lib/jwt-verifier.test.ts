@@ -5,7 +5,7 @@ import { jwtVerify, createRemoteJWKSet, decodeJwt } from 'jose';
 // Mock the env module
 jest.mock('@/app/lib/env', () => ({
   env: {
-    jwtIssuer: 'groupize',
+    railsBaseUrl: 'http://localhost:3000',
     jwksUrl: 'http://localhost:3000/.well-known/jwks.json',
   },
 }));
@@ -63,13 +63,13 @@ describe('JWT Verifier', () => {
       expect(claims.context.account_id).toBe('account123');
       expect(claims.context.organization_id).toBe('org456');
       expect(claims.iss).toBe('groupize');
-      expect(claims.aud).toBe('workflows');
+      expect(claims.aud).toBe('ai');
       expect(mockJwtVerify).toHaveBeenCalledWith(
         'valid.token.here',
         mockJWKS,
         expect.objectContaining({
           issuer: 'groupize',
-          audience: 'workflows',
+          audience: 'ai',
           clockTolerance: 60,
         })
       );
@@ -188,7 +188,7 @@ describe('JWT Verifier', () => {
     it('should verify a valid service token', async () => {
       const mockClaims = {
         iss: 'groupize',
-        aud: 'workflows-api',
+        aud: 'ai-api',
         sub: 'service:rails',
         exp: Math.floor(Date.now() / 1000) + 3600,
         iat: Math.floor(Date.now() / 1000),
@@ -211,14 +211,14 @@ describe('JWT Verifier', () => {
       expect(claims.context.user_id).toBe('user123');
       expect(claims.context.account_id).toBe('account123');
       expect(claims.iss).toBe('groupize');
-      expect(claims.aud).toBe('workflows-api');
+      expect(claims.aud).toBe('ai-api');
       expect(claims.sub).toBe('service:rails');
       expect(mockJwtVerify).toHaveBeenCalledWith(
         'valid.service.token',
         mockJWKS,
         expect.objectContaining({
           issuer: 'groupize',
-          audience: 'workflows-api',
+          audience: 'ai-api',
           subject: 'service:rails',
           clockTolerance: 60,
         })

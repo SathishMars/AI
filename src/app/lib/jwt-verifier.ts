@@ -7,8 +7,8 @@
    * - All tokens verified via Rails JWKS endpoint
    * 
    * Token Types:
-   * 1. User Tokens (aud="workflows") - Browser → Next.js
-   * 2. Service Tokens (aud="workflows-api") - Rails → Next.js /api/internal/**
+   * 1. User Tokens (aud="ai") - Browser → Next.js
+   * 2. Service Tokens (aud="ai-api") - Rails → Next.js /api/internal/**
 */
 
 import { createRemoteJWKSet, jwtVerify, decodeJwt, JWTPayload, JWTVerifyResult } from 'jose';
@@ -82,9 +82,7 @@ function getJWKS(): ReturnType<typeof createRemoteJWKSet> {
     return jwksCache;
   }
 
-  const jwksUrl = new URL(env.jwksUrl);
-
-  jwksCache = createRemoteJWKSet(jwksUrl, {
+  jwksCache = createRemoteJWKSet(new URL(env.jwksUrl), {
     cacheMaxAge: JWKS_CACHE_TTL,
     cooldownDuration: 30000,
   });
@@ -103,8 +101,8 @@ export async function verifyUserToken(token: string): Promise<UserJWTClaims> {
     const JWKS = getJWKS();
     
     const result: JWTVerifyResult = await jwtVerify(token, JWKS, {
-      issuer: env.jwtIssuer,
-      audience: 'workflows', // User tokens
+      issuer: 'groupize',
+      audience: 'ai', // User tokens
       clockTolerance: 60, // 60 seconds clock skew tolerance
     });
     
@@ -149,8 +147,8 @@ export async function verifyServiceToken(token: string): Promise<ServiceJWTClaim
     const JWKS = getJWKS();
     
     const result: JWTVerifyResult = await jwtVerify(token, JWKS, {
-      issuer: env.jwtIssuer,
-      audience: 'workflows-api',
+      issuer: 'groupize',
+      audience: 'ai-api', // Service tokens
       subject: 'service:rails',
       clockTolerance: 60,
     });
@@ -175,7 +173,7 @@ export async function verifyServiceToken(token: string): Promise<ServiceJWTClaim
         throw new JWTVerificationError('ISSUER_MISMATCH', 'Service token issuer mismatch', error);
       }
       if (error.message.includes('audience')) {
-        throw new JWTVerificationError('AUDIENCE_MISMATCH', 'Service token audience mismatch (expected workflows-api)', error);
+        throw new JWTVerificationError('AUDIENCE_MISMATCH', 'Service token audience mismatch (expected ai-api)', error);
       }
       if (error.message.includes('subject')) {
         throw new JWTVerificationError('SUBJECT_MISMATCH', 'Service token subject mismatch (expected service:rails)', error);

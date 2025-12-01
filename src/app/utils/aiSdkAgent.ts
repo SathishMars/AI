@@ -93,8 +93,12 @@ const parseAgentResponse = (responseText: string, existingWorkflow: WorkflowDefi
             }
         }
         
-        // If we can't determine the structure, return the parsed object as-is
-        return parsed;
+        // If we can't determine the structure, treat as plain text to avoid displaying raw JSON
+        console.warn('[aiSdkAgent] Could not determine response structure, treating as plain text');
+        return {
+            text: typeof parsed === 'string' ? parsed : JSON.stringify(parsed, null, 2),
+            workflowDefinition: existingWorkflow || undefined,
+        };
     } catch (parseError) {
         // Step 4: If JSON parsing fails, treat as plain text response
         console.warn('[aiSdkAgent] Failed to parse response as JSON, treating as plain text:', parseError);

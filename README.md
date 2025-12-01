@@ -177,7 +177,7 @@ npm run dev
 - No authentication required
 - Perfect for frontend-only development
 
-**Access:** `http://localhost:3000/aime/aimeworkflows/`
+**Access:** `http://localhost:3000/aime/`
 
 **Environment Variables (Optional):**
 ```bash
@@ -199,15 +199,13 @@ npm run dev:embedded
 - Full SSO experience with Rails
 - Redirects to Rails login if unauthorized
 
-**Access:** `http://groupize.local/aime/aimeworkflows/` (requires nginx setup)
+**Access:** `http://groupize.local/aime/` (requires nginx setup)
 
 **Environment Variables (Required):**
 ```bash
 AUTH_MODE=embedded
 RAILS_BASE_URL=http://groupize.local
 NEXT_PUBLIC_RAILS_BASE_URL=http://groupize.local
-JWT_ISSUER=groupize
-JWT_AUDIENCE=workflows
 COOKIE_NAME=gpw_session
 ```
 
@@ -215,7 +213,7 @@ COOKIE_NAME=gpw_session
 1. Start Rails: `cd reg_app && rails s -p 3000`
 2. Start Next.js: `cd Workflows && npm run dev:embedded`
 3. Configure nginx (see section 5 below)
-4. Access via: `http://groupize.local/aime/aimeworkflows/`
+4. Access via: `http://groupize.local/aime/`
 
 > **Note**: See `docs/ENV_VARIABLES.md` for complete environment variable reference.
 
@@ -249,22 +247,22 @@ When running alongside the Rails application, use nginx to proxy requests:
 4. **Access the application**:
    
    - Rails app: `http://groupize.local/`
-   - Next.js Workflows: `http://groupize.local/aime/aimeworkflows/`
-   - New workflow: `http://groupize.local/aime/aimeworkflows/workflows/configure/new/`
+   - Next.js Workflows: `http://groupize.local/aime/`
+   - New workflow: `http://groupize.local/aime/workflows/configure/new/`
 
 #### URL Structure
 
 The nginx proxy uses Next.js `basePath` configuration:
 
-- User visits: `http://groupize.local/aime/aimeworkflows/*`
+- User visits: `http://groupize.local/aime/*`
 - nginx passes full path to Next.js on port 3001
-- Next.js configured with `basePath: '/aime/aimeworkflows'` in `next.config.ts`
+- Next.js configured with `basePath: '/aime'` in `next.config.ts`
 - Everything else → Rails app (port 3000)
 
 **Example:**
 ```
-User visits:     http://groupize.local/aime/aimeworkflows/workflows/configure/123
-nginx proxies:   /aime/aimeworkflows/workflows/configure/123 → Next.js (port 3001)
+User visits:     http://groupize.local/aime/workflows/configure/123
+nginx proxies:   /aime/workflows/configure/123 → Next.js (port 3001)
 Next.js serves:  src/app/workflows/configure/[id]/page.tsx
 ```
 
@@ -282,7 +280,7 @@ See `nginx.example.conf` for the complete configuration with detailed comments.
 1. Start Rails: `cd /path/to/reg_app && rails s` (runs on port 3000)
 2. Start Next.js: `cd /path/to/Workflows && npm run dev:embedded` (runs on port 3001)
 3. Start nginx: `brew services start nginx`
-4. Access via: `http://groupize.local/aime/aimeworkflows/`
+4. Access via: `http://groupize.local/aime/`
 
 ## 🧪 Testing
 

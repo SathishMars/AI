@@ -9,11 +9,7 @@ interface EnvironmentConfig {
   
   // Rails/Backend URLs
   railsBaseUrl: string;
-  jwksUrl: string;
-  
-  // JWT Configuration
-  jwtIssuer: string;
-  jwtAudience: string;
+  jwksUrl: string; // Auto-derived from railsBaseUrl
   
   // Cookie configuration
   cookieName: string;
@@ -74,17 +70,10 @@ function buildConfig(): EnvironmentConfig {
     getEnv('RAILS_BASE_URL', isDevelopment ? 'http://groupize.local' : '')
   );
   
-  // JWKS endpoint and JWT configuration only used in embedded mode
-  const jwksUrl = getEnv(
-    'JWKS_URL',
-    `${railsBaseUrl}/.well-known/jwks.json`
-  );
-  
-  const jwtIssuer = getEnv('JWT_ISSUER', 'groupize');
-  const jwtAudience = getEnv('JWT_AUDIENCE', 'workflows');
+  const jwksUrl = `${railsBaseUrl}/.well-known/jwks.json`;
   const cookieName = getEnv('COOKIE_NAME', 'gpw_session');
-  const basePath = getEnv('NEXT_PUBLIC_BASE_PATH', '/aime/aimeworkflows');
-  const appUrl = getEnv('NEXT_PUBLIC_APP_URL', 'http://localhost:3000');
+  const basePath = getEnv('NEXT_PUBLIC_BASE_PATH', '/aime');
+  const appUrl = getEnv('NEXT_PUBLIC_APP_URL', 'http://localhost:3000'); // :3001 for embedded mode
   
   const anthropicApiKey = getOptionalEnv('ANTHROPIC_API_KEY');
   const anthropicModel = getEnv('ANTHROPIC_MODEL_WORKFLOW', 'claude-3-5-sonnet-20241022');
@@ -97,8 +86,6 @@ function buildConfig(): EnvironmentConfig {
     authMode,
     railsBaseUrl,
     jwksUrl,
-    jwtIssuer,
-    jwtAudience,
     cookieName,
     basePath,
     nodeEnv,

@@ -61,6 +61,7 @@ export function useJwtRenewal(options: JwtRenewalOptions) {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest', // CSRF protection
         },
         credentials: 'include',
       });

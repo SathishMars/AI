@@ -23,7 +23,7 @@ describe('Middleware', () => {
       authMode: 'embedded',
       cookieName: 'gpw_session',
       railsBaseUrl: 'http://groupize.local',
-      basePath: '/aime/aimeworkflows',
+      basePath: '/aime',
       isProduction: false,
     };
   });
@@ -68,7 +68,7 @@ describe('Middleware', () => {
     });
 
     it('should redirect to Rails when no token', async () => {
-      const request = createTestRequest('http://localhost:3000/aime/aimeworkflows/');
+      const request = createTestRequest('http://localhost:3000/aime/');
       const response = await middleware(request);
 
       expect(response).toBeInstanceOf(NextResponse);
@@ -96,7 +96,7 @@ describe('Middleware', () => {
 
       mockVerifyUserToken.mockResolvedValue(mockClaims as any);
 
-      const request = createTestRequest('http://localhost:3000/aime/aimeworkflows/accounts/account123/orgs/org456/workflows', {
+      const request = createTestRequest('http://localhost:3000/aime/accounts/account123/orgs/org456/workflows', {
         cookies: {
           gpw_session: 'valid.token.here',
         },
@@ -117,7 +117,7 @@ describe('Middleware', () => {
         new JWTVerificationError('TOKEN_EXPIRED', 'Token has expired')
       );
 
-      const request = createTestRequest('http://localhost:3000/aime/aimeworkflows/', {
+      const request = createTestRequest('http://localhost:3000/aime/', {
         cookies: {
           gpw_session: 'expired.token.here',
         },
@@ -151,7 +151,7 @@ describe('Middleware', () => {
       mockVerifyUserToken.mockResolvedValue(mockClaims as any);
 
       // URL has different account ID
-      const request = createTestRequest('http://localhost:3000/aime/aimeworkflows/accounts/wrong-account/workflows', {
+      const request = createTestRequest('http://localhost:3000/aime/accounts/wrong-account/workflows', {
         cookies: {
           gpw_session: 'valid.token.here',
         },
@@ -184,7 +184,7 @@ describe('Middleware', () => {
       mockVerifyUserToken.mockResolvedValue(mockClaims as any);
 
       // URL has different org ID
-      const request = createTestRequest('http://localhost:3000/aime/aimeworkflows/accounts/account123/orgs/wrong-org/workflows', {
+      const request = createTestRequest('http://localhost:3000/aime/accounts/account123/orgs/wrong-org/workflows', {
         cookies: {
           gpw_session: 'valid.token.here',
         },
@@ -217,7 +217,7 @@ describe('Middleware', () => {
       mockVerifyUserToken.mockResolvedValue(mockClaims as any);
 
       // URL requires org but JWT has none
-      const request = createTestRequest('http://localhost:3000/aime/aimeworkflows/accounts/account123/orgs/org456/workflows', {
+      const request = createTestRequest('http://localhost:3000/aime/accounts/account123/orgs/org456/workflows', {
         cookies: {
           gpw_session: 'valid.token.here',
         },
@@ -249,7 +249,7 @@ describe('Middleware', () => {
 
       mockVerifyUserToken.mockResolvedValue(mockClaims as any);
 
-      const request = createTestRequest('http://localhost:3000/aime/aimeworkflows/accounts/account123/orgs/org456/workflows', {
+      const request = createTestRequest('http://localhost:3000/aime/accounts/account123/orgs/org456/workflows', {
         cookies: {
           gpw_session: 'valid.token.here',
         },
@@ -269,7 +269,7 @@ describe('Middleware', () => {
     });
 
     it('should skip internal API routes', async () => {
-      const request = createTestRequest('http://localhost:3000/aime/aimeworkflows/api/internal/workflows');
+      const request = createTestRequest('http://localhost:3000/aime/api/internal/workflows');
       const response = await middleware(request);
 
       expect(response).toBeInstanceOf(NextResponse);
@@ -290,11 +290,11 @@ describe('Middleware', () => {
   describe('Standalone mode', () => {
     beforeEach(() => {
       (envModule as any).env.authMode = 'standalone';
-      (envModule as any).env.basePath = '/aime/aimeworkflows';
+      (envModule as any).env.basePath = '/aime';
     });
 
     it('should skip JWT verification in standalone mode', async () => {
-      const request = createTestRequest('http://localhost:3000/aime/aimeworkflows/');
+      const request = createTestRequest('http://localhost:3000/aime/');
       const response = await middleware(request);
 
       expect(response).toBeInstanceOf(NextResponse);
@@ -309,7 +309,7 @@ describe('Middleware', () => {
         status: 404,
       });
 
-      const request = createTestRequest('http://localhost:3000/aime/aimeworkflows/');
+      const request = createTestRequest('http://localhost:3000/aime/');
       const response = await middleware(request);
 
       expect(response.headers.get('x-user-id')).toBe('john.doe');
@@ -323,7 +323,7 @@ describe('Middleware', () => {
         status: 404,
       });
 
-      const request = createTestRequest('http://localhost:3000/aime/aimeworkflows/?account=test-account');
+      const request = createTestRequest('http://localhost:3000/aime/?account=test-account');
       const response = await middleware(request);
 
       expect(response.headers.get('x-account-id')).toBe('test-account');
@@ -335,7 +335,7 @@ describe('Middleware', () => {
         status: 404,
       });
 
-      const request = createTestRequest('http://localhost:3000/aime/aimeworkflows/?account=test-account&organization=test-org');
+      const request = createTestRequest('http://localhost:3000/aime/?account=test-account&organization=test-org');
       const response = await middleware(request);
 
       expect(response.headers.get('x-organization-id')).toBe('test-org');
@@ -351,7 +351,7 @@ describe('Middleware', () => {
     it('should handle unexpected errors gracefully in development', async () => {
       mockVerifyUserToken.mockRejectedValue(new Error('Unexpected error'));
 
-      const request = createTestRequest('http://localhost:3000/aime/aimeworkflows/', {
+      const request = createTestRequest('http://localhost:3000/aime/', {
         cookies: {
           gpw_session: 'token',
         },
@@ -369,7 +369,7 @@ describe('Middleware', () => {
       (envModule as any).env.isProduction = true;
       mockVerifyUserToken.mockRejectedValue(new Error('Unexpected error'));
 
-      const request = createTestRequest('http://localhost:3000/aime/aimeworkflows/', {
+      const request = createTestRequest('http://localhost:3000/aime/', {
         cookies: {
           gpw_session: 'token',
         },

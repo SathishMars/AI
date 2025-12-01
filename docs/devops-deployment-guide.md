@@ -25,15 +25,12 @@ Set the following environment variables in your deployment system (AWS ECS, Kube
 AUTH_MODE=embedded
 RAILS_BASE_URL=https://app.groupize.com
 NEXT_PUBLIC_RAILS_BASE_URL=https://app.groupize.com
-JWKS_URL=https://app.groupize.com/.well-known/jwks.json
-JWT_ISSUER=groupize
-JWT_AUDIENCE=workflows
 COOKIE_NAME=gpw_session
 
 # =============================================================================
 # Application Configuration
 # =============================================================================
-NEXT_PUBLIC_BASE_PATH=/aime/aimeworkflows
+NEXT_PUBLIC_BASE_PATH=/aime
 NODE_ENV=production
 NEXT_PUBLIC_APP_URL=https://app.groupize.com
 
@@ -63,7 +60,6 @@ PORT=3001
 ```bash
 RAILS_BASE_URL=https://staging.groupize.com
 NEXT_PUBLIC_RAILS_BASE_URL=https://staging.groupize.com
-JWKS_URL=https://staging.groupize.com/.well-known/jwks.json
 NEXT_PUBLIC_APP_URL=https://staging.groupize.com
 NODE_ENV=staging
 ```
@@ -72,7 +68,6 @@ NODE_ENV=staging
 ```bash
 RAILS_BASE_URL=https://app.groupize.com
 NEXT_PUBLIC_RAILS_BASE_URL=https://app.groupize.com
-JWKS_URL=https://app.groupize.com/.well-known/jwks.json
 NEXT_PUBLIC_APP_URL=https://app.groupize.com
 NODE_ENV=production
 ```
@@ -187,10 +182,10 @@ server {
   add_header X-Content-Type-Options "nosniff" always;
   add_header X-XSS-Protection "1; mode=block" always;
 
-  # ---- Next.js Workflows Micro-App: /aime/aimeworkflows/* ----
-  # With basePath: '/aime/aimeworkflows' in next.config.ts
-  # Pass the full path including /aime/aimeworkflows to Next.js
-  location /aime/aimeworkflows/ {
+  # ---- Next.js Workflows Micro-App: /aime/* ----
+  # With basePath: '/aime' in next.config.ts
+  # Pass the full path including /aime to Next.js
+  location /aime/ {
     proxy_pass http://next_upstream;
     proxy_http_version 1.1;
 
@@ -221,13 +216,13 @@ server {
     proxy_buffering off;
   }
 
-  # Handle /aime/aimeworkflows without trailing slash
-  location = /aime/aimeworkflows {
-    return 301 /aime/aimeworkflows/;
+  # Handle /aime without trailing slash
+  location = /aime {
+    return 301 /aime/;
   }
 
   # ---- Next.js Internal Routes (fonts, static assets, etc.) with basePath ----
-  location ~ ^/aime/aimeworkflows/(__|_next)/ {
+  location ~ ^/aime/(__|_next)/ {
     proxy_pass http://next_upstream;
     proxy_http_version 1.1;
 
@@ -377,8 +372,7 @@ Ensure Rails has these environment variables set:
 
 ```bash
 JWT_GSSO_GROUPIZE_KEY_ID=arn:aws:kms:us-east-1:123456789:key/xxxx-xxxx-xxxx
-JWT_ISSUER=groupize
-JWT_AUDIENCE=workflows
+# Note: Rails services hardcode issuer ('groupize') and audience ('ai' for user tokens, 'ai-api' for service tokens)
 ```
 
 ### 7. Database Setup
@@ -408,7 +402,7 @@ Create a health check endpoint or use Next.js default:
 
 ```bash
 # Test application is running
-curl https://app.groupize.com/aime/aimeworkflows/
+curl https://app.groupize.com/aime/
 
 # Should return HTML (not 502/503)
 ```
@@ -471,7 +465,7 @@ tail -f /var/log/nginx/workflows.error.log
 #### 10.1 Verify Authentication
 
 1. Log into Rails application
-2. Navigate to `/aime/aimeworkflows/`
+2. Navigate to `/aime/`
 3. Verify you're authenticated (check user context)
 4. Verify token renewal is working (check browser network tab)
 
@@ -482,7 +476,7 @@ tail -f /var/log/nginx/workflows.error.log
 # From Rails console or test script
 token = WorkflowsServiceTokenService.generate(user: current_user)
 response = HTTParty.get(
-  'https://app.groupize.com/aime/aimeworkflows/api/internal/workflows',
+  'https://app.groupize.com/aime/api/internal/workflows',
   headers: { 'Authorization' => "Bearer #{token}" }
 )
 ```
@@ -535,11 +529,8 @@ sudo systemctl reload nginx
 | `AUTH_MODE` | No | Authentication mode (default: `embedded`) | `embedded` |
 | `RAILS_BASE_URL` | Yes | Rails application base URL | `https://app.groupize.com` |
 | `NEXT_PUBLIC_RAILS_BASE_URL` | Yes | Rails URL (client-side accessible) | `https://app.groupize.com` |
-| `JWKS_URL` | No | JWKS endpoint (defaults to `${RAILS_BASE_URL}/.well-known/jwks.json`) | `https://app.groupize.com/.well-known/jwks.json` |
-| `JWT_ISSUER` | No | JWT issuer (default: `groupize`) | `groupize` |
-| `JWT_AUDIENCE` | No | JWT audience (default: `workflows`) | `workflows` |
 | `COOKIE_NAME` | No | JWT cookie name (default: `gpw_session`) | `gpw_session` |
-| `NEXT_PUBLIC_BASE_PATH` | No | Next.js base path (default: `/aime/aimeworkflows`) | `/aime/aimeworkflows` |
+| `NEXT_PUBLIC_BASE_PATH` | No | Next.js base path (default: `/aime`) | `/aime` |
 | `NODE_ENV` | Yes | Node environment | `production` |
 | `NEXT_PUBLIC_APP_URL` | No | Public app URL | `https://app.groupize.com` |
 | `DATABASE_ENVIRONMENT` | Yes | Database environment (`local` or `documentdb`) | `documentdb` |

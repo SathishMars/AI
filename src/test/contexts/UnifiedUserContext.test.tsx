@@ -159,7 +159,7 @@ describe('UnifiedUserContext', () => {
     mockEnv.env = {
       authMode: 'embedded',
       appUrl: 'http://localhost:3000',
-      basePath: '/aime/aimeworkflows',
+      basePath: '/aime',
       railsBaseUrl: 'http://rails.test',
     } as any;
 
