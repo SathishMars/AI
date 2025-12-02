@@ -103,6 +103,7 @@ export class NextRequest {
   private _cookies: MockCookies;
   nextUrl: URL;
   searchParams: URLSearchParams;
+  json: jest.Mock = jest.fn();
 
   constructor(input: Request | string | URL, init?: RequestInit) {
     let url: string;

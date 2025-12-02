@@ -5,11 +5,32 @@ const { TextEncoder, TextDecoder } = require('util');
 global.TextEncoder = TextEncoder;
 global.TextDecoder = TextDecoder;
 
+// Polyfill for TransformStream (required by AI SDK)
+if (typeof global.TransformStream === 'undefined') {
+  const { TransformStream } = require('stream/web');
+  global.TransformStream = TransformStream;
+}
+
 // Polyfill for URL and URLSearchParams if needed
 if (typeof global.URL === 'undefined') {
   global.URL = require('url').URL;
   global.URLSearchParams = require('url').URLSearchParams;
 }
+
+// Polyfill for window.matchMedia (required by Radix UI components)
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  value: jest.fn().mockImplementation(query => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: jest.fn(),
+    removeListener: jest.fn(),
+    addEventListener: jest.fn(),
+    removeEventListener: jest.fn(),
+    dispatchEvent: jest.fn(),
+  })),
+});
 
 // Minimal Request/Response mocks for Node.js environment
 // The actual NextRequest/NextResponse are mocked in __mocks__/next-server.ts

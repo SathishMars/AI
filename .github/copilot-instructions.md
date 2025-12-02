@@ -2,15 +2,16 @@
 
 ## Project Overview
 
-This is a Next.js 15+ embeddable frontend application designed to gradually migrate features from a Ruby on Rails monolith. The app is built to be embedded in RoR pages via script tags while maintaining independent functionality.
+This is a Next.js 16+ embeddable frontend application designed to gradually migrate features from a Ruby on Rails monolith. The app is built to be embedded in RoR pages via script tags while maintaining independent functionality.
 
 **Tech Stack:**
-- Next.js 15 with App Router and Turbopack
+- Next.js 16 with App Router and Turbopack (repository uses `next` v16.0.6)
+- React 19.2 with strict mode
 - TypeScript with strict mode
 - shadcn/ui for components (built on Radix UI primitives)
 - Tailwind CSS v4 for styling  
 - MongoDB 5.0 (local development) / AWS DocumentDB (production) with connection pooling
-- PostgreSQL database connection
+- AI SDK with OpenAI and Anthropic for AI processing
 - JWT-based session management
 
 ## Key Architecture Patterns
@@ -221,12 +222,12 @@ const templateId = uid(); // e.g. 'aB3k9ZpQ1x'
 - Always read the current code before applying updates and reconcile differences instead of overwriting custom logic.
 
 ### Build Commands
-- Development: `npm run dev` (uses Turbopack for fast builds)
-- Production: `npm run build` (uses Turbopack)
+- Development: `npm run dev` (uses Turbopack for fast builds - no --turbopack flag needed)
+- Production: `npm run build` (uses Turbopack - no --turbopack flag needed)
 - Linting: `npm run lint`
 
 ### File Organization (App Router Structure)
-- **App Router**: Use `src/app/` directory with Next.js 15 App Router conventions
+- **App Router**: Use `src/app/` directory with Next.js 16 App Router conventions
 - **Import path alias**: `@/*` maps to `./src/*`
 - **Components**: Reusable components go in `src/app/components/`
 - **Utilities**: Helper functions and utilities in `src/app/utils/`
@@ -262,14 +263,15 @@ const templateId = uid(); // e.g. 'aB3k9ZpQ1x'
 **MANDATORY**: When recommending or writing code, ALWAYS reference the EXACT versions specified in `package.json`. Never assume or use outdated API patterns.
 
 **Current Exact Versions (as of package.json) (MongoDB driver downgraded for AWS DocumentDB compatibility):**
-- **Next.js**: `15.5.4` - Use App Router patterns, Turbopack features
-- **React**: `19.1.0` - Follow React 19 patterns and hooks
-- **shadcn/ui**: Latest - Built on Radix UI primitives with Tailwind CSS
+- **Next.js**: `16.0.6` - Use App Router patterns, Turbopack features (matches `package.json`)
+- **React**: `19.2.0` - Follow React 19 patterns and hooks (matches `package.json`)
+- **React DOM**: `19.2.0` - Matches React version (matches `package.json`)
+- **shadcn/ui**: Latest - Built on Radix UI primitives with Tailwind CSS (v1.2+ components)
 - **Lucide React**: `^0.552.0` - Icon library for shadcn/ui components
 - **Tailwind CSS**: `^4` - Use Tailwind v4 syntax and features
-- **Zod**: `^3.23.8` - Use Zod v3 API for validation
+- **Zod**: `^4` - Use Zod v4 API for validation (matches `package.json`)
 - **TypeScript**: `^5` - Use TypeScript 5 features
-- **OpenAI SDK**: Latest via `@openai/agents@^0.1.10` - Use OpenAI API patterns
+- **AI SDK**: `@ai-sdk/react@^2.0.87`, `@ai-sdk/anthropic@^2.0.41` - Use latest AI SDK patterns
 - **MongoDB**: `mongodb@^5.9.0` - Driver aligned to MongoDB 5.x API surface (AWS DocumentDB compatible)
 - **json-rules-engine**: `^7.3.1` - Use v7 API for workflow rules
 - **react-md-editor**: `@uiw/react-md-editor@^4.0.8` - Use v4 API
@@ -279,7 +281,7 @@ const templateId = uid(); // e.g. 'aB3k9ZpQ1x'
 **Before Adding New Packages:**
 1. **Version Check**: Review `package.json` for exact versions FIRST
 2. **API Compatibility**: Ensure code examples match the installed versions
-3. **Dependency Conflicts**: Verify compatibility with current versions (especially Zod v3, React 19, shadcn/ui)
+3. **Dependency Conflicts**: Verify compatibility with current versions (especially Zod v4, React 19, shadcn/ui)
 4. **Bundle Size**: Consider impact for embedded contexts
 5. **Peer Dependencies**: Use `npm install --legacy-peer-deps` if needed
 6. **Documentation**: Update this list when adding major new dependencies
@@ -386,7 +388,7 @@ npm test
 4. Start with shadcn/ui components as the foundation
 5. Use Tailwind v4 for creating styled components and layout and spacing adjustments
 6. Place reusable components in `src/app/components/`
-7. Extract form validators to `src/app/validators/` (use Zod v3 API)
+7. Extract form validators to `src/app/validators/` (use Zod v4 API)
 8. Define TypeScript types in `src/app/types/`
 9. Ensure components work in embedded contexts
 10. For workflow components: Build and update workflow components using the AI chat functionality.

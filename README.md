@@ -1,15 +1,17 @@
 # Groupize Workflows
 
-A Next.js 15+ embeddable frontend application for workflow automation with AI-powered workflow generation. Built to gradually migrate features from a Ruby on Rails monolith while maintaining independent functionality.
+
+A Next.js 16+ embeddable frontend application for workflow automation with AI-powered workflow generation. Built to gradually migrate features from a Ruby on Rails monolith while maintaining independent functionality.
 
 ## 🚀 Tech Stack
 
-- **Next.js 15** with App Router and Turbopack
+- **Next.js 16** with App Router and Turbopack
+- **React 19.2** with strict mode
 - **TypeScript** with strict mode
-- **Material-UI (MUI) v7** for components
+- **shadcn/ui** for components (built on Radix UI primitives)
 - **Tailwind CSS v4** for styling
 - **MongoDB 5.0** (local development) / **AWS DocumentDB** (production)
-- **AI Integration**: OpenAI GPT and Anthropic Claude
+- **AI Integration**: OpenAI GPT and Anthropic Claude via AI SDK
 - **Workflow Engine**: json-rules-engine v7
 - **Testing**: Jest with React Testing Library
 
@@ -368,8 +370,8 @@ async function example() {
 ### Component Development
 
 1. Check existing components in `src/app/components/` before creating new ones
-2. Use MUI v7 components as foundation
-3. Use Tailwind v4 for additional styling
+2. Use shadcn/ui components (built on Radix UI) as foundation
+3. Use Tailwind v4 for styling and layout adjustments
 4. Ensure responsiveness (phone, tablet, desktop)
 5. Write comprehensive tests
 
@@ -476,7 +478,9 @@ DATABASE_ENVIRONMENT=documentdb
 ## 🔗 Additional Resources
 
 - [Next.js Documentation](https://nextjs.org/docs)
-- [Material-UI Documentation](https://mui.com/)
+- [React 19 Documentation](https://react.dev/)
+- [shadcn/ui Documentation](https://ui.shadcn.com/)
+- [Radix UI Documentation](https://www.radix-ui.com/)
 - [MongoDB Documentation](https://docs.mongodb.com/)
 - [TypeScript Documentation](https://www.typescriptlang.org/docs/)
 - [Jest Testing Framework](https://jestjs.io/docs/getting-started)
