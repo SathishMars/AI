@@ -5,6 +5,8 @@ import { workflowTemplateStarter } from '@/app/data/workflow-template-starter';
 import { WorkflowTemplateSchema, WorkflowTemplate } from '@/app/types/workflowTemplate';
 import ShortUniqueId from 'short-unique-id';
 import AimeWorkflowMessagesDBUtil from '@/app/utils/aimeWorkflowMessagesDBUtil';
+import { verifyUserToken, JWTVerificationError } from '@/app/lib/jwt-verifier';
+import { env } from '@/app/lib/env';
 
 // Reusable ShortUniqueId instance (10 chars, alphanum) — follow repo policy
 const uid = new ShortUniqueId({ length: 10, dictionary: 'alphanum' });
@@ -126,12 +128,44 @@ export async function GET(
 /**
  * PUT /api/workflow-templates/[templateId]
  * Update an existing workflow template
+ * 
+ * Requires valid JWT token in embedded mode
  */
 export async function PUT(
   request: NextRequest,
   { params }: RouteParams
 ): Promise<NextResponse> {
   try {
+    // Validate JWT token in embedded mode
+    if (env.authMode === 'embedded') {
+      const token = request.cookies.get(env.cookieName)?.value;
+      
+      if (!token) {
+        console.error('[PUT /api/workflow-templates/[templateId]] No JWT token found');
+        return NextResponse.json(
+          { error: 'Authentication required' },
+          { status: 401 }
+        );
+      }
+
+      try {
+        await verifyUserToken(token);
+      } catch (error) {
+        if (error instanceof JWTVerificationError) {
+          console.error('[PUT /api/workflow-templates/[templateId]] JWT verification failed:', error.code, error.message);
+          return NextResponse.json(
+            { error: 'Invalid or expired authentication token', code: error.code },
+            { status: 401 }
+          );
+        }
+        console.error('[PUT /api/workflow-templates/[templateId]] Unexpected JWT error:', error);
+        return NextResponse.json(
+          { error: 'Authentication failed' },
+          { status: 401 }
+        );
+      }
+    }
+
     const { id: templateId } = await params;
     const body = await request.text();
 
@@ -194,12 +228,44 @@ export async function PUT(
 /**
  * POST /api/workflow-templates/[templateId]
  * Create a draft from a published template
+ * 
+ * Requires valid JWT token in embedded mode
  */
 export async function POST(
   request: NextRequest,
   { params }: RouteParams
 ): Promise<NextResponse> {
   try {
+    // Validate JWT token in embedded mode
+    if (env.authMode === 'embedded') {
+      const token = request.cookies.get(env.cookieName)?.value;
+      
+      if (!token) {
+        console.error('[POST /api/workflow-templates/[templateId]] No JWT token found');
+        return NextResponse.json(
+          { error: 'Authentication required' },
+          { status: 401 }
+        );
+      }
+
+      try {
+        await verifyUserToken(token);
+      } catch (error) {
+        if (error instanceof JWTVerificationError) {
+          console.error('[POST /api/workflow-templates/[templateId]] JWT verification failed:', error.code, error.message);
+          return NextResponse.json(
+            { error: 'Invalid or expired authentication token', code: error.code },
+            { status: 401 }
+          );
+        }
+        console.error('[POST /api/workflow-templates/[templateId]] Unexpected JWT error:', error);
+        return NextResponse.json(
+          { error: 'Authentication failed' },
+          { status: 401 }
+        );
+      }
+    }
+
     const { id: templateId } = await params;
     const bodyText = await request.text();
 

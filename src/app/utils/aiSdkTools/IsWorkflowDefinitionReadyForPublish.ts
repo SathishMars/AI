@@ -19,12 +19,22 @@ const isWorkflowDefinitionReadyForPublishTool = async (
     const startTime = Date.now();
     console.log('[isWorkflowDefinitionReadyForPublishTool] called with account:', account, 'organization:', organization);
     
-    if (!workflowDefinition || typeof workflowDefinition !== 'object') {
-        throw new Error('workflowDefinition is required and must be an object');
+    // Normalize input: accept either an object or a JSON string
+    let wd: unknown = workflowDefinition;
+    if (typeof wd === 'string') {
+        try {
+            wd = JSON.parse(wd);
+        } catch {
+            throw new Error('workflowDefinition string could not be parsed as JSON.');
+        }
+    }
+    
+    if (!wd || typeof wd !== 'object') {
+        throw new Error('workflowDefinition is required and must be an object or valid JSON string');
     }
 
     // Let us first validate that the received workflowDefinition conforms to the schema    
-    const parsedInput = WorkflowDefinitionSchema.parse(workflowDefinition);
+    const parsedInput = WorkflowDefinitionSchema.parse(wd);
     const passedWorkflowTemplate: WorkflowTemplate = {
         id: 'temp-id-for-validation',
         version: '1.0.0',
@@ -49,10 +59,14 @@ const isWorkflowDefinitionReadyForPublishTool = async (
 
 };
 
+// To avoid generating complex nested JSON Schemas (which the OpenAI function
+// registration enforces strictly), accept a JSON string for the tool parameter.
+// The runtime validator will still accept objects when called directly, but
+// the tool registration uses a simple string schema which is compatible with the API.
 const isWorkflowDefinitionReadyForPublishSchema = z.object({
     account: z.string().min(1).describe('Account identifier (required)'),
     organization: z.string().optional().nullable().describe('Organization identifier (optional)'),
-    workflowDefinition: WorkflowDefinitionSchema.describe('The workflow template object to validate for publish readiness (required)'),
+    workflowDefinition: z.string().describe('The workflow definition as a JSON string to validate for publish readiness (required)'),
 });
 
 /**
@@ -80,7 +94,7 @@ const isWorkflowDefinitionReadyForPublishSchema = z.object({
 export const isWorkflowDefinitionReadyForPublishToolExport = tool({
     description:
         'Validates whether a given workflow definition is ready to be published. ' +
-        'This tool expects an object input with account (required), workflowDefinition (required), and organization (optional). ' +
+        'This tool expects an object input with account (required), workflowDefinition as a JSON string (required), and organization (optional). ' +
         'Returns an object with 2 properties. `valid` indicating if the workflow is ready for publish and an array of `errors` listing issues preventing publish.',
     
     inputSchema: isWorkflowDefinitionReadyForPublishSchema,
@@ -90,7 +104,7 @@ export const isWorkflowDefinitionReadyForPublishToolExport = tool({
             const result = await isWorkflowDefinitionReadyForPublishTool({ 
                 account, 
                 organization, 
-                workflowDefinition: workflowDefinition as WorkflowDefinition
+                workflowDefinition: workflowDefinition as unknown as WorkflowDefinition
             });
             return result;
         } catch (err) {

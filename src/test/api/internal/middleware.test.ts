@@ -54,7 +54,7 @@ describe('Service Auth Middleware', () => {
     it('should verify valid service token and return context', async () => {
       const mockClaims = {
         iss: 'groupize',
-        aud: 'ai-api',
+        aud: 'workflows-api',
         sub: 'service:rails',
         exp: Math.floor(Date.now() / 1000) + 3600,
         iat: Math.floor(Date.now() / 1000),
@@ -180,7 +180,7 @@ describe('Service Auth Middleware', () => {
     it('should handle optional headers gracefully', async () => {
       const mockClaims = {
         iss: 'groupize',
-        aud: 'ai-api',
+        aud: 'workflows-api',
         sub: 'service:rails',
         exp: Math.floor(Date.now() / 1000) + 3600,
         iat: Math.floor(Date.now() / 1000),
@@ -217,7 +217,7 @@ describe('Service Auth Middleware', () => {
     it('should call handler with context when auth succeeds', async () => {
       const mockClaims = {
         iss: 'groupize',
-        aud: 'ai-api',
+        aud: 'workflows-api',
         sub: 'service:rails',
         exp: Math.floor(Date.now() / 1000) + 3600,
         iat: Math.floor(Date.now() / 1000),

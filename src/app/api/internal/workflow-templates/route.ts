@@ -2,7 +2,7 @@
  * Internal Workflow Templates API
  * 
  * Service-to-service endpoints for Rails to call Next.js.
- * Protected by service token authentication (aud="ai-api").
+ * Protected by service token authentication (aud="workflows-api").
  * 
  * Purpose:
  * - Backend automation (stable contract)
@@ -53,7 +53,7 @@ export const GET = withServiceAuth(async (request: NextRequest, context): Promis
  * POST /api/internal/workflow-templates
  * Create a new workflow template (Rails → Next.js)
  * 
- * Authentication: Service token (aud="ai-api", sub="service:rails")
+ * Authentication: Service token (aud="workflows-api", sub="service:rails")
  * Authorization: Account/org from verified token claims
  */
 export const POST = withServiceAuth(async (request: NextRequest, context): Promise<NextResponse> => {

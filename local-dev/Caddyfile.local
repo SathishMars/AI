@@ -11,7 +11,7 @@
 http://groupize.local {
     # Next.js Workflows app at /aime/*
     handle /aime/* {
-        reverse_proxy localhost:3001 {
+        reverse_proxy 127.0.0.1:3001 {
             # Forward original headers
             header_up Host {host}
             header_up X-Real-IP {remote}
@@ -32,16 +32,16 @@ http://groupize.local {
     
     # Next.js internal routes (_next, __, etc.)
     handle /_next/* {
-        reverse_proxy localhost:3001
+        reverse_proxy 127.0.0.1:3001
     }
     
     handle /__* {
-        reverse_proxy localhost:3001
+        reverse_proxy 127.0.0.1:3001
     }
     
     # Everything else goes to Rails
     handle {
-        reverse_proxy localhost:3000 {
+        reverse_proxy 127.0.0.1:3000 {
             header_up Host {host}
             header_up X-Real-IP {remote}
             header_up X-Forwarded-For {remote}

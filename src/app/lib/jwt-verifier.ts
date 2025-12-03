@@ -7,8 +7,8 @@
    * - All tokens verified via Rails JWKS endpoint
    * 
    * Token Types:
-   * 1. User Tokens (aud="ai") - Browser → Next.js
-   * 2. Service Tokens (aud="ai-api") - Rails → Next.js /api/internal/**
+   * 1. User Tokens (aud="workflows") - Browser → Next.js
+   * 2. Service Tokens (aud="workflows-api") - Rails → Next.js /api/internal/**
 */
 
 import { createRemoteJWKSet, jwtVerify, decodeJwt, JWTPayload, JWTVerifyResult } from 'jose';
@@ -102,7 +102,7 @@ export async function verifyUserToken(token: string): Promise<UserJWTClaims> {
     
     const result: JWTVerifyResult = await jwtVerify(token, JWKS, {
       issuer: 'groupize',
-      audience: 'ai', // User tokens
+      audience: 'workflows',
       clockTolerance: 60, // 60 seconds clock skew tolerance
     });
     
@@ -148,7 +148,7 @@ export async function verifyServiceToken(token: string): Promise<ServiceJWTClaim
     
     const result: JWTVerifyResult = await jwtVerify(token, JWKS, {
       issuer: 'groupize',
-      audience: 'ai-api', // Service tokens
+      audience: 'workflows-api',
       subject: 'service:rails',
       clockTolerance: 60,
     });

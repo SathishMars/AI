@@ -69,7 +69,7 @@ describe('JWT Verifier', () => {
         mockJWKS,
         expect.objectContaining({
           issuer: 'groupize',
-          audience: 'ai',
+          audience: 'workflows',
           clockTolerance: 60,
         })
       );
@@ -188,7 +188,7 @@ describe('JWT Verifier', () => {
     it('should verify a valid service token', async () => {
       const mockClaims = {
         iss: 'groupize',
-        aud: 'ai-api',
+        aud: 'workflows-api',
         sub: 'service:rails',
         exp: Math.floor(Date.now() / 1000) + 3600,
         iat: Math.floor(Date.now() / 1000),
@@ -211,14 +211,14 @@ describe('JWT Verifier', () => {
       expect(claims.context.user_id).toBe('user123');
       expect(claims.context.account_id).toBe('account123');
       expect(claims.iss).toBe('groupize');
-      expect(claims.aud).toBe('ai-api');
+      expect(claims.aud).toBe('workflows-api');
       expect(claims.sub).toBe('service:rails');
       expect(mockJwtVerify).toHaveBeenCalledWith(
         'valid.service.token',
         mockJWKS,
         expect.objectContaining({
           issuer: 'groupize',
-          audience: 'ai-api',
+          audience: 'workflows-api',
           subject: 'service:rails',
           clockTolerance: 60,
         })
