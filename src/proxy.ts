@@ -61,7 +61,7 @@ function buildApiUrl(request: NextRequest, accountFromQuery: string | null, orgF
  * 
  * Both modes inject user context headers for downstream API routes.
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   try {
     const pathname = request.nextUrl.pathname;
     console.log('[Auth Middleware] pathname:', pathname, 'basePath:', env.basePath, 'mode:', env.authMode);
