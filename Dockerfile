@@ -20,10 +20,12 @@ RUN npm install
 FROM base AS builder
 ENV NODE_ENV=production
 
+
 # optout of tracking telemetry from nextjs
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Build the Next.js app (ensure next.config.js has output: 'standalone')
+
 RUN npm run build
 
 # ---- Stage 3: Production Runtime ----
@@ -32,9 +34,10 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3000
-
-# Ensures accessible by IP address, not internal DNS
 ENV HOST=0.0.0.0
+
+# (Optional) Pass runtime base path if needed for dynamic overrides
+ENV NEXT_PUBLIC_BASE_PATH=${BASE_PATH}
 
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs \
