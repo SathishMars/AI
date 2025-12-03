@@ -22,11 +22,9 @@ export const serverApiFetch = async (
     return fetch(input, init);
   }
 
-  // Construct absolute URL using appUrl
   const path = `${env.basePath}${input}`;
   const url = new URL(path, env.appUrl);
 
-  // Forward cookies from the Next.js request context if available
   const cookieStore = await cookies();
   const sessionCookie = cookieStore.get('gpw_session');
   

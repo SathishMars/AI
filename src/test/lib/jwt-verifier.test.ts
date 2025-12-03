@@ -63,7 +63,7 @@ describe('JWT Verifier', () => {
       expect(claims.context.account_id).toBe('account123');
       expect(claims.context.organization_id).toBe('org456');
       expect(claims.iss).toBe('groupize');
-      expect(claims.aud).toBe('ai');
+      expect(claims.aud).toBe('workflows');
       expect(mockJwtVerify).toHaveBeenCalledWith(
         'valid.token.here',
         mockJWKS,
