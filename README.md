@@ -162,7 +162,7 @@ NEXT_PUBLIC_ENABLE_MOCK_DATA=true
 
 ### 4. Development Server
 
-The application supports two development modes:
+The application supports three development modes:
 
 #### Standalone Mode (Frontend-Only Development)
 
@@ -186,9 +186,9 @@ npm run dev
 AUTH_MODE=standalone  # Set automatically by npm run dev
 ```
 
-#### Embedded Mode (Full Stack Development)
+#### Local Embedded Mode (Full Stack Development)
 
-For development with Rails authentication and JWT verification:
+For development with local Rails authentication and JWT verification:
 
 ```bash
 npm run dev:embedded
@@ -197,7 +197,7 @@ npm run dev:embedded
 **Features:**
 - Runs on **port 3001**
 - **Verifies JWT tokens** via JWKS endpoint from Rails
-- Requires Rails running at `RAILS_BASE_URL`
+- Requires Rails running locally at `NEXT_PUBLIC_RAILS_BASE_URL`
 - Full SSO experience with Rails
 - Redirects to Rails login if unauthorized
 
@@ -206,65 +206,88 @@ npm run dev:embedded
 **Environment Variables (Required):**
 ```bash
 AUTH_MODE=embedded
-RAILS_BASE_URL=http://groupize.local
 NEXT_PUBLIC_RAILS_BASE_URL=http://groupize.local
 COOKIE_NAME=gpw_session
 ```
 
 **Setup Steps:**
-1. Start Rails: `cd reg_app && rails s -p 3000`
-2. Start Next.js: `cd Workflows && npm run dev:embedded`
-3. Configure nginx (see section 5 below)
+1. Configure nginx proxy (see section 5 below)
+2. Start Rails: `cd ../reg_app && rails s -p 3000`
+3. Start Next.js: `npm run dev:embedded`
 4. Access via: `http://groupize.local/aime/`
+
+#### Split-Routing Mode (Real Testing API + Local Next.js)
+
+**NEW!** Develop Next.js locally while using the real testing environment's Rails API:
+
+**Features:**
+- Runs on **port 3000**
+- **No local Rails needed** - uses real testing Rails API
+- Real authentication and JWT tokens from testing environment
+- Real testing data
+- Faster setup - focus on Next.js development only
+
+**Access:** `https://testing.app.groupize.com/aime/` (requires nginx setup)
+
+**Setup Steps:**
+1. Configure nginx proxy for split-routing (see section 5 below)
+2. Create `.env.testing` from `.env.example` with split-routing values
+3. Start Next.js: `npm run dev` (automatically uses `.env.testing` if present)
+4. Access via: `https://testing.app.groupize.com/aime/`
 
 > **Note**: See `docs/ENV_VARIABLES.md` for complete environment variable reference.
 
 ### 5. Nginx Proxy Setup (Integration with Rails)
 
-When running alongside the Rails application, use nginx to proxy requests:
+When running alongside the Rails application (either locally or with split-routing), use nginx to proxy requests.
 
-#### Setup Steps
+**📖 For complete setup instructions, see: [`local-dev/SETUP_GUIDE.md`](./local-dev/SETUP_GUIDE.md)**
 
-   ```bash
-   # macOS (Homebrew nginx)
-   cp nginx.example.conf /opt/homebrew/etc/nginx/servers/groupize.local.conf
-   
-   # Linux
-   sudo cp nginx.example.conf /etc/nginx/sites-available/groupize.local
-   sudo ln -s /etc/nginx/sites-available/groupize.local /etc/nginx/sites-enabled/
-   
-   # Test configuration and restart nginx
-   nginx -t && brew services restart nginx  # macOS
-   # OR
-   sudo nginx -t && sudo systemctl restart nginx  # Linux
-   ```
+#### Quick Overview
 
-3. **Update your hosts file**:
-   
-   ```bash
-   # Add to /etc/hosts
-   echo "127.0.0.1 groupize.local" | sudo tee -a /etc/hosts
-   ```
+The application supports two proxy modes:
 
-4. **Access the application**:
-   
-   - Rails app: `http://groupize.local/`
-   - Next.js Workflows: `http://groupize.local/aime/`
-   - New workflow: `http://groupize.local/aime/workflows/configure/new/`
+1. **Local Embedded** - Both Rails and Next.js running locally
+   - nginx config: `local-dev/nginx.local.conf`
+   - URL: `http://groupize.local/aime/`
+   - Rails on port 3000, Next.js on port 3001
+
+2. **Split-Routing** - Local Next.js with real testing Rails API
+   - nginx config: `local-dev/nginx.testing.conf` (create from `nginx.testing.example`)
+   - URL: `https://testing.app.groupize.com/aime/`
+   - Next.js on port 3000, Rails API at testing environment
+
+#### Quick Start
+
+```bash
+# One-time setup
+cd local-dev
+
+# For Local Embedded mode:
+cp nginx.local.conf /opt/homebrew/etc/nginx/servers/groupize.local.conf
+
+# For Split-Routing mode:
+cp nginx.testing.example nginx.testing.conf
+# Edit nginx.testing.conf to replace YOUR_USERNAME with your username
+cp nginx.testing.conf /opt/homebrew/etc/nginx/servers/testing.app.groupize.com.conf
+
+# Restart nginx
+brew services restart nginx
+```
 
 #### URL Structure
 
 The nginx proxy uses Next.js `basePath` configuration:
 
-- User visits: `http://groupize.local/aime/*`
-- nginx passes full path to Next.js on port 3001
+- User visits: `http://groupize.local/aime/*` or `https://testing.app.groupize.com/aime/*`
+- nginx passes full path to Next.js
 - Next.js configured with `basePath: '/aime'` in `next.config.ts`
-- Everything else → Rails app (port 3000)
+- Everything else → Rails app
 
 **Example:**
 ```
 User visits:     http://groupize.local/aime/workflows/configure/123
-nginx proxies:   /aime/workflows/configure/123 → Next.js (port 3001)
+nginx proxies:   /aime/workflows/configure/123 → Next.js
 Next.js serves:  src/app/workflows/configure/[id]/page.tsx
 ```
 
@@ -275,14 +298,7 @@ Next.js serves:  src/app/workflows/configure/[id]/page.tsx
 - ✅ Shared authentication via forwarded cookies
 - ✅ Future micro-apps: `/aime/approvals/`, `/aime/analytics/`, etc.
 
-See `nginx.example.conf` for the complete configuration with detailed comments.
-
-#### Development Workflow
-
-1. Start Rails: `cd /path/to/reg_app && rails s` (runs on port 3000)
-2. Start Next.js: `cd /path/to/Workflows && npm run dev:embedded` (runs on port 3001)
-3. Start nginx: `brew services start nginx`
-4. Access via: `http://groupize.local/aime/`
+For detailed setup, troubleshooting, and switching between modes, see [`local-dev/SETUP_GUIDE.md`](./local-dev/SETUP_GUIDE.md).
 
 ## 🧪 Testing
 

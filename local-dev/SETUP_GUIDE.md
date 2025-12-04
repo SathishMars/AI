@@ -60,7 +60,7 @@ Run both Rails and Next.js locally on your machine.
 
 ```bash
 # Copy nginx config to nginx servers directory
-cd /Users/mdarwin/Projects/Workflows/local-dev
+cd local-dev
 cp nginx.local.conf /opt/homebrew/etc/nginx/servers/groupize.local.conf
 
 # Start nginx
@@ -75,11 +75,11 @@ brew services restart nginx
 brew services restart nginx
 
 # Terminal 1: Start Rails (port 3000)
-cd /Users/mdarwin/Projects/reg_app
+cd ../reg_app  # Adjust path to your Rails app location
 bin/rails server -p 3000
 
 # Terminal 2: Start Next.js (port 3001)
-cd /Users/mdarwin/Projects/Workflows
+cd ..  # Back to Workflows root
 npm run dev -- -p 3001
 ```
 
@@ -140,8 +140,6 @@ ls -la
 Create personal copies of the templates:
 
 ```bash
-cd /Users/mdarwin/Projects/Workflows
-
 # 1. Create nginx config
 cd local-dev
 cp nginx.testing.example nginx.testing.conf
@@ -161,7 +159,6 @@ cp .env.example .env.testing
 # Edit to use split-routing values (see comments in .env.example):
 nano .env.testing
 # Update these values:
-#   RAILS_BASE_URL=https://104.18.10.206
 #   NEXT_PUBLIC_RAILS_BASE_URL=https://104.18.10.206
 #   NEXT_PUBLIC_APP_URL=https://testing.app.groupize.com
 # Keep your API keys and other secrets
@@ -169,7 +166,7 @@ nano .env.testing
 
 **Note:** If testing.app.groupize.com's IP ever changes:
 - Update line 109 in `nginx.testing.conf`
-- Update the RAILS_BASE_URL values in `.env.testing`
+- Update the NEXT_PUBLIC_RAILS_BASE_URL values in `.env.testing`
 - See `.env.example` for instructions on finding the new IP
 - Reinstall the config: `cp nginx.testing.conf /opt/homebrew/etc/nginx/servers/testing.app.groupize.com.conf`
 - Restart nginx: `brew services restart nginx`
@@ -181,7 +178,6 @@ nano .env.testing
 brew services restart nginx
 
 # Start Next.js with testing environment config
-cd /Users/mdarwin/Projects/Workflows
 npm run dev
 # Automatically uses .env.testing if it exists (points to real testing Rails API)
 ```
@@ -215,7 +211,7 @@ brew services stop nginx
 
 ```bash
 # Make sure local config is installed
-cd /Users/mdarwin/Projects/Workflows/local-dev
+cd local-dev
 cp nginx.local.conf /opt/homebrew/etc/nginx/servers/groupize.local.conf
 
 # Remove testing config (if present)
@@ -231,7 +227,7 @@ brew services restart nginx
 
 ```bash
 # Make sure testing config is installed
-cd /Users/mdarwin/Projects/Workflows/local-dev
+cd local-dev
 cp nginx.testing.conf /opt/homebrew/etc/nginx/servers/testing.app.groupize.com.conf
 
 # Remove local config (if present)
@@ -347,7 +343,6 @@ ps aux | grep nginx
 
 **For split-routing, start Next.js:**
 ```bash
-cd /Users/mdarwin/Projects/Workflows
 npm run dev
 ```
 
@@ -380,13 +375,10 @@ If you see a Rails "Blocked hosts" error when visiting `/aime/`, it means your N
 **Solution:** Make sure you have `.env.testing` configured:
 
 ```bash
-cd /Users/mdarwin/Projects/Workflows
-
 # If .env.testing doesn't exist, create it from .env.example
 cp .env.example .env.testing
 
 # Update for split-routing (see comments in .env.example):
-#   RAILS_BASE_URL=https://104.18.10.206
 #   NEXT_PUBLIC_RAILS_BASE_URL=https://104.18.10.206
 #   NEXT_PUBLIC_APP_URL=https://testing.app.groupize.com
 nano .env.testing
@@ -414,12 +406,13 @@ nslookup testing.app.groupize.com
 sudo nano /etc/hosts
 
 # Update nginx.testing.conf
-nano /Users/mdarwin/Projects/Workflows/local-dev/nginx.testing.conf
+cd local-dev
+nano nginx.testing.conf
 # Find line 109: proxy_pass https://104.18.10.206;
 # Replace with new IP
 
 # Reinstall config and restart nginx
-cp /Users/mdarwin/Projects/Workflows/local-dev/nginx.testing.conf /opt/homebrew/etc/nginx/servers/testing.app.groupize.com.conf
+cp nginx.testing.conf /opt/homebrew/etc/nginx/servers/testing.app.groupize.com.conf
 brew services restart nginx
 ```
 
@@ -432,7 +425,7 @@ nginx provides more stable WebSocket connections than Caddy for Next.js HMR. If 
 tail -f /opt/homebrew/var/log/nginx/error.log
 
 # Ensure you're using the latest config
-cd /Users/mdarwin/Projects/Workflows/local-dev
+cd local-dev
 cp nginx.local.conf /opt/homebrew/etc/nginx/servers/groupize.local.conf
 brew services restart nginx
 ```

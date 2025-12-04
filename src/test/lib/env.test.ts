@@ -52,14 +52,6 @@ describe('Environment Configuration', () => {
       expect(env.railsBaseUrl).toBe('https://app.groupize.com');
     });
 
-    it('should fallback to RAILS_BASE_URL when NEXT_PUBLIC_RAILS_BASE_URL is not set', () => {
-      delete process.env.NEXT_PUBLIC_RAILS_BASE_URL;
-      process.env.RAILS_BASE_URL = 'https://rails.groupize.com';
-      jest.resetModules();
-      const { env } = require('@/app/lib/env');
-      expect(env.railsBaseUrl).toBe('https://rails.groupize.com');
-    });
-
     it('should default to http://groupize.local in development', () => {
       delete process.env.NEXT_PUBLIC_RAILS_BASE_URL;
       delete process.env.RAILS_BASE_URL;

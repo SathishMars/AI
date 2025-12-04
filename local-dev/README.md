@@ -14,7 +14,7 @@
 
 ```bash
 # Install nginx config
-cd /Users/mdarwin/Projects/Workflows/local-dev
+cd local-dev
 cp nginx.local.conf /opt/homebrew/etc/nginx/servers/groupize.local.conf
 brew services restart nginx
 
@@ -26,7 +26,7 @@ brew services restart nginx
 
 ```bash
 # Set up nginx config (one-time)
-cd /Users/mdarwin/Projects/Workflows/local-dev
+cd local-dev
 cp nginx.testing.example nginx.testing.conf
 nano nginx.testing.conf
 # Replace YOUR_USERNAME with your actual username

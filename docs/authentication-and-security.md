@@ -176,7 +176,7 @@ useJwtRenewal({
 
 Rails exposes public keys at `/.well-known/jwks.json`:
 
-- **URL**: `${RAILS_BASE_URL}/.well-known/jwks.json`
+- **URL**: `${NEXT_PUBLIC_RAILS_BASE_URL}/.well-known/jwks.json`
 - **Cache-Control**: `public, max-age=300, stale-while-revalidate=60`
 - **ETag**: For efficient revalidation
 - **Format**: Standard JWKS (RFC 7517)
@@ -404,7 +404,7 @@ if (result.success) {
 
 ```bash
 # Check JWKS endpoint is accessible
-curl ${RAILS_BASE_URL}/.well-known/jwks.json
+curl ${NEXT_PUBLIC_RAILS_BASE_URL}/.well-known/jwks.json
 
 # Should return JSON with keys array
 {
@@ -438,9 +438,9 @@ curl ${RAILS_BASE_URL}/.well-known/jwks.json
 
 ### Token Verification Fails
 
-1. **Check JWKS endpoint**: `curl ${RAILS_BASE_URL}/.well-known/jwks.json`
+1. **Check JWKS endpoint**: `curl ${NEXT_PUBLIC_RAILS_BASE_URL}/.well-known/jwks.json`
 2. **Check token claims**: Decode at jwt.io
-3. **Check environment**: Is `RAILS_BASE_URL` correct?
+3. **Check environment**: Is `NEXT_PUBLIC_RAILS_BASE_URL` correct?
 4. **Check Rails logs**: Look for JWT signing errors
 5. **Check KMS key**: Is `JWT_GSSO_GROUPIZE_KEY_ID` set in Rails?
 
