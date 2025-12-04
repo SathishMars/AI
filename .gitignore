@@ -34,7 +34,6 @@ yarn-error.log*
 # env files (exclude actual env files, but include example/template files)
 .env
 .env.local
-.env.testing
 .env.development
 .env.staging
 .env.production
@@ -62,6 +61,3 @@ user-stories/
 
 /reports/
 
-# Local dev proxy configs with personal paths (keep .example files in git)
-/local-dev/Caddyfile.testing
-/local-dev/*.local.personal
