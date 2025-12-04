@@ -112,7 +112,7 @@ export function useJwtRenewal(options: JwtRenewalOptions) {
   }, [calculateRenewalDelay, onRenewalSuccess, onRenewalFailure]);
 
   useEffect(() => {
-    if (env.authMode !== 'embedded' || !enabled || !expiresAt) return;
+    if (!enabled || !expiresAt) return;
 
     const expiryTime = new Date(expiresAt).getTime();
     if (isNaN(expiryTime)) return;

@@ -1,12 +1,7 @@
-export type AuthMode = 'embedded' | 'standalone';
-
 /**
  * Environment configuration interface
  */
 interface EnvironmentConfig {
-  // Authentication
-  authMode: AuthMode;
-  
   // Rails/Backend URLs
   railsBaseUrl: string;
   jwksUrl: string; // Auto-derived from railsBaseUrl
@@ -32,7 +27,6 @@ interface EnvironmentConfig {
   // Feature flags
   isDevelopment: boolean;
   isProduction: boolean;
-  isStandalone: boolean;
 }
 
 
@@ -48,23 +42,10 @@ function getOptionalEnv(key: string): string | undefined {
   return process.env[key];
 }
 
-function getAuthMode(): AuthMode {
-  const mode = process.env.AUTH_MODE?.toLowerCase();
-  
-  if (mode === 'standalone') {
-    return 'standalone';
-  }
-  
-  return 'embedded';
-}
-
 function buildConfig(): EnvironmentConfig {
   const nodeEnv = getEnv('NODE_ENV', 'development');
   const isDevelopment = nodeEnv === 'development';
   const isProduction = nodeEnv === 'production';
-  const authMode = getAuthMode();
-  const isStandalone = authMode === 'standalone';
-  
   const railsBaseUrl = getEnv('NEXT_PUBLIC_RAILS_BASE_URL', isDevelopment ? 'http://groupize.local' : '');
   
   const jwksUrl = `${railsBaseUrl}/.well-known/jwks.json`;
@@ -81,7 +62,6 @@ function buildConfig(): EnvironmentConfig {
   const mongoDbUri = getOptionalEnv('MONGODB_URI');
   
   return {
-    authMode,
     railsBaseUrl,
     jwksUrl,
     cookieName,
@@ -96,7 +76,6 @@ function buildConfig(): EnvironmentConfig {
     mongoDbUri,
     isDevelopment,
     isProduction,
-    isStandalone,
   };
 }
 

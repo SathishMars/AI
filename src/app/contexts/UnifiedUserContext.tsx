@@ -393,7 +393,7 @@ export function UnifiedUserProvider({ children, initialCurrentUser }: UnifiedUse
     expiresAt: sessionExpiresAt,
     onRenewalSuccess: handleRenewalSuccess,
     onRenewalFailure: handleRenewalFailure,
-    enabled: env.authMode === 'embedded' && !!sessionExpiresAt,
+    enabled: !!sessionExpiresAt,
   });
 
   // Permission helper functions

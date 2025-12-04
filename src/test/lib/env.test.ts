@@ -12,38 +12,6 @@ describe('Environment Configuration', () => {
     (process.env as any) = originalEnv;
   });
 
-  describe('Auth Mode', () => {
-    it('should default to embedded mode when AUTH_MODE is not set', () => {
-      delete process.env.AUTH_MODE;
-      jest.resetModules();
-      const { env } = require('@/app/lib/env');
-      expect(env.authMode).toBe('embedded');
-    });
-
-    it('should use standalone mode when AUTH_MODE=standalone', () => {
-      process.env.AUTH_MODE = 'standalone';
-      jest.resetModules();
-      const { env } = require('@/app/lib/env');
-      expect(env.authMode).toBe('standalone');
-      expect(env.isStandalone).toBe(true);
-    });
-
-    it('should use embedded mode when AUTH_MODE=embedded', () => {
-      process.env.AUTH_MODE = 'embedded';
-      jest.resetModules();
-      const { env } = require('@/app/lib/env');
-      expect(env.authMode).toBe('embedded');
-      expect(env.isStandalone).toBe(false);
-    });
-
-    it('should be case insensitive', () => {
-      process.env.AUTH_MODE = 'STANDALONE';
-      jest.resetModules();
-      const { env } = require('@/app/lib/env');
-      expect(env.authMode).toBe('standalone');
-    });
-  });
-
   describe('Rails Base URL', () => {
     it('should use NEXT_PUBLIC_RAILS_BASE_URL when set', () => {
       process.env.NEXT_PUBLIC_RAILS_BASE_URL = 'https://app.groupize.com';

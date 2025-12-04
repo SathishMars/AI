@@ -157,7 +157,6 @@ describe('UnifiedUserContext', () => {
     
     // Default env mock
     (mockEnv as any).env = {
-      authMode: 'embedded',
       appUrl: 'http://localhost:3000',
       basePath: '/aime',
       railsBaseUrl: 'http://rails.test',
@@ -955,8 +954,7 @@ describe('UnifiedUserContext', () => {
   });
 
   describe('JWT Renewal Integration', () => {
-    it('should setup JWT renewal in embedded mode', () => {
-      mockEnv.env.authMode = 'embedded';
+    it('should setup JWT renewal', () => {
       const currentUser = createMockCurrentUser();
 
       renderHook(() => useUnifiedUserContext(), {
@@ -971,23 +969,7 @@ describe('UnifiedUserContext', () => {
       });
     });
 
-    it('should not setup JWT renewal in standalone mode', () => {
-      mockEnv.env.authMode = 'standalone';
-      const currentUser = createMockCurrentUser();
-
-      renderHook(() => useUnifiedUserContext(), {
-        wrapper: createWrapper(currentUser),
-      });
-
-      expect(mockUseJwtRenewal).toHaveBeenCalledWith(
-        expect.objectContaining({
-          enabled: false,
-        })
-      );
-    });
-
     it('should handle JWT renewal success', () => {
-      mockEnv.env.authMode = 'embedded';
       const currentUser = createMockCurrentUser();
       let renewalSuccessCallback: (newExpiresAt: string) => void;
 
@@ -1008,7 +990,6 @@ describe('UnifiedUserContext', () => {
     });
 
     it('should handle JWT renewal failure with redirect', () => {
-      mockEnv.env.authMode = 'embedded';
       const currentUser = createMockCurrentUser();
       let renewalFailureCallback: (error: { code: string; message: string; shouldRedirect: boolean }) => void;
 
@@ -1030,7 +1011,6 @@ describe('UnifiedUserContext', () => {
     });
 
     it('should handle JWT renewal failure without redirect', () => {
-      mockEnv.env.authMode = 'embedded';
       const currentUser = createMockCurrentUser();
       let renewalFailureCallback: (error: { code: string; message: string; shouldRedirect: boolean }) => void;
 

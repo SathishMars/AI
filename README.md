@@ -182,10 +182,6 @@ npm run dev
 **Access:** `http://localhost:3000/aime/`
 
 **Environment Variables (Optional):**
-```bash
-AUTH_MODE=standalone  # Set automatically by npm run dev
-```
-
 #### Local Embedded Mode (Full Stack Development)
 
 For development with local Rails authentication and JWT verification:
@@ -205,7 +201,6 @@ npm run dev:embedded
 
 **Environment Variables (Required):**
 ```bash
-AUTH_MODE=embedded
 NEXT_PUBLIC_RAILS_BASE_URL=http://groupize.local
 COOKIE_NAME=gpw_session
 ```
@@ -229,17 +224,24 @@ COOKIE_NAME=gpw_session
 
 **Access:** `https://testing.app.groupize.com/aime/` (requires nginx setup)
 
+**How It Works:**
+This setup uses a **local HTTP reverse proxy (nginx)** to route requests:
+- Requests to `/aime/*` → proxied to your local Next.js dev server
+- All other requests → proxied to the real testing Rails API
+- **JWT authentication cookies** from the Rails app are forwarded to Next.js, allowing seamless authentication
+
 **Setup Steps:**
 1. Configure nginx proxy for split-routing (see section 5 below)
 2. Create `.env.testing` from `.env.example` with split-routing values
 3. Start Next.js: `npm run dev` (automatically uses `.env.testing` if present)
-4. Access via: `https://testing.app.groupize.com/aime/`
+4. **Authenticate via Rails app**: Go to `https://testing.app.groupize.com/ops/tools/aime_ai` and select an account/org
+5. Access the app: `https://testing.app.groupize.com/aime/` (you'll be authenticated via the JWT cookie from Rails)
 
 > **Note**: See `docs/ENV_VARIABLES.md` for complete environment variable reference.
 
-### 5. Nginx Proxy Setup (Integration with Rails)
+### 5. Nginx Reverse Proxy Setup (Integration with Rails)
 
-When running alongside the Rails application (either locally or with split-routing), use nginx to proxy requests.
+When running alongside the Rails application (either locally or with split-routing), use nginx as a **local HTTP reverse proxy** to route requests and forward authentication cookies.
 
 **📖 For complete setup instructions, see: [`local-dev/SETUP_GUIDE.md`](./local-dev/SETUP_GUIDE.md)**
 
@@ -251,11 +253,14 @@ The application supports two proxy modes:
    - nginx config: `local-dev/nginx.local.conf`
    - URL: `http://groupize.local/aime/`
    - Rails on port 3000, Next.js on port 3001
+   - nginx forwards JWT cookies between Rails and Next.js
 
 2. **Split-Routing** - Local Next.js with real testing Rails API
    - nginx config: `local-dev/nginx.testing.conf` (create from `nginx.testing.example`)
    - URL: `https://testing.app.groupize.com/aime/`
    - Next.js on port 3000, Rails API at testing environment
+   - **Authentication:** Go to `https://testing.app.groupize.com/ops/tools/aime_ai` to select account/org and get JWT cookie
+   - nginx reverse proxy forwards JWT authentication cookies from Rails to your local Next.js dev server
 
 #### Quick Start
 

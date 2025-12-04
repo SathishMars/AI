@@ -106,6 +106,13 @@ brew services stop nginx
 
 **Purpose:** Develop on Next.js locally WITHOUT running Rails. Use the real testing environment's Rails API and JWT authentication.
 
+**How It Works:**
+This setup uses a **local HTTP reverse proxy (nginx)** that:
+- Routes `/aime/*` requests to your **local Next.js dev server** (port 3000)
+- Routes all other requests to the **real testing Rails API** (testing.app.groupize.com)
+- **Forwards JWT authentication cookies** from Rails to Next.js, enabling seamless authentication
+- Allows you to develop Next.js locally while using real authentication and data from the testing environment
+
 **Why this is useful:**
 - No need to run Rails locally (saves setup time and resources)
 - Use real testing data and authentication
@@ -120,7 +127,7 @@ brew services stop nginx
 # Install mkcert
 brew install mkcert nss
 
-# Initialize mkcert
+# Initialize mkcert (installs CA certificate in system trust store)
 mkcert -install
 
 # Create certificate directory
@@ -135,12 +142,36 @@ ls -la
 # Should see: testing.app.groupize.com.pem and testing.app.groupize.com-key.pem
 ```
 
+**Important:** While `mkcert -install` adds the CA certificate to your system's trust store (for browsers), **Node.js requires an explicit environment variable** to trust the certificate when making HTTPS requests (like fetching the JWKS endpoint).
+
+**Node.js Certificate Trust Setup:**
+The `npm run dev` script automatically includes `NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"` which:
+1. Runs `mkcert -CAROOT` to get the path to your mkcert CA root directory
+2. Appends `/rootCA.pem` to point to the CA certificate file
+3. Sets `NODE_EXTRA_CA_CERTS` so Node.js trusts certificates signed by mkcert
+
+This is necessary for:
+- Fetching JWKS from `https://testing.app.groupize.com/.well-known/jwks.json`
+- Any other HTTPS requests your Next.js app makes to the testing environment
+
+**Verify your mkcert CA root (optional check):**
+```bash
+mkcert -CAROOT
+# Should output: /Users/YOUR_USERNAME/Library/Application Support/mkcert
+
+# Verify the CA certificate file exists
+ls "$(mkcert -CAROOT)/rootCA.pem"
+# Should show the rootCA.pem file
+```
+
+**Note:** You don't need to manually set `NODE_EXTRA_CA_CERTS` - the `npm run dev` script handles this automatically. Just make sure you've run `mkcert -install` first.
+
 #### B. Create Your Personal Configs
 
 Create personal copies of the templates:
 
 ```bash
-# 1. Create nginx config
+# 1. Create nginx config (this is your local HTTP reverse proxy)
 cd local-dev
 cp nginx.testing.example nginx.testing.conf
 
@@ -159,10 +190,12 @@ cp .env.example .env.testing
 # Edit to use split-routing values (see comments in .env.example):
 nano .env.testing
 # Update these values:
-#   NEXT_PUBLIC_RAILS_BASE_URL=https://104.18.10.206
+#   NEXT_PUBLIC_RAILS_BASE_URL=https://testing.app.groupize.com
 #   NEXT_PUBLIC_APP_URL=https://testing.app.groupize.com
 # Keep your API keys and other secrets
 ```
+
+**Note:** The nginx reverse proxy forwards JWT authentication cookies from the Rails app to your local Next.js server, enabling seamless authentication without running Rails locally.
 
 **Note:** If testing.app.groupize.com's IP ever changes:
 - Update line 109 in `nginx.testing.conf`
@@ -180,18 +213,32 @@ brew services restart nginx
 # Start Next.js with testing environment config
 npm run dev
 # Automatically uses .env.testing if it exists (points to real testing Rails API)
+# The dev script automatically includes NODE_EXTRA_CA_CERTS to trust mkcert certificates
+# This allows Node.js to verify SSL certificates when fetching JWKS from HTTPS endpoints
 ```
 
-### Test It
+### Authenticate and Access
 
-Open browser: `https://testing.app.groupize.com/`
+**Important:** You must authenticate through the Rails app first to get the JWT cookie:
+
+1. **Go to the Rails authentication page:**
+   ```
+   https://testing.app.groupize.com/ops/tools/aime_ai
+   ```
+
+2. **Select an account and organization** from the dropdown
+
+3. **Access the Next.js app:**
+   ```
+   https://testing.app.groupize.com/aime/
+   ```
+   The JWT authentication cookie from Rails will be automatically forwarded to your local Next.js dev server via the nginx reverse proxy.
 
 **Expected behavior:**
-- Visit `/` → See real testing environment login
-- Log in with your testing credentials
-- Browse around → Real testing data
-- Visit `/aime/` → Your LOCAL Next.js dev server
-- Auth cookies work seamlessly between both!
+- Visit `https://testing.app.groupize.com/ops/tools/aime_ai` → Select account/org → Get authenticated
+- Visit `https://testing.app.groupize.com/aime/` → Your LOCAL Next.js dev server with authentication
+- Auth cookies work seamlessly between Rails and Next.js via the reverse proxy!
+- Hot reload works in your local Next.js dev server
 
 ### Stop It
 
@@ -298,6 +345,7 @@ sudo killall -HUP mDNSResponder
 
 ### Certificate Errors (Split-Routing)
 
+**Browser certificate warnings:**
 ```bash
 # Reinstall mkcert CA
 mkcert -install
@@ -309,6 +357,22 @@ mkcert testing.app.groupize.com
 # Restart nginx
 brew services restart nginx
 ```
+
+**Node.js SSL certificate errors (e.g., "unable to verify the first certificate"):**
+If you see SSL certificate verification errors when Next.js tries to fetch the JWKS endpoint:
+
+1. **Verify mkcert CA root exists:**
+   ```bash
+   mkcert -CAROOT
+   # Should output: /Users/YOUR_USERNAME/Library/Application Support/mkcert
+   ls "$(mkcert -CAROOT)/rootCA.pem"
+   # Should show the CA certificate file
+   ```
+
+2. **The `npm run dev` script automatically includes `NODE_EXTRA_CA_CERTS`** to trust the mkcert CA. If you're still seeing errors:
+   - Make sure you're using `npm run dev` (not running `next dev` directly)
+   - Verify the mkcert CA root path is correct
+   - Check that `mkcert -install` was run successfully
 
 ### "Permission denied" on Port 443
 
@@ -498,14 +562,13 @@ brew services restart nginx
 - [ ] `nginx.testing.conf` has your username (not `YOUR_USERNAME`)
 - [ ] nginx.testing.conf is copied to nginx servers directory
 - [ ] nginx is running
-- [ ] Next.js runs on port 3000
-- [ ] Visit `https://testing.app.groupize.com/` → See real testing login
-- [ ] Can log in successfully
-- [ ] Browse main app → See real testing data
-- [ ] Visit `https://testing.app.groupize.com/aime/` → See local Next.js
+- [ ] Next.js runs on port 3000 (using `npm run dev`)
+- [ ] Visit `https://testing.app.groupize.com/ops/tools/aime_ai` → Select account/org → Get authenticated
+- [ ] Visit `https://testing.app.groupize.com/aime/` → See local Next.js with authentication
 - [ ] Hot reload works in local Next.js
 - [ ] No certificate warnings in browser
 - [ ] No 502 Bad Gateway errors
+- [ ] JWT authentication cookies are forwarded from Rails to Next.js
 
 ---
 
