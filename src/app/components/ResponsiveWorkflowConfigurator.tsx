@@ -107,9 +107,6 @@ export default function ResponsiveWorkflowConfigurator({
     updateWorkflowTemplateSelectorItem(workflowTemplate);
   }, [updateWorkflowTemplateSelectorItem, workflowTemplate, workflowTemplate?.metadata?.label]);
 
-  console.log("WORKFLOW TEMPLATE IN CONFIGURATOR:", workflowTemplate); 
-
-
   // Resizable divider functionality
   const dividerRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);

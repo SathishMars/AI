@@ -84,7 +84,19 @@ export async function GET(
       return NextResponse.json({ success: true, data: starter });
     }
 
-    const result = await WorkflowTemplateDbUtil.get(account, organization, decodedTemplateId);
+    // Try to get template with the provided organization context
+    let result = await WorkflowTemplateDbUtil.get(account, organization, decodedTemplateId);
+    if (!result && organization === null) {
+      console.log(`[GET] Template not found at account level, trying all templates (org=undefined)`);
+      result = await WorkflowTemplateDbUtil.get(account, undefined, decodedTemplateId);
+    }
+
+    // If not found and we're looking for an org-specific template, also try account-level
+    // (account-level templates should be accessible from any org context)
+    if (!result && organization !== null) {
+      console.log(`[GET] Template not found with org=${organization}, trying account-level (org=null)`);
+      result = await WorkflowTemplateDbUtil.get(account, null, decodedTemplateId);
+    }
 
     if (!result) {
       return NextResponse.json({ error: 'Template not found' }, { status: 404 });

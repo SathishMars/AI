@@ -1,3 +1,5 @@
+export type AuthMode = 'embedded' | 'standalone';
+
 /**
  * Environment configuration interface
  */
@@ -46,7 +48,7 @@ function buildConfig(): EnvironmentConfig {
   const nodeEnv = getEnv('NODE_ENV', 'development');
   const isDevelopment = nodeEnv === 'development';
   const isProduction = nodeEnv === 'production';
-  const railsBaseUrl = getEnv('NEXT_PUBLIC_RAILS_BASE_URL', isDevelopment ? 'http://groupize.local' : '');
+  const railsBaseUrl = getEnv('NEXT_PUBLIC_RAILS_BASE_URL', 'http://groupize.local');
   
   const jwksUrl = `${railsBaseUrl}/.well-known/jwks.json`;
   const cookieName = getEnv('COOKIE_NAME', 'gpw_session');

@@ -173,7 +173,7 @@ export async function verifyServiceToken(token: string): Promise<ServiceJWTClaim
         throw new JWTVerificationError('ISSUER_MISMATCH', 'Service token issuer mismatch', error);
       }
       if (error.message.includes('audience')) {
-        throw new JWTVerificationError('AUDIENCE_MISMATCH', 'Service token audience mismatch (expected ai-api)', error);
+        throw new JWTVerificationError('AUDIENCE_MISMATCH', 'Service token audience mismatch (expected workflows-api)', error);
       }
       if (error.message.includes('subject')) {
         throw new JWTVerificationError('SUBJECT_MISMATCH', 'Service token subject mismatch (expected service:rails)', error);
