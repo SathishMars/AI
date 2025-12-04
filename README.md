@@ -162,54 +162,7 @@ NEXT_PUBLIC_ENABLE_MOCK_DATA=true
 
 ### 4. Development Server
 
-The application supports three development modes:
-
-#### Standalone Mode (Frontend-Only Development)
-
-Perfect for UI/component development without Rails:
-
-```bash
-npm run dev
-```
-
-**Features:**
-- Runs on **port 3000**
-- **Skips JWT verification** - uses mocked API responses
-- No Rails connection needed
-- No authentication required
-- Perfect for frontend-only development
-
-**Access:** `http://localhost:3000/aime/`
-
-**Environment Variables (Optional):**
-#### Local Embedded Mode (Full Stack Development)
-
-For development with local Rails authentication and JWT verification:
-
-```bash
-npm run dev:embedded
-```
-
-**Features:**
-- Runs on **port 3001**
-- **Verifies JWT tokens** via JWKS endpoint from Rails
-- Requires Rails running locally at `NEXT_PUBLIC_RAILS_BASE_URL`
-- Full SSO experience with Rails
-- Redirects to Rails login if unauthorized
-
-**Access:** `http://groupize.local/aime/` (requires nginx setup)
-
-**Environment Variables (Required):**
-```bash
-NEXT_PUBLIC_RAILS_BASE_URL=http://groupize.local
-COOKIE_NAME=gpw_session
-```
-
-**Setup Steps:**
-1. Configure nginx proxy (see section 5 below)
-2. Start Rails: `cd ../reg_app && rails s -p 3000`
-3. Start Next.js: `npm run dev:embedded`
-4. Access via: `http://groupize.local/aime/`
+The application supports two development modes:
 
 #### Split-Routing Mode (Real Testing API + Local Next.js)
 
