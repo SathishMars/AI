@@ -17,6 +17,20 @@ function generateShortUniqueId(): string {
   return uid.rnd();
 }
 
+// Helper to safely extract nested fields from unknown parsed JSON without using `any`
+function getField(obj: unknown, path: string[]): unknown {
+  if (!obj || typeof obj !== 'object') return undefined;
+  let cur: unknown = obj;
+  for (const p of path) {
+    if (cur && typeof cur === 'object' && p in (cur as Record<string, unknown>)) {
+      cur = (cur as Record<string, unknown>)[p];
+    } else {
+      return undefined;
+    }
+  }
+  return cur;
+}
+
 /**
  * Workflow Template API Routes
  * 
@@ -166,6 +180,13 @@ export async function PUT(
     }
 
     // Validate against Zod schema
+    console.log('[PUT] Validating template:', {
+      id: getField(parsedBody, ['id']),
+      account: getField(parsedBody, ['account']),
+      createdAt: getField(parsedBody, ['metadata', 'createdAt']),
+      updatedAt: getField(parsedBody, ['metadata', 'updatedAt']),
+    });
+
     try {
       WorkflowTemplateSchema.parse(parsedBody);
     } catch (e) {
@@ -255,6 +276,13 @@ export async function POST(
     console.log('[POST /api/workflow-templates/[templateId]] Parsed the request body:', parsedBody);
 
     // Validate against schema
+    console.log('[PUT] Validating template:', {
+      id: getField(parsedBody, ['id']),
+      account: getField(parsedBody, ['account']),
+      createdAt: getField(parsedBody, ['metadata', 'createdAt']),
+      updatedAt: getField(parsedBody, ['metadata', 'updatedAt']),
+    });
+
     try {
       WorkflowTemplateSchema.parse(parsedBody);
     } catch (err) {
