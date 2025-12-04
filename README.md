@@ -166,8 +166,6 @@ The application supports two development modes:
 
 #### Split-Routing Mode (Real Testing API + Local Next.js)
 
-**NEW!** Develop Next.js locally while using the real testing environment's Rails API:
-
 **Features:**
 - Runs on **port 3000**
 - **No local Rails needed** - uses real testing Rails API
