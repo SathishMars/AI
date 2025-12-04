@@ -6,12 +6,12 @@ import { env } from '@/app/lib/env';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const accountId = request.headers.get('x-account');
     const organizationId = request.headers.get('x-organization');
-    const requestTemplateId = params.id;
+    const { id: requestTemplateId } = await params;
     
     if (!accountId) {
       return NextResponse.json(
