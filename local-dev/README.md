@@ -13,8 +13,10 @@
 ### Local Development (Both Apps Local)
 
 ```bash
+# Install nginx config
 cd /Users/mdarwin/Projects/Workflows/local-dev
-caddy run --config Caddyfile.local
+cp nginx.local.conf /opt/homebrew/etc/nginx/servers/groupize.local.conf
+brew services restart nginx
 
 # In other terminals: Start Rails (port 3000) + Next.js (port 3001)
 # Visit: http://groupize.local/
@@ -23,8 +25,14 @@ caddy run --config Caddyfile.local
 ### Split-Routing (Real Testing + Local Next.js)
 
 ```bash
+# Set up nginx config (one-time)
 cd /Users/mdarwin/Projects/Workflows/local-dev
-sudo caddy run --config Caddyfile.testing
+cp nginx.testing.example nginx.testing.conf
+nano nginx.testing.conf
+# Replace YOUR_USERNAME with your actual username
+
+cp nginx.testing.conf /opt/homebrew/etc/nginx/servers/testing.app.groupize.com.conf
+brew services restart nginx
 
 # In another terminal: Start Next.js (port 3000)
 # Visit: https://testing.app.groupize.com/
@@ -32,14 +40,20 @@ sudo caddy run --config Caddyfile.testing
 
 ## 📋 Prerequisites
 
-1. Add to `/etc/hosts`:
+1. Install nginx:
+   ```
+   brew install nginx
+   ```
+
+2. Add to `/etc/hosts`:
    ```
    127.0.0.1 groupize.local
    127.0.0.1 testing.app.groupize.com
    ```
 
-2. For split-routing:
-   - Create `Caddyfile.testing` from `Caddyfile.testing.example`
+3. For split-routing:
+   - Generate mkcert certificates (see SETUP_GUIDE.md)
+   - Create `nginx.testing.conf` from `nginx.testing.example`
    - Create `.env.testing` from `.env.example` (with split-routing values)
 
 **For complete setup instructions, troubleshooting, and details:**

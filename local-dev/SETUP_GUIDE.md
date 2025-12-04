@@ -15,17 +15,17 @@ Two development modes available:
    - Use when: Working on Next.js/AI features without needing Rails locally
    - Benefits: Faster setup, real authentication/data, no Rails server needed
 
-**Using Caddy** for simple, reliable HTTP proxying with automatic TLS support.
+**Using nginx** for reliable HTTP proxying with stable WebSocket connections.
 
 ---
 
 ## 🚀 One-Time Setup
 
-### Step 1: Install Caddy
+### Step 1: Install nginx
 
 ```bash
-# Install Caddy
-brew install caddy
+# Install nginx
+brew install nginx
 ```
 
 ### Step 2: Configure /etc/hosts
@@ -56,18 +56,29 @@ ping -c 2 testing.app.groupize.com
 
 Run both Rails and Next.js locally on your machine.
 
+### One-Time Setup for Local Embedded
+
+```bash
+# Copy nginx config to nginx servers directory
+cd /Users/mdarwin/Projects/Workflows/local-dev
+cp nginx.local.conf /opt/homebrew/etc/nginx/servers/groupize.local.conf
+
+# Start nginx
+brew services restart nginx
+```
+
 ### Start Everything
 
 ```bash
-# Terminal 1: Start Caddy
-cd /Users/mdarwin/Projects/Workflows/local-dev
-caddy run --config Caddyfile.local
+# nginx should already be running from setup above
+# If not, restart it:
+brew services restart nginx
 
-# Terminal 2: Start Rails (port 3000)
+# Terminal 1: Start Rails (port 3000)
 cd /Users/mdarwin/Projects/reg_app
 bin/rails server -p 3000
 
-# Terminal 3: Start Next.js (port 3001)
+# Terminal 2: Start Next.js (port 3001)
 cd /Users/mdarwin/Projects/Workflows
 npm run dev -- -p 3001
 ```
@@ -81,7 +92,13 @@ Open browser: `http://groupize.local/`
 
 ### Stop It
 
-Press `Ctrl+C` in each terminal.
+```bash
+# Stop Rails and Next.js
+# Press Ctrl+C in each terminal
+
+# Stop nginx (if needed)
+brew services stop nginx
+```
 
 ---
 
@@ -125,14 +142,17 @@ Create personal copies of the templates:
 ```bash
 cd /Users/mdarwin/Projects/Workflows
 
-# 1. Create Caddy config
+# 1. Create nginx config
 cd local-dev
-cp Caddyfile.testing.example Caddyfile.testing
+cp nginx.testing.example nginx.testing.conf
 
 # Edit to replace YOUR_USERNAME with your actual username
-nano Caddyfile.testing
+nano nginx.testing.conf
 # Find and replace: YOUR_USERNAME → mdarwin (or your username)
 # Save and exit
+
+# Install to nginx servers directory
+cp nginx.testing.conf /opt/homebrew/etc/nginx/servers/testing.app.groupize.com.conf
 
 # 2. Create environment config for Next.js
 cd ..
@@ -148,18 +168,19 @@ nano .env.testing
 ```
 
 **Note:** If testing.app.groupize.com's IP ever changes:
-- Update line 69 in `Caddyfile.testing`
+- Update line 109 in `nginx.testing.conf`
 - Update the RAILS_BASE_URL values in `.env.testing`
 - See `.env.example` for instructions on finding the new IP
+- Reinstall the config: `cp nginx.testing.conf /opt/homebrew/etc/nginx/servers/testing.app.groupize.com.conf`
+- Restart nginx: `brew services restart nginx`
 
 ### Daily Use - Split-Routing
 
 ```bash
-# Terminal 1: Start Caddy (needs sudo for port 443)
-cd /Users/mdarwin/Projects/Workflows/local-dev
-sudo caddy run --config Caddyfile.testing
+# Make sure nginx is running with the testing config
+brew services restart nginx
 
-# Terminal 2: Start Next.js with testing environment config
+# Start Next.js with testing environment config
 cd /Users/mdarwin/Projects/Workflows
 npm run dev
 # Automatically uses .env.testing if it exists (points to real testing Rails API)
@@ -178,7 +199,13 @@ Open browser: `https://testing.app.groupize.com/`
 
 ### Stop It
 
-Press `Ctrl+C` in each terminal.
+```bash
+# Stop Next.js
+# Press Ctrl+C in the terminal
+
+# Stop nginx (if needed)
+brew services stop nginx
+```
 
 ---
 
@@ -187,12 +214,15 @@ Press `Ctrl+C` in each terminal.
 ### To Local Embedded
 
 ```bash
-# Stop Caddy if running
-caddy stop  # or killall caddy
-
-# Start with local config
+# Make sure local config is installed
 cd /Users/mdarwin/Projects/Workflows/local-dev
-caddy run --config Caddyfile.local
+cp nginx.local.conf /opt/homebrew/etc/nginx/servers/groupize.local.conf
+
+# Remove testing config (if present)
+rm -f /opt/homebrew/etc/nginx/servers/testing.app.groupize.com.conf
+
+# Restart nginx
+brew services restart nginx
 
 # Start Rails (port 3000) + Next.js (port 3001)
 ```
@@ -200,12 +230,15 @@ caddy run --config Caddyfile.local
 ### To Split-Routing
 
 ```bash
-# Stop Caddy if running
-caddy stop  # or killall caddy
-
-# Start with testing config
+# Make sure testing config is installed
 cd /Users/mdarwin/Projects/Workflows/local-dev
-sudo caddy run --config Caddyfile.testing
+cp nginx.testing.conf /opt/homebrew/etc/nginx/servers/testing.app.groupize.com.conf
+
+# Remove local config (if present)
+rm -f /opt/homebrew/etc/nginx/servers/groupize.local.conf
+
+# Restart nginx
+brew services restart nginx
 
 # Start Next.js (port 3000)
 ```
@@ -213,8 +246,8 @@ sudo caddy run --config Caddyfile.testing
 ### To Real Servers (No Local Proxy)
 
 ```bash
-# Stop Caddy
-caddy stop
+# Stop nginx
+brew services stop nginx
 
 # Comment out /etc/hosts
 sudo nano /etc/hosts
@@ -229,11 +262,11 @@ sudo nano /etc/hosts
 
 ## 📊 Quick Reference Table
 
-| Mode | Caddy Config | Rails Port | Next.js Port | URL | What's Local | What's Remote |
+| Mode | nginx Config | Rails Port | Next.js Port | URL | What's Local | What's Remote |
 |------|-------------|------------|--------------|-----|--------------|---------------|
-| **Local Embedded** | `Caddyfile.local` | 3000 | 3001 | `http://groupize.local` | Both apps | Nothing |
-| **Split-Routing** | `Caddyfile.testing` | - | 3000 | `https://testing.app.groupize.com` | Next.js only | Everything else |
-| **No Proxy** | (Caddy stopped) | - | - | Real URLs | Nothing | Everything |
+| **Local Embedded** | `nginx.local.conf` | 3000 | 3001 | `http://groupize.local` | Both apps | Nothing |
+| **Split-Routing** | `nginx.testing.conf` | - | 3000 | `https://testing.app.groupize.com` | Next.js only | Everything else |
+| **No Proxy** | (nginx stopped) | - | - | Real URLs | Nothing | Everything |
 
 ---
 
@@ -248,9 +281,8 @@ sudo lsof -i :443
 sudo lsof -i :3000
 sudo lsof -i :3001
 
-# Stop Caddy
-caddy stop
-killall caddy
+# Stop nginx
+brew services stop nginx
 ```
 
 ### DNS Not Resolving
@@ -278,21 +310,22 @@ mkcert -install
 cd ~/.local-dev-certs
 mkcert testing.app.groupize.com
 
-# Restart Caddy
-killall caddy
-cd /Users/mdarwin/Projects/Workflows/local-dev
-sudo caddy run --config Caddyfile.testing
+# Restart nginx
+brew services restart nginx
 ```
 
 ### "Permission denied" on Port 443
 
-Use `sudo`:
+nginx installed via Homebrew should handle privileged ports automatically. If you get permission errors:
 
 ```bash
-sudo caddy run --config Caddyfile.testing
-```
+# Check nginx is installed correctly
+brew services list | grep nginx
 
-Ports below 1024 (like 80 and 443) require elevated privileges on macOS.
+# Reinstall if needed
+brew reinstall nginx
+brew services restart nginx
+```
 
 ### Page Keeps Spinning / Not Loading
 
@@ -302,10 +335,14 @@ lsof -i :3000
 # Should show node/npm process
 ```
 
-**Check if Caddy is running:**
+**Check if nginx is running:**
 ```bash
-ps aux | grep caddy
-# Should show caddy process
+brew services list | grep nginx
+# Should show "started"
+
+# Or check processes
+ps aux | grep nginx
+# Should show nginx processes
 ```
 
 **For split-routing, start Next.js:**
@@ -314,11 +351,27 @@ cd /Users/mdarwin/Projects/Workflows
 npm run dev
 ```
 
+### Check nginx Configuration
+
+```bash
+# Test nginx config for syntax errors
+nginx -t
+
+# View nginx error log
+tail -f /opt/homebrew/var/log/nginx/error.log
+
+# View specific site logs (local)
+tail -f /opt/homebrew/var/log/nginx/groupize.error.log
+
+# View specific site logs (split-routing)
+tail -f /opt/homebrew/var/log/nginx/testing-split.error.log
+```
+
 ### Can't Access testing.app.groupize.com
 
 1. **Check /etc/hosts has the entry**
-2. **Make sure Caddy is running with `Caddyfile.testing`**
-3. **Check Caddy isn't showing 502 errors** (if so, the IP might have changed - see below)
+2. **Make sure nginx is running with `nginx.testing.conf`**
+3. **Check nginx isn't showing 502 errors** (if so, the IP might have changed - see below)
 
 ### "Blocked hosts: testing.app.groupize.com" Error
 
@@ -360,14 +413,28 @@ nslookup testing.app.groupize.com
 # Put /etc/hosts back (remove the #)
 sudo nano /etc/hosts
 
-# Update Caddyfile.testing
-nano /Users/mdarwin/Projects/Workflows/local-dev/Caddyfile.testing
-# Find line 69: reverse_proxy https://104.18.10.206 {
+# Update nginx.testing.conf
+nano /Users/mdarwin/Projects/Workflows/local-dev/nginx.testing.conf
+# Find line 109: proxy_pass https://104.18.10.206;
 # Replace with new IP
 
-# Restart Caddy
-killall caddy
-sudo caddy run --config Caddyfile.testing
+# Reinstall config and restart nginx
+cp /Users/mdarwin/Projects/Workflows/local-dev/nginx.testing.conf /opt/homebrew/etc/nginx/servers/testing.app.groupize.com.conf
+brew services restart nginx
+```
+
+### Connection Drops / Page Reloading
+
+nginx provides more stable WebSocket connections than Caddy for Next.js HMR. If you still experience issues:
+
+```bash
+# Check nginx error logs
+tail -f /opt/homebrew/var/log/nginx/error.log
+
+# Ensure you're using the latest config
+cd /Users/mdarwin/Projects/Workflows/local-dev
+cp nginx.local.conf /opt/homebrew/etc/nginx/servers/groupize.local.conf
+brew services restart nginx
 ```
 
 ---
@@ -392,12 +459,12 @@ sudo caddy run --config Caddyfile.testing
 ### What Gets Committed to Git
 
 ✅ **Committed (templates):**
-- `Caddyfile.local` - Ready to use
-- `Caddyfile.testing.example` - Caddy template with placeholders
+- `nginx.local.conf` - Ready to use
+- `nginx.testing.example` - nginx template with placeholders
 - `.env.example` - Environment template (documents all modes)
 
 ❌ **Gitignored (personal configs):**
-- `Caddyfile.testing` - Your personal Caddy config
+- `nginx.testing.conf` - Your personal nginx config
 - `.env.local` - Your local embedded environment
 - `.env.testing` - Your split-routing environment
 - `~/.local-dev-certs/` - Your SSL certificates
@@ -410,9 +477,9 @@ sudo caddy run --config Caddyfile.testing
 |------|----------|---------|-------|---------|
 | `SETUP_GUIDE.md` | `local-dev/` | This guide | No | Yes ✅ |
 | `README.md` | `local-dev/` | Quick reference | No | Yes ✅ |
-| `Caddyfile.local` | `local-dev/` | Local embedded config | No | Yes ✅ |
-| `Caddyfile.testing.example` | `local-dev/` | Split-routing Caddy template | No | Yes ✅ |
-| `Caddyfile.testing` | `local-dev/` | Your personal Caddy config | Yes | No ❌ |
+| `nginx.local.conf` | `local-dev/` | Local embedded config | No | Yes ✅ |
+| `nginx.testing.example` | `local-dev/` | Split-routing nginx template | No | Yes ✅ |
+| `nginx.testing.conf` | `local-dev/` | Your personal nginx config | Yes | No ❌ |
 | `.env.example` | Root | Environment template (all modes) | No | Yes ✅ |
 | `.env.local` | Root | Local embedded env config | Yes | No ❌ |
 | `.env.testing` | Root | Split-routing env config | Yes | No ❌ |
@@ -424,7 +491,8 @@ sudo caddy run --config Caddyfile.testing
 
 ### Local Embedded Mode
 
-- [ ] Caddy starts without errors
+- [ ] nginx is installed and running
+- [ ] nginx.local.conf is copied to nginx servers directory
 - [ ] Rails runs on port 3000
 - [ ] Next.js runs on port 3001
 - [ ] Visit `http://groupize.local/` → See Rails app
@@ -434,8 +502,9 @@ sudo caddy run --config Caddyfile.testing
 ### Split-Routing Mode
 
 - [ ] mkcert certificates created
-- [ ] `Caddyfile.testing` has your username (not `YOUR_USERNAME`)
-- [ ] Caddy starts with sudo
+- [ ] `nginx.testing.conf` has your username (not `YOUR_USERNAME`)
+- [ ] nginx.testing.conf is copied to nginx servers directory
+- [ ] nginx is running
 - [ ] Next.js runs on port 3000
 - [ ] Visit `https://testing.app.groupize.com/` → See real testing login
 - [ ] Can log in successfully
@@ -460,7 +529,7 @@ sudo caddy run --config Caddyfile.testing
 **Each developer needs to:**
 - Run setup on their own machine
 - Generate their own mkcert certificates
-- Create their own `Caddyfile.testing` from the template
+- Create their own `nginx.testing.conf` from the template
 - Configure their own `/etc/hosts`
 
 This setup is **per-developer** and doesn't affect others.
@@ -470,7 +539,7 @@ This setup is **per-developer** and doesn't affect others.
 ## 🆘 Still Having Issues?
 
 1. **Read the troubleshooting section** above carefully
-2. **Check Caddy output** for error messages
+2. **Check nginx logs** for error messages (`nginx -t` and `tail -f /opt/homebrew/var/log/nginx/error.log`)
 3. **Verify all setup steps** were completed
 4. **Make sure /etc/hosts has both entries**
 5. **Ensure you're using the right port** for Next.js (3001 for local, 3000 for split-routing)
@@ -481,4 +550,3 @@ This setup is **per-developer** and doesn't affect others.
 **That's it! You're ready to develop! 🚀**
 
 Questions? Check troubleshooting or ask the team!
-
