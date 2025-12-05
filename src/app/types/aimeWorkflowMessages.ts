@@ -2,6 +2,17 @@ import { WorkflowDefinition } from "./workflowTemplate";
 import { z } from "zod";
 import { WorkflowDefinitionSchema } from "./workflowTemplate";
 
+export const FOLLOWUP_OPTION_CATEGORIES = [
+    'template_request',
+    'template_approval', 
+    'template_mrf',
+    'template_workflow',
+    'field',
+    'general'
+] as const;
+
+export type FollowUpOptionCategory = typeof FOLLOWUP_OPTION_CATEGORIES[number];
+
 // This defines the record stored in the databse. It has the account,organization,conversationId fields in addition to the message fields
 export interface AimeWorkflowConversationsRecord extends WorkflowMessage {
     account: string;
@@ -34,7 +45,9 @@ export interface WorkflowMessageContent {
 }
 export interface FollowUpOption {
     label: string;
-    value: string | number | boolean ; // Value associated with the option
+    value: string | number | boolean; // Value associated with the option
+    category?: FollowUpOptionCategory; // Category for UI behavior
+    metadata?: Record<string, any>; // Additional metadata (e.g., templateId, version)
 }
 
 
@@ -42,6 +55,8 @@ export interface FollowUpOption {
 export const FollowUpOptionSchema = z.object({
     label: z.string(),
     value: z.union([z.string(), z.number(), z.boolean()]),
+    category: z.enum(FOLLOWUP_OPTION_CATEGORIES).optional(),
+    metadata: z.record(z.any()).optional(),
 });
 
 // WorkflowMessageContent schema

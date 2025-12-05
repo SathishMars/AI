@@ -5,7 +5,7 @@ import { jwtVerify, createRemoteJWKSet, decodeJwt } from 'jose';
 // Mock the env module
 jest.mock('@/app/lib/env', () => ({
   env: {
-    jwtIssuer: 'groupize',
+    railsBaseUrl: 'http://localhost:3000',
     jwksUrl: 'http://localhost:3000/.well-known/jwks.json',
   },
 }));

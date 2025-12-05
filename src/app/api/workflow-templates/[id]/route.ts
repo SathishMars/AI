@@ -5,6 +5,8 @@ import { workflowTemplateStarter } from '@/app/data/workflow-template-starter';
 import { WorkflowTemplateSchema, WorkflowTemplate } from '@/app/types/workflowTemplate';
 import ShortUniqueId from 'short-unique-id';
 import AimeWorkflowMessagesDBUtil from '@/app/utils/aimeWorkflowMessagesDBUtil';
+import { verifyUserToken, JWTVerificationError } from '@/app/lib/jwt-verifier';
+import { env } from '@/app/lib/env';
 
 // Reusable ShortUniqueId instance (10 chars, alphanum) — follow repo policy
 const uid = new ShortUniqueId({ length: 10, dictionary: 'alphanum' });
@@ -132,6 +134,34 @@ export async function PUT(
   { params }: RouteParams
 ): Promise<NextResponse> {
   try {
+    // Validate JWT token (authentication is always required)
+    const token = request.cookies.get(env.cookieName)?.value;
+    
+    if (!token) {
+      console.error('[PUT /api/workflow-templates/[templateId]] No JWT token found');
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    try {
+      await verifyUserToken(token);
+    } catch (error) {
+      if (error instanceof JWTVerificationError) {
+        console.error('[PUT /api/workflow-templates/[templateId]] JWT verification failed:', error.code, error.message);
+        return NextResponse.json(
+          { error: 'Invalid or expired authentication token', code: error.code },
+          { status: 401 }
+        );
+      }
+      console.error('[PUT /api/workflow-templates/[templateId]] Unexpected JWT error:', error);
+      return NextResponse.json(
+        { error: 'Authentication failed' },
+        { status: 401 }
+      );
+    }
+
     const { id: templateId } = await params;
     const body = await request.text();
 
@@ -156,17 +186,12 @@ export async function PUT(
       createdAt: getField(parsedBody, ['metadata', 'createdAt']),
       updatedAt: getField(parsedBody, ['metadata', 'updatedAt']),
     });
-    
+
     try {
       WorkflowTemplateSchema.parse(parsedBody);
     } catch (e) {
-      console.error('[PUT] Validation failed:', e);
       const msg = e instanceof Error ? e.message : 'Invalid template data';
-      return NextResponse.json({ 
-        error: 'Invalid template data', 
-        details: msg,
-        received: parsedBody
-      }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid template data', details: msg }, { status: 400 });
     }
 
   const template = parsedBody as WorkflowTemplate;
@@ -200,6 +225,34 @@ export async function POST(
   { params }: RouteParams
 ): Promise<NextResponse> {
   try {
+    // Validate JWT token (authentication is always required)
+    const token = request.cookies.get(env.cookieName)?.value;
+    
+    if (!token) {
+      console.error('[POST /api/workflow-templates/[templateId]] No JWT token found');
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    try {
+      await verifyUserToken(token);
+    } catch (error) {
+      if (error instanceof JWTVerificationError) {
+        console.error('[POST /api/workflow-templates/[templateId]] JWT verification failed:', error.code, error.message);
+        return NextResponse.json(
+          { error: 'Invalid or expired authentication token', code: error.code },
+          { status: 401 }
+        );
+      }
+      console.error('[POST /api/workflow-templates/[templateId]] Unexpected JWT error:', error);
+      return NextResponse.json(
+        { error: 'Authentication failed' },
+        { status: 401 }
+      );
+    }
+
     const { id: templateId } = await params;
     const bodyText = await request.text();
 
@@ -223,23 +276,18 @@ export async function POST(
     console.log('[POST /api/workflow-templates/[templateId]] Parsed the request body:', parsedBody);
 
     // Validate against schema
-    console.log('[POST] Validating template:', {
+    console.log('[PUT] Validating template:', {
       id: getField(parsedBody, ['id']),
       account: getField(parsedBody, ['account']),
       createdAt: getField(parsedBody, ['metadata', 'createdAt']),
       updatedAt: getField(parsedBody, ['metadata', 'updatedAt']),
     });
-    
+
     try {
       WorkflowTemplateSchema.parse(parsedBody);
     } catch (err) {
-      console.error('[POST] Validation failed:', err);
       const msg = err instanceof Error ? err.message : 'Invalid template data';
-      return NextResponse.json({ 
-        error: 'Invalid template data', 
-        details: msg,
-        received: parsedBody
-      }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid template data', details: msg }, { status: 400 });
     }
     console.log('[POST /api/workflow-templates/[templateId]] validated against workflowTemplateSchema');
 

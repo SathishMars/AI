@@ -12,7 +12,6 @@
  */
 
 import { useEffect, useRef, useCallback } from 'react';
-import { env } from '@/app/lib/env';
 
 export interface JwtRenewalOptions {
   expiresAt?: string; // ISO 8601 timestamp from JWT exp claim
@@ -54,13 +53,14 @@ export function useJwtRenewal(options: JwtRenewalOptions) {
     isRenewingRef.current = true;
 
     try {
-      const railsBase = env.railsBaseUrl;
+      const railsBase = process.env.NEXT_PUBLIC_RAILS_BASE_URL || 'http://groupize.local';
       const renewUrl = `${railsBase}/auth/renew`;
 
       const response = await fetch(renewUrl, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest', // CSRF protection
         },
         credentials: 'include',
       });
@@ -111,7 +111,7 @@ export function useJwtRenewal(options: JwtRenewalOptions) {
   }, [calculateRenewalDelay, onRenewalSuccess, onRenewalFailure]);
 
   useEffect(() => {
-    if (env.authMode !== 'embedded' || !enabled || !expiresAt) return;
+    if (!enabled || !expiresAt) return;
 
     const expiryTime = new Date(expiresAt).getTime();
     if (isNaN(expiryTime)) return;

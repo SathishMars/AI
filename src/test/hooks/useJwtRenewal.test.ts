@@ -10,7 +10,7 @@
  */
 
 import { renderHook, waitFor, act } from '@testing-library/react';
-import { useJwtRenewal, JwtRenewalOptions, RenewalError } from '@/app/hooks/useJwtRenewal';
+import { useJwtRenewal } from '@/app/hooks/useJwtRenewal';
 import * as envModule from '@/app/lib/env';
 
 // Mock dependencies
@@ -34,7 +34,6 @@ describe('useJwtRenewal', () => {
     
     // Default env mock
     (mockEnv as any).env = {
-      authMode: 'embedded',
       railsBaseUrl: mockRailsBaseUrl,
     } as any;
 
@@ -70,19 +69,6 @@ describe('useJwtRenewal', () => {
       expect(jest.getTimerCount()).toBe(0);
     });
 
-    it('should not set up renewal in standalone mode', () => {
-      mockEnv.env.authMode = 'standalone';
-      const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
-      
-      renderHook(() => useJwtRenewal({
-        expiresAt,
-        enabled: true,
-      }));
-
-      expect(global.fetch).not.toHaveBeenCalled();
-      expect(jest.getTimerCount()).toBe(0);
-    });
-
     it('should not set up renewal with invalid date', () => {
       const invalidDate = 'invalid-date';
       
@@ -95,7 +81,7 @@ describe('useJwtRenewal', () => {
       expect(jest.getTimerCount()).toBe(0);
     });
 
-    it('should set up renewal timer when enabled in embedded mode', () => {
+    it('should set up renewal timer when enabled', () => {
       const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
       
       renderHook(() => useJwtRenewal({
@@ -200,6 +186,7 @@ describe('useJwtRenewal', () => {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest',
             },
             credentials: 'include',
           })

@@ -43,28 +43,9 @@ function buildApiUrl(request: NextRequest, accountFromQuery: string | null, orgF
   }
 }
 
-/**
- * Authentication Middleware
- * 
- * Supports two modes via AUTH_MODE environment variable:
- * 
- * 1. EMBEDDED MODE (default):
- *    - Verifies JWT token from gpw_session cookie
- *    - Validates RS256 signature via JWKS
- *    - Validates claims (exp, aud, iss, etc.)
- *    - Redirects to Rails login on failure
- * 
- * 2. STANDALONE MODE:
- *    - Skips JWT verification
- *    - Uses mocked user API for development
- *    - Injects user headers from API response
- * 
- * Both modes inject user context headers for downstream API routes.
- */
 export async function proxy(request: NextRequest) {
   try {
     const pathname = request.nextUrl.pathname;
-    console.log('[Auth Middleware] pathname:', pathname, 'basePath:', env.basePath, 'mode:', env.authMode);
 
     if (
       pathname.startsWith('/_next') ||
@@ -91,20 +72,11 @@ export async function proxy(request: NextRequest) {
       return NextResponse.next();
     }
 
-    if (env.authMode === 'embedded') {
-      return await handleEmbeddedMode(request, pathname);
-    }
-
-    return await handleStandaloneMode(request);
+    return await handleUserAuth(request, pathname);
 
   } catch (err) {
     console.error('[Auth Middleware] Critical error:', err);
-    
-    if (env.isProduction && env.authMode === 'embedded') {
-      return NextResponse.redirect(getRailsAppUrl());
-    }
-    
-    return NextResponse.next();
+    return NextResponse.redirect(getRailsAppUrl());
   }
 }
 
@@ -117,7 +89,7 @@ export async function proxy(request: NextRequest) {
  * - Middleware only verifies tokens and redirects if expired/invalid
  * - This separation ensures renewal happens proactively in the browser, not reactively in middleware
  */
-async function handleEmbeddedMode(request: NextRequest, pathname: string) {
+async function handleUserAuth(request: NextRequest, pathname: string) {
   const token = request.cookies.get(env.cookieName)?.value;
   
   if (!token) {
@@ -256,133 +228,6 @@ async function buildAuthorizedResponse(
   );
   
   return response;
-}
-
-async function handleStandaloneMode(request: NextRequest) {
-  const url = request.nextUrl;
-  const accountFromQuery = url.searchParams.get('account');
-  const accountFromHeader = request.headers.get('x-account');
-  const accountFromCookie = request.cookies.get('account')?.value;
-  const orgFromQuery = url.searchParams.get('organization');
-  const orgFromHeader = request.headers.get('x-organization');
-  const orgFromCookie = request.cookies.get('organization')?.value;
-
-  const apiUrl = buildApiUrl(request, accountFromQuery, orgFromQuery);
-  const fallbackUser = {
-    userId: 'john.doe',
-    firstName: 'John',
-    lastName: 'Doe',
-    email: 'john.doe@example.com',
-    fullName: 'John Doe'
-  };
-
-  let fetchedData: UserSessionData = null;
-  try {
-    console.log('[Auth Middleware] Fetching user session from', apiUrl.toString());
-    const apiRes = await fetch(apiUrl.toString(), {
-      method: 'GET',
-      headers: {
-        accept: 'application/json',
-        [MIDDLEWARE_SKIP_HEADER]: MIDDLEWARE_SKIP_VALUE
-      }
-    });
-
-    if (apiRes.ok) {
-      const json = await apiRes.json().catch(() => null);
-      if (json && json.success && json.data) {
-        fetchedData = json.data;
-      }
-    } else {
-      console.warn('[Auth Middleware] User-session fetch failed with response', apiRes.status);
-    }
-  } catch (err) {
-    console.warn('[Auth Middleware] User-session fetch failed', err);
-  }
-
-  const accountId = fetchedData?.account?.id || accountFromQuery || accountFromHeader || accountFromCookie || 'groupize-demos';
-  
-  let organizationObj = fetchedData?.currentOrganization || null;
-  if (!organizationObj) {
-    if (orgFromQuery) {
-      organizationObj = { id: orgFromQuery };
-    } else if (orgFromHeader) {
-      organizationObj = { id: orgFromHeader };
-    } else if (orgFromCookie) {
-      organizationObj = { id: orgFromCookie };
-    }
-  }
-  const organizationId = organizationObj?.id || null;
-  const userObj = fetchedData?.user || null;
-
-  const requestHeaders = new Headers(request.headers);
-  requestHeaders.set('x-account', accountId);
-  requestHeaders.set('x-account-id', accountId);
-  if (organizationId) {
-    requestHeaders.set('x-organization', organizationId);
-    requestHeaders.set('x-organization-id', organizationId);
-  } else {
-    requestHeaders.delete('x-organization');
-    requestHeaders.delete('x-organization-id');
-  }
-
-  const finalUser = userObj
-    ? {
-        id: userObj.id ?? userObj.userId ?? '',
-        firstName: userObj.profile?.firstName ?? userObj.firstName ?? fallbackUser.firstName,
-        lastName: userObj.profile?.lastName ?? userObj.lastName ?? fallbackUser.lastName,
-        email: userObj.profile?.email ?? userObj.email ?? fallbackUser.email
-      }
-    : {
-        id: fallbackUser.userId,
-        firstName: fallbackUser.firstName,
-        lastName: fallbackUser.lastName,
-        email: fallbackUser.email
-      };
-
-  requestHeaders.set('x-user-id', finalUser.id);
-  requestHeaders.set('x-user-first-name', finalUser.firstName);
-  requestHeaders.set('x-user-last-name', finalUser.lastName);
-  requestHeaders.set('x-user-email', finalUser.email);
-  requestHeaders.set('x-user-full-name', `${finalUser.firstName} ${finalUser.lastName}`);
-
-  const res = NextResponse.next({
-    request: {
-      headers: requestHeaders
-    }
-  });
-
-  const cookiePath = env.basePath ? `/${env.basePath}` : '/';
-  try {
-    res.cookies.set('user', encodeURIComponent(JSON.stringify(finalUser)), {
-      path: cookiePath,
-      httpOnly: false,
-      sameSite: 'lax'
-    });
-    res.cookies.set('account', encodeURIComponent(JSON.stringify({ id: accountId })), {
-      path: cookiePath,
-      httpOnly: false,
-      sameSite: 'lax'
-    });
-    if (organizationId) {
-      res.cookies.set('organization', encodeURIComponent(JSON.stringify({ id: organizationId })), {
-        path: cookiePath,
-        httpOnly: false,
-        sameSite: 'lax'
-      });
-    } else {
-      try {
-        res.cookies.delete('organization');
-      } catch {
-      }
-    }
-  } catch (e) {
-    console.warn('[Auth Middleware] Could not set user/account cookie', e);
-  }
-  console.log(
-    `[Auth Middleware] Authorized (standalone): ${finalUser.id} (${finalUser.email}) - Account: ${accountId}${organizationId ? `, Org: ${organizationId}` : ''}`
-  );
-
-  return res;
 }
 
 export const config = {

@@ -4,16 +4,9 @@ export type AuthMode = 'embedded' | 'standalone';
  * Environment configuration interface
  */
 interface EnvironmentConfig {
-  // Authentication
-  authMode: AuthMode;
-  
   // Rails/Backend URLs
   railsBaseUrl: string;
-  jwksUrl: string;
-  
-  // JWT Configuration
-  jwtIssuer: string;
-  jwtAudience: string;
+  jwksUrl: string; // Auto-derived from railsBaseUrl
   
   // Cookie configuration
   cookieName: string;
@@ -36,7 +29,6 @@ interface EnvironmentConfig {
   // Feature flags
   isDevelopment: boolean;
   isProduction: boolean;
-  isStandalone: boolean;
 }
 
 
@@ -52,37 +44,13 @@ function getOptionalEnv(key: string): string | undefined {
   return process.env[key];
 }
 
-function getAuthMode(): AuthMode {
-  const mode = process.env.AUTH_MODE?.toLowerCase();
-  
-  if (mode === 'standalone') {
-    return 'standalone';
-  }
-  
-  return 'embedded';
-}
-
 function buildConfig(): EnvironmentConfig {
   const nodeEnv = getEnv('NODE_ENV', 'development');
   const isDevelopment = nodeEnv === 'development';
   const isProduction = nodeEnv === 'production';
-  const authMode = getAuthMode();
-  const isStandalone = authMode === 'standalone';
+  const railsBaseUrl = getEnv('NEXT_PUBLIC_RAILS_BASE_URL', 'http://groupize.local');
   
-  // Allow client-side access via NEXT_PUBLIC_ prefix, fallback to server-side env
-  const railsBaseUrl = getEnv(
-    'NEXT_PUBLIC_RAILS_BASE_URL',
-    getEnv('RAILS_BASE_URL', isDevelopment ? 'http://groupize.local' : '')
-  );
-  
-  // JWKS endpoint and JWT configuration only used in embedded mode
-  const jwksUrl = getEnv(
-    'JWKS_URL',
-    `${railsBaseUrl}/.well-known/jwks.json`
-  );
-  
-  const jwtIssuer = getEnv('JWT_ISSUER', 'groupize');
-  const jwtAudience = getEnv('JWT_AUDIENCE', 'workflows');
+  const jwksUrl = `${railsBaseUrl}/.well-known/jwks.json`;
   const cookieName = getEnv('COOKIE_NAME', 'gpw_session');
   const basePath = getEnv('NEXT_PUBLIC_BASE_PATH', '/aime');
   const appUrl = getEnv('NEXT_PUBLIC_APP_URL', 'http://localhost:3000');
@@ -96,11 +64,8 @@ function buildConfig(): EnvironmentConfig {
   const mongoDbUri = getOptionalEnv('MONGODB_URI');
   
   return {
-    authMode,
     railsBaseUrl,
     jwksUrl,
-    jwtIssuer,
-    jwtAudience,
     cookieName,
     basePath,
     nodeEnv,
@@ -113,7 +78,6 @@ function buildConfig(): EnvironmentConfig {
     mongoDbUri,
     isDevelopment,
     isProduction,
-    isStandalone,
   };
 }
 

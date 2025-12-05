@@ -12,52 +12,12 @@ describe('Environment Configuration', () => {
     (process.env as any) = originalEnv;
   });
 
-  describe('Auth Mode', () => {
-    it('should default to embedded mode when AUTH_MODE is not set', () => {
-      delete process.env.AUTH_MODE;
-      jest.resetModules();
-      const { env } = require('@/app/lib/env');
-      expect(env.authMode).toBe('embedded');
-    });
-
-    it('should use standalone mode when AUTH_MODE=standalone', () => {
-      process.env.AUTH_MODE = 'standalone';
-      jest.resetModules();
-      const { env } = require('@/app/lib/env');
-      expect(env.authMode).toBe('standalone');
-      expect(env.isStandalone).toBe(true);
-    });
-
-    it('should use embedded mode when AUTH_MODE=embedded', () => {
-      process.env.AUTH_MODE = 'embedded';
-      jest.resetModules();
-      const { env } = require('@/app/lib/env');
-      expect(env.authMode).toBe('embedded');
-      expect(env.isStandalone).toBe(false);
-    });
-
-    it('should be case insensitive', () => {
-      process.env.AUTH_MODE = 'STANDALONE';
-      jest.resetModules();
-      const { env } = require('@/app/lib/env');
-      expect(env.authMode).toBe('standalone');
-    });
-  });
-
   describe('Rails Base URL', () => {
     it('should use NEXT_PUBLIC_RAILS_BASE_URL when set', () => {
       process.env.NEXT_PUBLIC_RAILS_BASE_URL = 'https://app.groupize.com';
       jest.resetModules();
       const { env } = require('@/app/lib/env');
       expect(env.railsBaseUrl).toBe('https://app.groupize.com');
-    });
-
-    it('should fallback to RAILS_BASE_URL when NEXT_PUBLIC_RAILS_BASE_URL is not set', () => {
-      delete process.env.NEXT_PUBLIC_RAILS_BASE_URL;
-      process.env.RAILS_BASE_URL = 'https://rails.groupize.com';
-      jest.resetModules();
-      const { env } = require('@/app/lib/env');
-      expect(env.railsBaseUrl).toBe('https://rails.groupize.com');
     });
 
     it('should default to http://groupize.local in development', () => {
@@ -71,50 +31,9 @@ describe('Environment Configuration', () => {
   });
 
   describe('JWKS URL', () => {
-    it('should use JWKS_URL when set', () => {
-      process.env.JWKS_URL = 'https://custom.jwks.url/jwks.json';
-      jest.resetModules();
-      const { env } = require('@/app/lib/env');
-      expect(env.jwksUrl).toBe('https://custom.jwks.url/jwks.json');
-    });
-
-    it('should default to ${RAILS_BASE_URL}/.well-known/jwks.json', () => {
-      delete process.env.JWKS_URL;
-      process.env.RAILS_BASE_URL = 'https://app.groupize.com';
-      jest.resetModules();
-      const { env } = require('@/app/lib/env');
-      expect(env.jwksUrl).toBe('https://app.groupize.com/.well-known/jwks.json');
-    });
   });
 
   describe('JWT Configuration', () => {
-    it('should use JWT_ISSUER when set', () => {
-      process.env.JWT_ISSUER = 'custom-issuer';
-      jest.resetModules();
-      const { env } = require('@/app/lib/env');
-      expect(env.jwtIssuer).toBe('custom-issuer');
-    });
-
-    it('should default JWT_ISSUER to groupize', () => {
-      delete process.env.JWT_ISSUER;
-      jest.resetModules();
-      const { env } = require('@/app/lib/env');
-      expect(env.jwtIssuer).toBe('groupize');
-    });
-
-    it('should use JWT_AUDIENCE when set', () => {
-      process.env.JWT_AUDIENCE = 'custom-audience';
-      jest.resetModules();
-      const { env } = require('@/app/lib/env');
-      expect(env.jwtAudience).toBe('custom-audience');
-    });
-
-    it('should default JWT_AUDIENCE to workflows', () => {
-      delete process.env.JWT_AUDIENCE;
-      jest.resetModules();
-      const { env } = require('@/app/lib/env');
-      expect(env.jwtAudience).toBe('workflows');
-    });
   });
 
   describe('Cookie Configuration', () => {

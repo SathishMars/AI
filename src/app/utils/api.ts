@@ -1,7 +1,5 @@
-import { env } from '@/app/lib/env';
-
 /**
- * Fetch wrapper that automatically prepends basePath to API calls
+ * Client-side fetch wrapper that automatically prepends basePath to API calls
  * 
  * @example
  * // Instead of: fetch('/api/workflow-templates')
@@ -15,6 +13,7 @@ export const apiFetch = (
     return fetch(input, init);
   }
 
-  const url = `${env.basePath}${input}`;
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '/aime';
+  const url = `${basePath}${input}`;
   return fetch(url, init);
 };

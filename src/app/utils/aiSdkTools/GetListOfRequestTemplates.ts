@@ -3,52 +3,66 @@
 
 import { tool } from 'ai';
 import { z } from 'zod';
+import { serverApiFetch } from '@/app/utils/server-api';
 
 export interface ListOfRequestTemplatesInput {
-    account: string;
-    // organization is optional; when present it may be `null` or a non-empty string
-    organization?: string | null;
+  account: string;
+  organization?: string | null;
 }
 
 export interface RequestTemplateSummary {
-    id: string;
-    version: string;
-    label: string;
-    description?: string | null;
+  id: string;
+  version: string;
+  label: string;
+  description?: string | null;
 }
 
 export interface ListOfRequestTemplatesOutput {
-    templates: RequestTemplateSummary[];
+  templates: RequestTemplateSummary[];
 }
 
 export const getListOfRequestTemplates = async (
-    input: ListOfRequestTemplatesInput
+  input: ListOfRequestTemplatesInput
 ): Promise<ListOfRequestTemplatesOutput> => {
-    const { account, organization } = input;
-    console.log('[GetListOfRequestTemplates] Fetching request templates for account:', account, 'organization:', organization);
-    
-    // Defensive: ensure account present
-    if (!account || typeof account !== 'string') {
-        throw new Error('account is required and must be a string');
-    }
+  const { account, organization } = input;
 
-    // This is a placeholder and needs to be modified to use a helper that fetches request templates from the DB
-    const templates: RequestTemplateSummary[] = [
-        { id: 'req1001', version: '1.0.0', label: 'Budget Request', description: 'Request for budget approval' },
-        { id: 'req1002', version: '1.0.0', label: 'Travel Request', description: 'Request for travel approval' },
-        { id: 'req1003', version: '1.0.0', label: 'Hotel Request', description: 'Request for hotel approval' }
-    ];
+  if (!account || typeof account !== 'string') {
+      throw new Error('account is required and must be a string');
+  }
 
-    console.log('[GetListOfRequestTemplates] returning the list of request templates.', templates.length);
-    return { templates };
+  try {
+      const response = await serverApiFetch('/api/request-templates', {
+        method: 'GET',
+        headers: {
+          'x-account': account,
+          'x-organization': organization || ''
+        }
+      });
+
+      if (!response.ok) {
+          return { templates: [] };
+      }
+
+      const data = await response.json();  
+      const templates: RequestTemplateSummary[] = data.requests?.map((req: any) => ({
+          id: req.internal_key || req.requestId,
+          version: req.version || '1.0.0',
+          label: req.name,
+          description: null,
+      })) || [];
+
+      return { templates };
+      
+  } catch (error) {
+      return { templates: [] };
+  }
 };
 
 const nonEmptyStringOrNull = z.union([z.string().min(1), z.null()]);
 
 const getListOfRequestTemplatesSchema = z.object({
-    account: z.string().min(1).describe('Account identifier (required)'),
-    // organization may be omitted, null, or a non-empty string
-    organization: nonEmptyStringOrNull.optional().nullable().describe('Organization identifier (optional)'),
+  account: z.string().min(1).describe('Account identifier (required)'),
+  organization: nonEmptyStringOrNull.optional().nullable().describe('Organization identifier (optional)'),
 });
 
 /**
@@ -74,24 +88,26 @@ const getListOfRequestTemplatesSchema = z.object({
  * ```
  */
 export const getListOfRequestTemplatesTool = tool({
-    description:
-        'Returns a structured object containing published request templates for a given account and optional organization. ' +
-        'This tool expects an object input with account (required) and organization (optional). ' +
-        'Returns an object with a templates array containing request template details. ' +
-        'Use this tool to discover available request templates for an account before taking template-specific actions.',
-    
-    inputSchema: getListOfRequestTemplatesSchema,
-    
-    execute: async ({ account, organization }) => {
-        try {
-            const result = await getListOfRequestTemplates({ account, organization });
-            return result;
-        } catch (err) {
-            // Provide clear error messages for debugging
-            if (err instanceof Error) {
-                throw new Error(`getListOfRequestTemplates: ${err.message}`);
-            }
-            throw new Error(`getListOfRequestTemplates: unexpected error - ${String(err)}`);
-        }
-    },
+  description:
+      'Returns a structured object containing published request templates for a given account and optional organization. ' +
+      'This tool expects an object input with account (required) and organization (optional). ' +
+      'Returns an object with a templates array containing request template details. ' +
+      'Use this tool to discover available request templates for an account before taking template-specific actions. ' +
+      'IMPORTANT: When displaying templates to users in content.text or followUpOptions, show only the label (e.g., "Budget Request", "Travel Request") - NEVER display the ID. ' +
+      'The ID is for internal reference only and should be stored in the value field of followUpOptions, but users will only see the label. ' +
+      'CRITICAL: When presenting these templates as followUpOptions, you MUST include category: "template_request" in each option object. ' +
+      'Example format: {"label": "Digital Sign-In Request", "value": "req123", "category": "template_request", "metadata": {"templateId": "req123", "version": "1.0.0"}}. ' +
+      'NEVER display HTTP error statuses or technical error messages to users. If no templates are available, simply state that no templates were found.',
+  
+  inputSchema: getListOfRequestTemplatesSchema,
+  
+  execute: async ({ account, organization }) => {
+      try {
+          const result = await getListOfRequestTemplates({ account, organization });
+          return result;
+      } catch (err) {
+          // Never expose errors to the AI - return empty array instead - This prevents HTTP status codes and technical errors from being displayed to the user
+          return { templates: [] };
+      }
+  },
 });

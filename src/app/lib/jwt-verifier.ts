@@ -82,9 +82,7 @@ function getJWKS(): ReturnType<typeof createRemoteJWKSet> {
     return jwksCache;
   }
 
-  const jwksUrl = new URL(env.jwksUrl);
-
-  jwksCache = createRemoteJWKSet(jwksUrl, {
+  jwksCache = createRemoteJWKSet(new URL(env.jwksUrl), {
     cacheMaxAge: JWKS_CACHE_TTL,
     cooldownDuration: 30000,
   });
@@ -103,8 +101,8 @@ export async function verifyUserToken(token: string): Promise<UserJWTClaims> {
     const JWKS = getJWKS();
     
     const result: JWTVerifyResult = await jwtVerify(token, JWKS, {
-      issuer: env.jwtIssuer,
-      audience: 'workflows', // User tokens
+      issuer: 'groupize',
+      audience: 'workflows',
       clockTolerance: 60, // 60 seconds clock skew tolerance
     });
     
@@ -149,7 +147,7 @@ export async function verifyServiceToken(token: string): Promise<ServiceJWTClaim
     const JWKS = getJWKS();
     
     const result: JWTVerifyResult = await jwtVerify(token, JWKS, {
-      issuer: env.jwtIssuer,
+      issuer: 'groupize',
       audience: 'workflows-api',
       subject: 'service:rails',
       clockTolerance: 60,

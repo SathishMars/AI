@@ -20,7 +20,6 @@ describe('Middleware', () => {
 
     // Default env mock
     (envModule as any).env = {
-      authMode: 'embedded',
       cookieName: 'gpw_session',
       railsBaseUrl: 'http://groupize.local',
       basePath: '/aime',
@@ -62,11 +61,7 @@ describe('Middleware', () => {
     });
   });
 
-  describe('Embedded mode', () => {
-    beforeEach(() => {
-      (envModule as any).env.authMode = 'embedded';
-    });
-
+  describe('User authentication', () => {
     it('should redirect to Rails when no token', async () => {
       const request = createTestRequest('http://localhost:3000/aime/');
       const response = await proxy(request);
@@ -287,64 +282,8 @@ describe('Middleware', () => {
     });
   });
 
-  describe('Standalone mode', () => {
-    beforeEach(() => {
-      (envModule as any).env.authMode = 'standalone';
-      (envModule as any).env.basePath = '/aime';
-    });
-
-    it('should skip JWT verification in standalone mode', async () => {
-      const request = createTestRequest('http://localhost:3000/aime/');
-      const response = await proxy(request);
-
-      expect(response).toBeInstanceOf(NextResponse);
-      expect(response.status).toBe(200);
-      expect(mockVerifyUserToken).not.toHaveBeenCalled();
-    });
-
-    it('should inject default user headers in standalone mode', async () => {
-      // Mock fetch for user-session API
-      global.fetch = jest.fn().mockResolvedValue({
-        ok: false,
-        status: 404,
-      });
-
-      const request = createTestRequest('http://localhost:3000/aime/');
-      const response = await proxy(request);
-
-      expect(response.headers.get('x-user-id')).toBe('john.doe');
-      expect(response.headers.get('x-user-email')).toBe('john.doe@example.com');
-      expect(response.headers.get('x-account-id')).toBe('groupize-demos');
-    });
-
-    it('should use account from query params in standalone mode', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
-        ok: false,
-        status: 404,
-      });
-
-      const request = createTestRequest('http://localhost:3000/aime/?account=test-account');
-      const response = await proxy(request);
-
-      expect(response.headers.get('x-account-id')).toBe('test-account');
-    });
-
-    it('should use organization from query params in standalone mode', async () => {
-      global.fetch = jest.fn().mockResolvedValue({
-        ok: false,
-        status: 404,
-      });
-
-      const request = createTestRequest('http://localhost:3000/aime/?account=test-account&organization=test-org');
-      const response = await proxy(request);
-
-      expect(response.headers.get('x-organization-id')).toBe('test-org');
-    });
-  });
-
   describe('Error handling', () => {
     beforeEach(() => {
-      (envModule as any).env.authMode = 'embedded';
       (envModule as any).env.isProduction = false;
     });
 
@@ -360,25 +299,8 @@ describe('Middleware', () => {
       const response = await proxy(request);
 
       expect(response).toBeInstanceOf(NextResponse);
-      // In embedded mode, errors redirect to Rails for re-authentication
       expect(response.status).toBe(307); // Redirect
       expect(response.headers.get('Location')).toBe('http://groupize.local/');
-    });
-
-    it('should redirect on error in production', async () => {
-      (envModule as any).env.isProduction = true;
-      mockVerifyUserToken.mockRejectedValue(new Error('Unexpected error'));
-
-      const request = createTestRequest('http://localhost:3000/aime/', {
-        cookies: {
-          gpw_session: 'token',
-        },
-      });
-
-      const response = await proxy(request);
-
-      expect(response).toBeInstanceOf(NextResponse);
-      expect(response.status).toBe(307); // Redirect in production
     });
   });
 });
