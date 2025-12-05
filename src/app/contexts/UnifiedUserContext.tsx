@@ -3,7 +3,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { apiFetch } from '@/app/utils/api';
-import { env } from '@/app/lib/env';
 import { useJwtRenewal } from '@/app/hooks/useJwtRenewal';
 import { 
   User,
@@ -380,7 +379,8 @@ export function UnifiedUserProvider({ children, initialCurrentUser }: UnifiedUse
   const handleRenewalFailure = useCallback((error: { code: string; message: string; shouldRedirect: boolean }) => {
     console.error('[UnifiedUserContext] JWT renewal failed:', error);  
     if (error.shouldRedirect) {
-      window.location.href = env.railsBaseUrl;
+      const railsBaseUrl = process.env.NEXT_PUBLIC_RAILS_BASE_URL || 'http://groupize.local';
+      window.location.href = railsBaseUrl;
     } else {
       setUserError(`Session renewal failed: ${error.message}`);
     }

@@ -1,5 +1,3 @@
-import { env } from '@/app/lib/env';
-
 /**
  * Client-side fetch wrapper that automatically prepends basePath to API calls
  * 
@@ -15,7 +13,7 @@ export const apiFetch = (
     return fetch(input, init);
   }
 
-  // Client-side: use relative URL with basePath
-  const url = `${env.basePath}${input}`;
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '/aime';
+  const url = `${basePath}${input}`;
   return fetch(url, init);
 };
