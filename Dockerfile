@@ -20,12 +20,16 @@ RUN npm install
 FROM base AS builder
 ENV NODE_ENV=production
 
+# Base path for Next.js app (can be overridden at build time)
+ARG BASE_PATH=/aime
+
+# Set NEXT_PUBLIC_BASE_PATH for build-time embedding
+ENV NEXT_PUBLIC_BASE_PATH=${BASE_PATH}
 
 # optout of tracking telemetry from nextjs
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Build the Next.js app (ensure next.config.js has output: 'standalone')
-
 RUN npm run build
 
 # ---- Stage 3: Production Runtime ----
@@ -35,6 +39,9 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOST=0.0.0.0
+
+# Base path for Next.js app (can be overridden at build time)
+ARG BASE_PATH=/aime
 
 # (Optional) Pass runtime base path if needed for dynamic overrides
 ENV NEXT_PUBLIC_BASE_PATH=${BASE_PATH}

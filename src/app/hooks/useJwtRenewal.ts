@@ -6,12 +6,15 @@
  * Architecture:
  * - Renews tokens 5 minutes before expiry (e.g., at 25 minutes for 30-minute tokens)
  * - This ensures tokens are rarely expired when middleware verifies them
+ * - Calls Next.js /api/auth/renew endpoint (which proxies to Rails)
+ * - All JWT and cookie handling stays server-side - browser never sees Rails URLs or JWTs
  * - Middleware only verifies and redirects - no renewal logic there
  * 
  * Security: NEVER decodes or manipulates JWT in browser - only uses expiresAt from server.
  */
 
 import { useEffect, useRef, useCallback } from 'react';
+import { apiFetch } from '@/app/utils/api';
 
 export interface JwtRenewalOptions {
   expiresAt?: string; // ISO 8601 timestamp from JWT exp claim
@@ -24,6 +27,7 @@ export interface RenewalError {
   code: string;
   message: string;
   shouldRedirect: boolean;
+  redirectUrl?: string; // Server-provided redirect URL
 }
 
 // Renew 5 minutes before token expiry (e.g., for 30-minute tokens, renew at 25 minutes)
@@ -53,28 +57,18 @@ export function useJwtRenewal(options: JwtRenewalOptions) {
     isRenewingRef.current = true;
 
     try {
-      const railsBase = process.env.NEXT_PUBLIC_RAILS_BASE_URL || 'http://groupize.local';
-      const renewUrl = `${railsBase}/auth/renew`;
+      const renewUrl = '/api/auth/renew';
 
-      const response = await fetch(renewUrl, {
+      const response = await apiFetch(renewUrl, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest', // CSRF protection
         },
         credentials: 'include',
       });
 
       if (!response.ok) {
-        const errorText = await response.text().catch(() => 'Unknown error');
-        let errorData: { error?: string; code?: string } = {};
-        try {
-          if (errorText) {
-            errorData = JSON.parse(errorText);
-          }
-        } catch {
-          // Not JSON, use status code
-        }
+        const errorData = await response.json().catch(() => ({}));
         
         const shouldRedirect = response.status === 401 || response.status === 403;
         
@@ -83,13 +77,14 @@ export function useJwtRenewal(options: JwtRenewalOptions) {
             code: errorData.code || (response.status === 401 ? 'SESSION_EXPIRED' : 'RENEWAL_FAILED'),
             message: errorData.error || (response.status === 401 ? 'Session expired' : 'Renewal failed'),
             shouldRedirect: true,
+            redirectUrl: errorData.redirectUrl,
           });
         }
         return;
       }
 
       const data = await response.json();
-      if (!data.expiresAt) {
+      if (!data.ok || !data.expiresAt) {
         console.error('[JWT Renewal] Invalid response format:', data);
         return;
       }

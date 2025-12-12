@@ -5,10 +5,18 @@ import * as workflowTemplateService from '@/app/services/workflowTemplateService
 import * as WorkflowStepUtils from '@/app/utils/WorkflowStepUtils';
 import { WorkflowTemplate, WorkflowTemplateMetadata } from '@/app/types/workflowTemplate';
 import { createTestRequest } from '../helpers/next-request';
+import { Session } from '@/app/lib/dal';
 
 // Mock dependencies
 jest.mock('@/app/services/workflowTemplateService');
 jest.mock('@/app/utils/WorkflowStepUtils');
+
+// Mock DAL module
+jest.mock('@/app/lib/dal', () => ({
+  requireSession: jest.fn(),
+  verifySession: jest.fn(),
+  getRailsBaseUrl: jest.fn(() => 'https://api.example.com'),
+}));
 
 const mockListTemplates = workflowTemplateService.listTemplates as jest.MockedFunction<typeof workflowTemplateService.listTemplates>;
 const mockCreateTemplate = workflowTemplateService.createTemplate as jest.MockedFunction<typeof workflowTemplateService.createTemplate>;
@@ -37,8 +45,43 @@ const createMockTemplate = (overrides?: Partial<WorkflowTemplate>): WorkflowTemp
 });
 
 describe('Workflow Templates API Routes', () => {
+  let mockSession: Session;
+  let mockRequireSession: jest.MockedFunction<() => Promise<Session>>;
+
   beforeEach(() => {
     jest.clearAllMocks();
+
+    // Setup default mock session
+    mockSession = {
+      userId: 'user123',
+      accountId: 'account123',
+      organizationId: 'org456',
+      email: 'test@example.com',
+      firstName: 'John',
+      lastName: 'Doe',
+      expiresAt: new Date(Date.now() + 3600000),
+      claims: {
+        iss: 'groupize',
+        aud: 'workflows',
+        sub: 'user123',
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        iat: Math.floor(Date.now() / 1000),
+        nbf: Math.floor(Date.now() / 1000),
+        context: {
+          user_id: 'user123',
+          email: 'test@example.com',
+          user_first_name: 'John',
+          user_last_name: 'Doe',
+          account_id: 'account123',
+          organization_id: 'org456',
+        },
+      },
+    };
+
+    // Default mock for requireSession
+    const dalModule = require('@/app/lib/dal');
+    mockRequireSession = dalModule.requireSession as jest.MockedFunction<() => Promise<Session>>;
+    mockRequireSession.mockResolvedValue(mockSession);
   });
 
   describe('GET /api/workflow-templates', () => {

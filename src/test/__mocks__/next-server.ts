@@ -9,9 +9,11 @@ class MockHeaders {
   // Add an index signature to be compatible with Record<string, string>
   [key: string]: any;
   public headers: Map<string, string>;
+  private setCookieHeaders: string[];
 
   constructor(init?: HeadersInit) {
     this.headers = new Map();
+    this.setCookieHeaders = [];
     if (init) {
       if (init instanceof Headers) {
         init.forEach((value, key) => {
@@ -22,6 +24,7 @@ class MockHeaders {
         init.headers.forEach((value, key) => {
           this.headers.set(key, value);
         });
+        this.setCookieHeaders = [...init.setCookieHeaders];
       } else if (Array.isArray(init)) {
         init.forEach(([key, value]) => {
           this.headers.set(key.toLowerCase(), value);
@@ -42,12 +45,32 @@ class MockHeaders {
     this.headers.set(name.toLowerCase(), value);
   }
 
+  append(name: string, value: string): void {
+    const lowerName = name.toLowerCase();
+    if (lowerName === 'set-cookie') {
+      // For Set-Cookie headers, append to the array (multiple Set-Cookie headers are allowed)
+      this.setCookieHeaders.push(value);
+    } else {
+      // For other headers, append the value to existing value or set it
+      const existing = this.headers.get(lowerName);
+      if (existing) {
+        this.headers.set(lowerName, `${existing}, ${value}`);
+      } else {
+        this.headers.set(lowerName, value);
+      }
+    }
+  }
+
   has(name: string): boolean {
     return this.headers.has(name.toLowerCase());
   }
 
   delete(name: string): void {
-    this.headers.delete(name.toLowerCase());
+    const lowerName = name.toLowerCase();
+    this.headers.delete(lowerName);
+    if (lowerName === 'set-cookie') {
+      this.setCookieHeaders = [];
+    }
   }
 
   entries(): IterableIterator<[string, string]> {
@@ -56,6 +79,11 @@ class MockHeaders {
 
   forEach(callback: (value: string, key: string) => void): void {
     this.headers.forEach(callback);
+  }
+
+  // Next.js 16+ method for getting Set-Cookie headers
+  getSetCookie(): string[] {
+    return [...this.setCookieHeaders];
   }
 }
 

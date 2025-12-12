@@ -1,4 +1,4 @@
-import { serverApiFetch } from './server-api';
+import { serverApiFetch } from '@/app/utils/server-api';
 import { cookies } from 'next/headers';
 import { env } from '@/app/lib/env';
 

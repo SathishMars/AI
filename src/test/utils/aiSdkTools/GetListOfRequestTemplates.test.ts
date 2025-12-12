@@ -1,7 +1,7 @@
 import {
   getListOfRequestTemplates,
   getListOfRequestTemplatesTool,
-} from './GetListOfRequestTemplates';
+} from '@/app/utils/aiSdkTools/GetListOfRequestTemplates';
 import { serverApiFetch } from '@/app/utils/server-api';
 
 // Mock server-api

@@ -17,6 +17,8 @@ import { env } from '@/app/lib/env';
 const JWKS_CACHE_TTL = 5 * 60 * 1000;
 let jwksCache: ReturnType<typeof createRemoteJWKSet> | null = null;
 let jwksCacheTime: number | null = null;
+// Promise-based cache to prevent race conditions during concurrent cache refreshes
+let jwksCachePromise: Promise<ReturnType<typeof createRemoteJWKSet>> | null = null;
 
 
 export interface UserJWTClaims extends JWTPayload {
@@ -75,21 +77,40 @@ export class JWTVerificationError extends Error {
 }
 
 
-function getJWKS(): ReturnType<typeof createRemoteJWKSet> {
+/**
+ * Get JWKS with race condition protection
+ * 
+ * Uses a promise-based cache to ensure concurrent requests share the same
+ * JWKS instance creation, preventing multiple fetches when cache expires.
+ */
+async function getJWKS(): Promise<ReturnType<typeof createRemoteJWKSet>> {
   const now = Date.now();
 
   if (jwksCache && jwksCacheTime && (now - jwksCacheTime < JWKS_CACHE_TTL)) {
     return jwksCache;
   }
 
-  jwksCache = createRemoteJWKSet(new URL(env.jwksUrl), {
-    cacheMaxAge: JWKS_CACHE_TTL,
-    cooldownDuration: 30000,
-  });
+  if (jwksCachePromise) {
+    return await jwksCachePromise;
+  }
 
-  jwksCacheTime = now;
+  jwksCachePromise = (async () => {
+    try {
+      const newCache = createRemoteJWKSet(new URL(env.jwksUrl), {
+        cacheMaxAge: JWKS_CACHE_TTL,
+        cooldownDuration: 30000,
+      });
 
-  return jwksCache;
+      jwksCache = newCache;
+      jwksCacheTime = Date.now();
+      
+      return newCache;
+    } finally {
+      jwksCachePromise = null;
+    }
+  })();
+
+  return await jwksCachePromise;
 }
 
 export async function verifyUserToken(token: string): Promise<UserJWTClaims> {
@@ -98,19 +119,21 @@ export async function verifyUserToken(token: string): Promise<UserJWTClaims> {
   }
 
   try {
-    const JWKS = getJWKS();
+    const JWKS = await getJWKS();
     
     const result: JWTVerifyResult = await jwtVerify(token, JWKS, {
       issuer: 'groupize',
       audience: 'workflows',
-      clockTolerance: 60, // 60 seconds clock skew tolerance
+      clockTolerance: 60,
     });
     
-    console.log('[JWTVerifier] User token verified:', {
-      user_id: (result.payload as UserJWTClaims).context.user_id,
-      account_id: (result.payload as UserJWTClaims).context.account_id,
-      organization_id: (result.payload as UserJWTClaims).context.organization_id,
-    });
+    if (process.env.NODE_ENV !== 'production') {
+      console.debug('[JWTVerifier] User token verified', {
+        user_id: (result.payload as UserJWTClaims).context.user_id,
+        account_id: (result.payload as UserJWTClaims).context.account_id,
+        organization_id: (result.payload as UserJWTClaims).context.organization_id,
+      });
+    }
     
     return result.payload as UserJWTClaims;
     
@@ -144,19 +167,13 @@ export async function verifyServiceToken(token: string): Promise<ServiceJWTClaim
   }
 
   try {
-    const JWKS = getJWKS();
+    const JWKS = await getJWKS();
     
     const result: JWTVerifyResult = await jwtVerify(token, JWKS, {
       issuer: 'groupize',
       audience: 'workflows-api',
       subject: 'service:rails',
       clockTolerance: 60,
-    });
-    
-    console.log('[JWTVerifier] Service token verified:', {
-      sub: result.payload.sub,
-      user_id: (result.payload as ServiceJWTClaims).context.user_id,
-      account_id: (result.payload as ServiceJWTClaims).context.account_id,
     });
     
     return result.payload as ServiceJWTClaims;
@@ -196,7 +213,7 @@ export function decodeTokenWithoutVerification(token: string): { exp?: number; i
     const decoded = decodeJwt(token);
     return decoded;
   } catch (error) {
-    console.error('[JWTVerifier] Failed to decode token:', error);
+    console.error('[JWTVerifier] Failed to decode token', error);
     return null;
   }
 }
@@ -204,6 +221,6 @@ export function decodeTokenWithoutVerification(token: string): { exp?: number; i
 export function clearJWKSCache(): void {
   jwksCache = null;
   jwksCacheTime = null;
-  console.log('[JWTVerifier] JWKS cache cleared');
+  jwksCachePromise = null;
 }
 

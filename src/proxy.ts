@@ -1,46 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyUserToken, JWTVerificationError, UserJWTClaims } from '@/app/lib/jwt-verifier';
 import { env } from '@/app/lib/env';
+import { requireSessionFromToken, requireAccountAccess, requireOrganizationAccess } from '@/app/lib/dal';
 
 const MIDDLEWARE_SKIP_HEADER = 'x-middleware-skip';
 const MIDDLEWARE_SKIP_VALUE = '1';
 
-// standalone mode
-type DemoUser = {
-  id?: string;
-  userId?: string;
-  firstName?: string;
-  lastName?: string;
-  email?: string;
-  profile?: { firstName?: string; lastName?: string; email?: string };
-};
-
-type UserSessionData = {
-  user?: DemoUser;
-  account?: { id?: string };
-  currentOrganization?: { id?: string } | null;
-} | null;
-
-
 function getRailsAppUrl(): URL {
   return new URL('/', env.railsBaseUrl || 'http://groupize.local');
-}
-
-
-
-function buildApiUrl(request: NextRequest, accountFromQuery: string | null, orgFromQuery: string | null): URL {
-  try {
-    const apiUrl = new URL(`${env.basePath}/api/user-session/`, request.nextUrl.origin);
-    if (accountFromQuery) apiUrl.searchParams.set('account', accountFromQuery);
-    if (orgFromQuery) apiUrl.searchParams.set('organization', orgFromQuery);
-    return apiUrl;
-  } catch {
-    const host = request.headers.get('host') || 'localhost:3000';
-    const apiUrl = new URL(`http://${host}${env.basePath}/api/user-session/`);
-    if (accountFromQuery) apiUrl.searchParams.set('account', accountFromQuery);
-    if (orgFromQuery) apiUrl.searchParams.set('organization', orgFromQuery);
-    return apiUrl;
-  }
 }
 
 export async function proxy(request: NextRequest) {
@@ -66,9 +32,18 @@ export async function proxy(request: NextRequest) {
       return NextResponse.next();
     }
 
+    if (request.nextUrl.pathname.startsWith('/api/health')) {
+      return NextResponse.next();
+    }
+
+    // Skip the auth renewal endpoint - it needs to handle expired/missing tokens
+    // and will proxy to Rails which will decide if renewal is valid
+    if (pathname.startsWith('/api/auth/renew') || pathname.startsWith(`${env.basePath}/api/auth/renew`)) {
+      return NextResponse.next();
+    }
+
     // Skip internal API routes - they use service token auth via withServiceAuth wrapper
     if (pathname.startsWith('/api/internal/') || pathname.startsWith(`${env.basePath}/api/internal/`)) {
-      console.log('[Auth Middleware] Skipping internal API route (uses service auth)');
       return NextResponse.next();
     }
 
@@ -82,12 +57,15 @@ export async function proxy(request: NextRequest) {
 
 
 /**
- * Handle embedded mode authentication
+ * Handle JWT authentication and route protection
  * 
  * Architecture:
- * - Client-side hook (useJwtRenewal) handles proactive renewal 5 minutes before token expiry
- * - Middleware only verifies tokens and redirects if expired/invalid
- * - This separation ensures renewal happens proactively in the browser, not reactively in middleware
+ * - Verifies JWT token from cookie and extracts user/account/org claims
+ * - Validates URL account/org IDs against JWT claims (route protection)
+ * - Client-side hook (useJwtRenewal) calls Next.js /api/auth/renew endpoint
+ * - Next.js /api/auth/renew proxies to Rails /auth/renew, forwarding cookies
+ * - All JWT and cookie handling stays server-side (Next.js ↔ Rails)
+ * - Browser never directly interacts with Rails or handles JWTs
  */
 async function handleUserAuth(request: NextRequest, pathname: string) {
   const token = request.cookies.get(env.cookieName)?.value;
@@ -98,21 +76,16 @@ async function handleUserAuth(request: NextRequest, pathname: string) {
     return NextResponse.redirect(railsUrl);
   }
 
-  let claims: UserJWTClaims;
+  // Use DAL function for middleware-compatible session verification
+  let session;
   try {
-    claims = await verifyUserToken(token);
+    session = await requireSessionFromToken(token);
   } catch (error) {
-    if (error instanceof JWTVerificationError) {
-      console.error('[Auth Middleware] Token verification failed:', error.code);
-      console.error('[Auth Middleware] Error details:', error.message);
-    } else {
-      console.error('[Auth Middleware] Unexpected verification error:', error);
-    }
-    
+    console.error('[Auth Middleware] Session verification failed:', error instanceof Error ? error.message : 'Unknown error');
     return NextResponse.redirect(getRailsAppUrl());
   }
 
-  return buildAuthorizedResponse(request, pathname, claims);
+  return buildAuthorizedResponse(request, pathname, session);
 }
 
 /**
@@ -121,19 +94,19 @@ async function handleUserAuth(request: NextRequest, pathname: string) {
 async function buildAuthorizedResponse(
   request: NextRequest,
   pathname: string,
-  claims: UserJWTClaims
+  session: Awaited<ReturnType<typeof requireSessionFromToken>>
 ): Promise<NextResponse> {
-  const fullName = `${claims.context.user_first_name} ${claims.context.user_last_name}`.trim();
+  const fullName = `${session.firstName} ${session.lastName}`.trim();
   
   const currentUser = {
-    userId: claims.context.user_id,
-    accountId: claims.context.account_id,
-    organizationId: claims.context.organization_id,
-    email: claims.context.email,
-    firstName: claims.context.user_first_name,
-    lastName: claims.context.user_last_name,
+    userId: session.userId,
+    accountId: session.accountId,
+    organizationId: session.organizationId,
+    email: session.email,
+    firstName: session.firstName,
+    lastName: session.lastName,
     fullName,
-    expiresAt: claims.exp ? new Date(claims.exp * 1000).toISOString() : undefined,
+    expiresAt: session.expiresAt.toISOString(),
   };
   
   const pathSegments = pathname.split('/').filter(Boolean);
@@ -150,33 +123,29 @@ async function buildAuthorizedResponse(
     }
   }
   
-  if (urlAccountId && urlAccountId !== currentUser.accountId) {
-    console.error(
-      `[Auth Middleware] Account ID mismatch. URL: ${urlAccountId}, JWT: ${currentUser.accountId}`
-    );
-    return NextResponse.json(
-      { error: 'Forbidden: Account access denied' },
-      { status: 403 }
-    );
-  }
-  
-  if (urlOrgId) {
-    if (!currentUser.organizationId) {
+  if (urlAccountId) {
+    try {
+      requireAccountAccess(session, urlAccountId);
+    } catch (error) {
       console.error(
-        `[Auth Middleware] User ${currentUser.userId} attempted to access org ${urlOrgId} but has no org in JWT`
+        `[Auth Middleware] Account access denied. URL: ${urlAccountId}, JWT: ${session.accountId}`
       );
       return NextResponse.json(
-        { error: 'Forbidden: Organization access denied' },
+        { error: error instanceof Error ? error.message : 'Forbidden: Account access denied' },
         { status: 403 }
       );
     }
-    
-    if (urlOrgId !== currentUser.organizationId) {
+  }
+  
+  if (urlOrgId) {
+    try {
+      requireOrganizationAccess(session, urlOrgId);
+    } catch (error) {
       console.error(
-        `[Auth Middleware] Org ID mismatch. URL: ${urlOrgId}, JWT: ${currentUser.organizationId}`
+        `[Auth Middleware] Organization access denied. URL: ${urlOrgId}, JWT: ${session.organizationId || 'none'}`
       );
       return NextResponse.json(
-        { error: 'Forbidden: Organization access denied' },
+        { error: error instanceof Error ? error.message : 'Forbidden: Organization access denied' },
         { status: 403 }
       );
     }

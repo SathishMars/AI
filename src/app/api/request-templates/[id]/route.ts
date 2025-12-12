@@ -1,21 +1,23 @@
 // Workflows/src/app/api/request-templates/[id]/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { env } from '@/app/lib/env';
+import { requireSession } from '@/app/lib/dal';
+import { AuthenticationError, AuthorizationError } from '@/app/lib/auth-errors';
+import { railsFetch, RailsApiError } from '@/app/lib/rails-fetcher';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const accountId = request.headers.get('x-account');
-    const organizationId = request.headers.get('x-organization');
+    const session = await requireSession();
+    const accountId = session.accountId || request.headers.get('x-account');
+    const organizationId = session.organizationId || request.headers.get('x-organization');
     const { id: requestTemplateId } = await params;
     
     if (!accountId) {
       return NextResponse.json(
-        { error: 'Account ID not found in request headers' },
+        { error: 'Account ID not found' },
         { status: 400 }
       );
     }
@@ -27,50 +29,50 @@ export async function GET(
       );
     }
     
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get('gpw_session');
-    
-    if (!sessionCookie) {
-      return NextResponse.json(
-        { error: 'Not authenticated' },
-        { status: 401 }
-      );
-    }
-    
-    const jwtToken = sessionCookie.value;
-    const railsBaseUrl = env.railsBaseUrl;
-    const url = new URL(`${railsBaseUrl}/api/v1/requests/${encodeURIComponent(requestTemplateId)}`);
+    const data = await railsFetch(
+      request,
+      `/api/v1/requests/${encodeURIComponent(requestTemplateId)}`,
+      {
+        method: 'GET',
+        searchParams: {
+          account_id: accountId,
+          organization_id: organizationId || '',
+        },
+      }
+    );
 
-
-    url.searchParams.set('account_id', accountId);
-    url.searchParams.set('organization_id', organizationId || '');
+    console.log('[request-templates/[id]] data returned', data);
     
-    const railsResponse = await fetch(url.toString(), {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${jwtToken}`,
-        'Cookie': `gpw_session=${jwtToken}`,
-        'Accept': 'application/json',
-      },
-    });
-    
-    if (!railsResponse.ok) {
-      const errorText = await railsResponse.text();
-      console.error('[request-templates/[id]] Rails API error:', {
-        status: railsResponse.status,
-        statusText: railsResponse.statusText,
-        errorBody: errorText,
-      });
-      return NextResponse.json(
-        { error: 'Failed to fetch request template from Rails', details: errorText },
-        { status: railsResponse.status }
-      );
-    }
-    
-    const data = await railsResponse.json();
     return NextResponse.json(data);
     
   } catch (error) {
+    if (error instanceof AuthenticationError) {
+      return NextResponse.json(
+        { error: 'Unauthorized', code: error.code },
+        { status: error.statusCode }
+      );
+    }
+    
+    if (error instanceof AuthorizationError) {
+      return NextResponse.json(
+        { error: 'Forbidden', code: error.code },
+        { status: error.statusCode }
+      );
+    }
+    
+    if (error instanceof RailsApiError) {
+      console.error('[request-templates/[id]] Rails API error:', {
+        status: error.status,
+        statusText: error.statusText,
+        errorBody: error.details,
+      });
+      return NextResponse.json(
+        { error: 'Failed to fetch request template from Rails', details: error.details },
+        { status: error.status }
+      );
+    }
+    
+    console.error('[request-templates/[id]] Unexpected error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

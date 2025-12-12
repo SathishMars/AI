@@ -1,5 +1,7 @@
 // src/app/api/workflow-templates/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import { requireSession } from '@/app/lib/dal';
+import { AuthenticationError, AuthorizationError } from '@/app/lib/auth-errors';
 import { listTemplates, createTemplate } from '@/app/services/workflowTemplateService';
 import { TemplateStatus } from '@/app/types/workflowTemplate';
 
@@ -20,12 +22,10 @@ import { TemplateStatus } from '@/app/types/workflowTemplate';
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
+    const session = await requireSession();
     const { searchParams } = new URL(request.url);
-
-    // Parse query parameters (public API specific)
     const page = parseInt(searchParams.get('page') || '1', 10);
     const pageSize = Math.min(parseInt(searchParams.get('pageSize') || '20', 10), 100);
-    
     const statusParam = searchParams.get('status');
     const status = statusParam 
       ? statusParam.split(',').map(s => s.trim() as TemplateStatus)
@@ -39,10 +39,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       ? new Date(searchParams.get('createdBefore')!) 
       : undefined;
 
-    // Get account/org from headers (injected by middleware from user token)
-    const account = searchParams.get('account') || request.headers.get('x-account') || 'groupize-demos';
-    // If no organization provided, pass undefined to get ALL templates for account (not just account-level)
-    const organization = searchParams.get('organization') || request.headers.get('x-organization') || undefined;
+    const account = searchParams.get('account') || session.accountId || request.headers.get('x-account') || 'groupize-demos';
+    const organization = searchParams.get('organization') || session.organizationId || request.headers.get('x-organization') || undefined;
     
     // Logging (public API context)
     console.log('🌐 [Public API] List templates:', {
@@ -70,6 +68,20 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ success: true, data: result });
 
   } catch (error) {
+    if (error instanceof AuthenticationError) {
+      return NextResponse.json(
+        { error: 'Unauthorized', code: error.code },
+        { status: error.statusCode }
+      );
+    }
+    
+    if (error instanceof AuthorizationError) {
+      return NextResponse.json(
+        { error: 'Forbidden', code: error.code },
+        { status: error.statusCode }
+      );
+    }
+    
     console.error('[Public API] Failed to list templates:', error);
     const message = error instanceof Error ? error.message : 'Internal server error';
     const statusCode = error instanceof Error && error.message.includes('must be greater') ? 400 : 500;
@@ -83,15 +95,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
+    const session = await requireSession();
     const body = await request.json();
     
-    // Get account/org from headers (injected by middleware from user token)
-    const account = body.account || request.headers.get('x-account') || 'default-account';
-    const organization = body.organization || request.headers.get('x-organization') || undefined;
+    const account = body.account || session.accountId || request.headers.get('x-account') || 'default-account';
+    const organization = body.organization || session.organizationId || request.headers.get('x-organization') || undefined;
     
     console.log('📥 [Public API] Create template:', { account, organization });
     
-    // Call shared business logic
     const created = await createTemplate({
       account,
       organization,
@@ -108,6 +119,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ success: true, data: created }, { status: 201 });
 
   } catch (error) {
+    if (error instanceof AuthenticationError) {
+      return NextResponse.json(
+        { error: 'Unauthorized', code: error.code },
+        { status: error.statusCode }
+      );
+    }
+    
+    if (error instanceof AuthorizationError) {
+      return NextResponse.json(
+        { error: 'Forbidden', code: error.code },
+        { status: error.statusCode }
+      );
+    }
+    
     console.error('[Public API] Failed to create template:', error);
     const message = error instanceof Error ? error.message : 'Internal server error';
     const statusCode = error instanceof Error && error.message.includes('Invalid template') ? 400 : 500;

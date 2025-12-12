@@ -1,23 +1,38 @@
 // src/app/api/user-session/route.ts
 
 import { NextResponse } from 'next/server';
-import { getDemoSessionData } from './session-data';
+import { verifySession } from '@/app/lib/dal';
+import { logger } from '@/app/lib/logger';
+import { mergeSessionWithBase } from './session-data';
 
 /**
  * Unified User Session API Endpoint
  * Provides complete user context including user, account, and organization data
  * This replaces the separate /api/user and /api/account endpoints
+ * 
+ * User data comes from the verified JWT token claims, merged with base structure
  */
 
 export async function GET() {
   try {
-    // Use shared demo session data helper to avoid duplication
-    const data = getDemoSessionData();
+    const session = await verifySession();
+    
+    if (!session) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Unauthorized',
+        },
+        { status: 401 }
+      );
+    }
+    
+    const data = mergeSessionWithBase(session);
 
     return NextResponse.json({ success: true, data });
 
   } catch (error) {
-    console.error('User Session API Error:', error);
+    logger.error('User Session API Error', error, { module: 'user-session' });
     
     return NextResponse.json(
       {

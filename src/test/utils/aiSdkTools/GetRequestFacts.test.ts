@@ -1,8 +1,8 @@
-import { getListOfRequestFacts, getRequestFactsTool } from './GetRequestFacts';
-import { serverApiFetch } from '../server-api';
+import { getListOfRequestFacts, getRequestFactsTool } from '@/app/utils/aiSdkTools/GetRequestFacts';
+import { serverApiFetch } from '@/app/utils/server-api';
 
 // Mock server-api
-jest.mock('../server-api', () => ({
+jest.mock('@/app/utils/server-api', () => ({
   serverApiFetch: jest.fn(),
 }));
 

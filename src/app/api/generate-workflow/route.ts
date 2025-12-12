@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireSession } from '@/app/lib/dal';
+import { AuthenticationError, AuthorizationError } from '@/app/lib/auth-errors';
 import { validateWorkflowDefinition, WorkflowDefinition } from '@/app/types/workflowTemplate';
 import { AimeWorkflowConversationsRecord, WorkflowMessage } from '@/app/types/aimeWorkflowMessages';
 import { generateMermaidFromWorkflow } from '@/app/utils/MermaidGenerator';
@@ -39,15 +41,15 @@ type GeneratedResponseBody = {
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await requireSession();
+    
     const body = (await req.json()) as GenerateRequestBody;
-    const account = req.headers.get('x-account');
-    const organizationHeader = req.headers.get('x-organization');
+    const account = session.accountId || req.headers.get('x-account');
+    const organizationHeader = session.organizationId || req.headers.get('x-organization');
     const organization = organizationHeader === null ? null : organizationHeader;
 
     let isNewConversation: boolean = false;
-    // Middleware injects user info into headers; prefer header value
-    const userIdHeader = req.headers.get('x-user-id');
-    const resolvedUserId = userIdHeader && userIdHeader.trim() !== '' ? userIdHeader : undefined;
+    const resolvedUserId = session.userId;
 
     if (!body || typeof body !== 'object') {
       return NextResponse.json({ error: 'Missing request body' }, { status: 400 });
@@ -184,6 +186,20 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(responseBody, { status: 200 });
   } catch (err: unknown) {
+    if (err instanceof AuthenticationError) {
+      return NextResponse.json(
+        { error: 'Unauthorized', code: err.code },
+        { status: err.statusCode }
+      );
+    }
+    
+    if (err instanceof AuthorizationError) {
+      return NextResponse.json(
+        { error: 'Forbidden', code: err.code },
+        { status: err.statusCode }
+      );
+    }
+    
     console.log("[route] Error:", err);
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: message }, { status: 500 });

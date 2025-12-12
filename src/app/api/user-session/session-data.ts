@@ -140,3 +140,63 @@ export function getDemoSessionData() {
 }
 
 export type DemoSessionData = ReturnType<typeof getDemoSessionData>;
+
+/**
+ * Merge JWT session data with base session structure
+ * Overrides demo data with actual user data from verified JWT
+ */
+import { Session } from '@/app/lib/dal';
+
+export function mergeSessionWithBase(session: Session): DemoSessionData {
+  const base = getDemoSessionData();
+  
+  // Merge user data from JWT
+  const mergedUser = {
+    ...base.user,
+    id: session.userId,
+    profile: {
+      ...base.user.profile,
+      firstName: session.firstName,
+      lastName: session.lastName,
+      email: session.email,
+    },
+  };
+  
+  // Merge account data from JWT
+  const mergedAccount = {
+    ...base.account,
+    id: session.accountId,
+    organizations: session.organizationId 
+      ? base.account.organizations.map(org => ({
+          ...org,
+          id: session.organizationId!,
+        }))
+      : [],
+  };
+  
+  // Merge organization data from JWT
+  const mergedOrg = session.organizationId ? {
+    ...base.currentOrganization,
+    id: session.organizationId,
+    metadata: {
+      ...base.currentOrganization.metadata,
+      createdBy: session.userId,
+    },
+  } : base.currentOrganization;
+  
+  // Merge session data from JWT
+  const mergedSession = {
+    ...base.session,
+    sessionId: `session-${session.userId}-${Date.now()}`,
+    token: '', // Not needed for embedded mode (JWT in cookie)
+    expiresAt: session.expiresAt,
+  };
+  
+  return {
+    user: mergedUser,
+    account: mergedAccount,
+    currentOrganization: mergedOrg,
+    availableOrganizations: session.organizationId ? [mergedOrg] : base.availableOrganizations,
+    session: mergedSession,
+  };
+}

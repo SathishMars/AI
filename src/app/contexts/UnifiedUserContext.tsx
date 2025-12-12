@@ -376,19 +376,18 @@ export function UnifiedUserProvider({ children, initialCurrentUser }: UnifiedUse
   /**
    * Handle JWT renewal failure
    */
-  const handleRenewalFailure = useCallback((error: { code: string; message: string; shouldRedirect: boolean }) => {
+  const handleRenewalFailure = useCallback((error: { code: string; message: string; shouldRedirect: boolean; redirectUrl?: string }) => {
     console.error('[UnifiedUserContext] JWT renewal failed:', error);  
-    if (error.shouldRedirect) {
-      const railsBaseUrl = process.env.NEXT_PUBLIC_RAILS_BASE_URL || 'http://groupize.local';
-      window.location.href = railsBaseUrl;
+    if (error.shouldRedirect && error.redirectUrl) {
+      window.location.href = error.redirectUrl;
+    } else if (error.shouldRedirect) {
+      console.warn('[UnifiedUserContext] Redirect required but no redirectUrl provided');
+      setUserError(`Session renewal failed: ${error.message}`);
     } else {
       setUserError(`Session renewal failed: ${error.message}`);
     }
   }, []);
 
-  /**
-   * Setup JWT auto-renewal (only in embedded mode)
-   */
   useJwtRenewal({
     expiresAt: sessionExpiresAt,
     onRenewalSuccess: handleRenewalSuccess,

@@ -25,17 +25,14 @@ global.fetch = jest.fn();
 jest.useFakeTimers();
 
 describe('useJwtRenewal', () => {
-  const mockRailsBaseUrl = 'http://rails.test';
-  const mockRenewUrl = `${mockRailsBaseUrl}/auth/renew`;
+  const mockRenewUrl = '/aime/api/auth/renew';
 
   beforeEach(() => {
     jest.clearAllMocks();
     jest.clearAllTimers();
     
-    // Default env mock
-    (mockEnv as any).env = {
-      railsBaseUrl: mockRailsBaseUrl,
-    } as any;
+    // Set base path for apiFetch
+    process.env.NEXT_PUBLIC_BASE_PATH = '/aime';
 
     // Reset fetch mock
     (global.fetch as jest.Mock).mockClear();
@@ -159,7 +156,7 @@ describe('useJwtRenewal', () => {
 
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ expiresAt: newExpiresAt }),
+        json: async () => ({ ok: true, expiresAt: newExpiresAt }),
       });
 
       const onRenewalSuccess = jest.fn();
@@ -186,7 +183,6 @@ describe('useJwtRenewal', () => {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'X-Requested-With': 'XMLHttpRequest',
             },
             credentials: 'include',
           })
@@ -204,7 +200,7 @@ describe('useJwtRenewal', () => {
 
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
-        json: async () => ({ expiresAt: newExpiresAt }),
+        json: async () => ({ ok: true, expiresAt: newExpiresAt }),
       });
 
       renderHook(() => useJwtRenewal({
@@ -268,7 +264,7 @@ describe('useJwtRenewal', () => {
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: false,
         status: 401,
-        text: async () => JSON.stringify({ error: 'Session expired', code: 'SESSION_EXPIRED' }),
+        json: async () => ({ error: 'Session expired', code: 'SESSION_EXPIRED' }),
       });
 
       const onRenewalFailure = jest.fn();
@@ -301,7 +297,7 @@ describe('useJwtRenewal', () => {
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: false,
         status: 403,
-        text: async () => JSON.stringify({ error: 'Forbidden', code: 'FORBIDDEN' }),
+        json: async () => ({ error: 'Forbidden', code: 'FORBIDDEN' }),
       });
 
       const onRenewalFailure = jest.fn();
@@ -334,7 +330,9 @@ describe('useJwtRenewal', () => {
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: false,
         status: 401,
-        text: async () => 'Plain text error',
+        json: async () => {
+          throw new Error('Invalid JSON');
+        },
       });
 
       const onRenewalFailure = jest.fn();
@@ -367,7 +365,7 @@ describe('useJwtRenewal', () => {
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: false,
         status: 403,
-        text: async () => 'Forbidden',
+        json: async () => ({}), // Empty object, no error data
       });
 
       const onRenewalFailure = jest.fn();
@@ -412,7 +410,7 @@ describe('useJwtRenewal', () => {
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: false,
         status: 500,
-        text: async () => 'Internal Server Error',
+        json: async () => ({ error: 'Internal Server Error' }),
       });
 
       const onRenewalFailure = jest.fn();
@@ -495,7 +493,7 @@ describe('useJwtRenewal', () => {
       await act(async () => {
         resolveFetch!({
           ok: true,
-          json: async () => ({ expiresAt: newExpiresAt }),
+          json: async () => ({ ok: true, expiresAt: newExpiresAt }),
         });
         await Promise.resolve();
         await Promise.resolve();
