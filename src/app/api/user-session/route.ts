@@ -2,7 +2,6 @@
 
 import { NextResponse } from 'next/server';
 import { verifySession } from '@/app/lib/dal';
-import { logger } from '@/app/lib/logger';
 import { mergeSessionWithBase } from './session-data';
 
 /**
@@ -32,7 +31,7 @@ export async function GET() {
     return NextResponse.json({ success: true, data });
 
   } catch (error) {
-    logger.error('User Session API Error', error, { module: 'user-session' });
+    console.error('[user-session] Error', error);
     
     return NextResponse.json(
       {
