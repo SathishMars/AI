@@ -10,7 +10,7 @@ COPY package*.json ./
 # Copy source files
 COPY . .
 # Clear any stale modules and reinstall (just to be safe)
-RUN rm -rf node_modules 
+RUN rm -rf node_modules .next
 
 # Install dependencies for build and dev
 RUN npm install
@@ -20,11 +20,9 @@ RUN npm install
 FROM base AS builder
 ENV NODE_ENV=production
 
-# Base path for Next.js app (can be overridden at build time)
-ARG BASE_PATH=/aime
 
 # Set NEXT_PUBLIC_BASE_PATH for build-time embedding
-ENV NEXT_PUBLIC_BASE_PATH=${BASE_PATH}
+ENV NEXT_PUBLIC_BASE_PATH=/aime
 
 # optout of tracking telemetry from nextjs
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -40,8 +38,6 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOST=0.0.0.0
 
-# Base path for Next.js app (can be overridden at build time)
-ARG BASE_PATH=/aime
 
 # (Optional) Pass runtime base path if needed for dynamic overrides
 ENV NEXT_PUBLIC_BASE_PATH=/aime
@@ -70,7 +66,7 @@ ENV DOCUMENTDB_CA_FILE_PATH=/app/rds-combined-ca-bundle.pem
 
 # Healthcheck (optional)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+  CMD node -e "require('http').get('http://localhost:3000/aime/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
 EXPOSE 3000
 USER nextjs

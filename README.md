@@ -22,9 +22,10 @@ A Next.js 16+ embeddable frontend application for workflow automation with AI-po
 - **asdf** - Version manager for Node.js (see setup below)
 - **Node.js 18+** (recommended: Node.js 20) - managed via asdf
 - **npm** (comes with Node.js)
-- **Docker** and **Docker Compose** - For MongoDB 8.0 (recommended)
-- **MongoDB 8.0** - Via Docker (easiest) or local installation
+- **Docker** and **Docker Compose** - For MongoDB 8.0 and nginx reverse proxy
 - **Git** for version control
+- **Superadmin privileges** in testing.app.groupize.com
+- **Bash shell** - macOS/Linux native, Windows requires WSL
 
 ### 0. Install asdf Version Manager and Node.js
 
@@ -73,109 +74,229 @@ This project uses **asdf** to manage the Node.js version automatically. asdf is 
 
 > **Note**: We recommend NOT setting a global Node.js version with `asdf global`, as different projects may require different versions. Let asdf manage versions per-project automatically.
 
-### 1. Clone and Install Dependencies
+### Quick Start Guide
+
+Follow these steps to set up your local development environment:
+
+#### 1. Clone Repository and Install Dependencies
 
 ```bash
-# Clone the repository
-git clone <repository-url>
+# Clone the develop branch
+git clone -b develop <repository-url>
 cd groupize-workflows
 
-# Install dependencies (use legacy peer deps flag if needed)
+# Install dependencies
 npm install --legacy-peer-deps
-
-# If you encounter dependency conflicts, try:
-npm install --legacy-peer-deps --force
 ```
 
 > **Note**: The `--legacy-peer-deps` flag may be required due to version conflicts between OpenAI SDK, Anthropic SDK, and Zod versions.
 
-### 2. Environment Configuration
+#### 2. Configure Environment Variables
 
-Copy the environment template and configure your settings:
+Copy the environment template and set your AI API keys:
 
 ```bash
 # Copy environment template
 cp .env.example .env.local
 
-# Edit .env.local with your configuration
+# Edit .env.local and set your AI API keys
 nano .env.local  # or use your preferred editor
 ```
 
-#### Required Environment Variables
+**Required Configuration:**
+- `OPENAI_API_KEY` - Your OpenAI API key (required)
+- `ANTHROPIC_API_KEY` - Your Anthropic API key (required)
+
+All other settings use defaults suitable for local development.
+
+#### 3. Run Setup Script (Administrator Privileges Required)
+
+This script sets up SSL certificates and adds testing.app.groupize.com to your /etc/hosts file:
 
 ```bash
-# Database Configuration
-DATABASE_ENVIRONMENT=local  # 'local' for MongoDB, 'documentdb' for AWS DocumentDB
-
-# MongoDB (Local Development)
-MONGODB_HOST=localhost
-MONGODB_PORT=27017
-MONGODB_USER=groupize_app
-MONGODB_PASSWORD=gr0up!zeapP
-MONGODB_DATABASE=groupize-workflows
-
-# AI API Keys (Required)
-OPENAI_API_KEY=sk-your-openai-api-key-here
-ANTHROPIC_API_KEY=sk-ant-your-anthropic-api-key-here
-
-# Application Settings
-NODE_ENV=development
-NEXT_PUBLIC_APP_ENV=development
-NEXT_PUBLIC_ENABLE_MOCK_DATA=true
+npm run setup
 ```
 
-### 3. Database Setup
+**What this does:**
+- Generates browser-trusted SSL certificates using mkcert
+- Adds `127.0.0.1 testing.app.groupize.com` to `/etc/hosts`
+- Installs mkcert CA certificate in your system keychain
 
-#### Option A: MongoDB 8.0 with Docker (Recommended)
+> **Note**: You'll be prompted for your administrator password to modify /etc/hosts and install the certificate.
 
-This is the easiest and most consistent way to run MongoDB locally.
+#### 4. Set Up MongoDB Container
 
-1. **Start MongoDB 8.0 in Docker**:
-   ```bash
-   npm run mongodb up
-   ```
+Start MongoDB 8.0 in a Docker container:
 
-   This command:
-   - Builds a MongoDB 8.0 Docker image
-   - Creates and starts the container
-   - Initializes the database with user and authentication
-   - Enables automatic health checks
+```bash
+# Run the interactive menu
+npm run mongodb
 
-2. **Verify MongoDB is Running**:
-   ```bash
-   npm run mongodb health
-   ```
+# Select option 1 to start MongoDB
+# Or directly: npm run mongodb up
+```
 
-   Expected output: ✓ All health checks passed!
+**Verify MongoDB is running:**
+```bash
+npm run mongodb health
+# Expected output: ✓ All health checks passed!
+```
 
-3. **View MongoDB Logs** (optional):
-   ```bash
-   npm run mongodb logs        # Live logs (press Ctrl+C to exit)
-   npm run mongodb logs:recent # Last 100 lines
-   ```
+#### 5. (Optional) Install MongoDB Compass
 
-4. **Access MongoDB Shell** (optional):
-   ```bash
-   npm run mongodb shell
-   ```
+For a visual interface to browse MongoDB collections:
 
-**Essential Commands**:
+1. Download from [MongoDB Compass](https://www.mongodb.com/products/compass)
+2. Connect using:
+   - **Connection String**: `mongodb://groupize_app:gr0up!zeapP@localhost:27017/groupize-workflows`
+   - Or use individual fields:
+     - **Host**: localhost
+     - **Port**: 27017
+     - **Username**: groupize_app
+     - **Password**: gr0up!zeapP
+     - **Database**: groupize-workflows
+
+#### 6. Start Nginx Reverse Proxy
+
+Start the nginx reverse proxy to route requests between your local Next.js app and the testing environment:
+
+```bash
+npm run nginx
+```
+
+**What this does:**
+- Routes `/aime/*` → Your local Next.js dev server (port 3000)
+- Routes everything else → Real testing.app.groupize.com Rails API
+- Forwards authentication cookies from Rails to Next.js
+
+**Verify nginx is running:**
+```bash
+npm run nginx status
+```
+
+#### 7. Start Next.js Development Server
+
+In a new terminal window:
+
+```bash
+npm run dev
+```
+
+Your local Next.js app is now running on port 3000 (behind nginx proxy).
+
+#### 8. Authenticate via Testing Environment
+
+1. **Use your SSO bookmark** to sign in to testing.app.groupize.com
+2. Navigate to: **https://testing.app.groupize.com/ops/tools/aime_ai**
+3. **Select an account and organization**
+4. Click **"Access AIME AI"**
+
+> **Important**: You must have superadmin privileges in testing.app.groupize.com
+
+#### 9. Initialize Database (First Time Only)
+
+If this is your first time setting up:
+
+1. Navigate to: **https://testing.app.groupize.com/aime/initialize**
+2. Click **"Initialize Database"**
+3. Wait for confirmation that all collections and indexes are created
+
+**What this creates:**
+- `workflowTemplates` collection with indexes
+- `aimeConversations` collection with indexes
+- Initial test data (if configured)
+
+---
+
+### You're All Set! 🎉
+
+Access your local app at: **https://testing.app.groupize.com/aime/**
+
+- Local Next.js changes reflect immediately with Hot Module Replacement
+- Authentication via real testing environment
+- Real data from testing.app.groupize.com Rails API
+- MongoDB running locally in Docker
+
+---
+
+### Alternative MongoDB Setup
+
+#### Option A: MongoDB 8.0 with Docker (Recommended - Already Covered Above)
+
+See step 4 above for Docker setup instructions.
+
+**Essential MongoDB Commands:**
 - `npm run mongodb up` - Start MongoDB
 - `npm run mongodb down` - Stop MongoDB
 - `npm run mongodb status` - Check if MongoDB is running
 - `npm run mongodb health` - Run health checks
 - `npm run mongodb reset` - Delete all data and start fresh
 - `npm run mongodb info` - Display connection details
-- `npm run mongodb menu` - Show interactive menu
-
-**Interactive Menu** (recommended for beginners):
-Simply run `npm run mongodb` without arguments to see an interactive menu with all available options.
+- `npm run mongodb logs` - View live logs
+- `npm run mongodb shell` - Access MongoDB shell
 
 For detailed Docker MongoDB setup, see [`local-dev/mongodb/README.md`](./local-dev/mongodb/README.md)
 
-#### Option B: Local MongoDB Installation
+#### Option B: Local MongoDB Installation (Alternative)
 
-If you prefer to install MongoDB locally instead of Docker:
+If you prefer to install MongoDB locally without Docker:
+---
+
+## 🔄 Daily Development Workflow
+
+Once you've completed the setup above, your daily workflow is simple:
+
+```bash
+# Start MongoDB (if not already running)
+npm run mongodb up
+
+# Start nginx reverse proxy (if not already running)  
+npm run nginx
+
+# Start Next.js dev server
+npm run dev
+
+# Access your app
+open https://testing.app.groupize.com/aime/
+```
+
+**Stopping Services:**
+```bash
+# Stop Next.js (Ctrl+C in terminal)
+
+# Stop nginx
+npm run nginx stop
+
+# Stop MongoDB
+npm run mongodb down
+```
+
+---
+
+## 🧹 Cleanup
+
+To remove the local development setup:
+
+```bash
+# Remove /etc/hosts entry and uninstall certificate
+npm run local-setup-cleanup
+
+# Stop and remove MongoDB container
+npm run mongodb down
+
+# Stop nginx
+npm run nginx stop
+```
+
+---
+
+## 🚀 Advanced: Alternative Development Modes
+
+The application supports additional development modes beyond the standard setup:
+
+#### Option B: Local MongoDB Installation (Without Docker)
+
+If you prefer to install MongoDB locally without Docker:
 
 1. **Install MongoDB 8.0**:
    ```bash
@@ -213,9 +334,11 @@ If you prefer to install MongoDB locally instead of Docker:
 3. Get connection string and update `.env.local`
 4. Update `DATABASE_ENVIRONMENT=local` and connection details
 
-### 4. Development Server
+---
 
-The application supports two development modes:
+## 💡 Additional Development Modes
+
+The application also supports other development configurations:
 
 #### Split-Routing Mode (Real Testing API + Local Next.js)
 
