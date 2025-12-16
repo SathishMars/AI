@@ -78,6 +78,8 @@ Resources:
               Value: gpw_session
             - Name: NEXT_PUBLIC_RAILS_BASE_URL
               Value: https://testing.app.groupize.com
+            - Name: NEXT_PUBLIC_APP_URL
+              Value: https://testing.app.groupize.com
           LinuxParameters:
             InitProcessEnabled: true
           PortMappings:
