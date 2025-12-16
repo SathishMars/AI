@@ -26,6 +26,11 @@ interface EnvironmentConfig {
   documentDBCaFilePath: string | undefined;
   mongoDbUri: string | undefined;
   
+  // Database Initialization
+  skipDbInit: string;
+  databaseInitLogging: string;
+  enableDbInitOnBuild: string;
+  
   // Feature flags
   isDevelopment: boolean;
   isProduction: boolean;
@@ -63,6 +68,10 @@ function buildConfig(): EnvironmentConfig {
   const documentDBCaFilePath = getOptionalEnv('DOCUMENTDB_CA_FILE_PATH');
   const mongoDbUri = getOptionalEnv('MONGODB_URI');
   
+  const skipDbInit = getEnv('SKIP_DB_INIT', 'false');
+  const databaseInitLogging = getEnv('DATABASE_INIT_LOGGING', isDevelopment ? 'verbose' : 'normal');
+  const enableDbInitOnBuild = getEnv('ENABLE_DB_INIT_ON_BUILD', isDevelopment ? 'true' : 'false');
+  
   return {
     railsBaseUrl,
     jwksUrl,
@@ -76,6 +85,9 @@ function buildConfig(): EnvironmentConfig {
     documentDbUri,
     documentDBCaFilePath,
     mongoDbUri,
+    skipDbInit,
+    databaseInitLogging,
+    enableDbInitOnBuild,
     isDevelopment,
     isProduction,
   };

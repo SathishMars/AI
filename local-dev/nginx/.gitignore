@@ -1,0 +1,34 @@
+# .gitignore for Nginx container development
+
+# Certificates (don't commit)
+*.pem
+*.key
+
+# Docker volumes
+.docker-volume-*
+
+# Build artifacts
+Dockerfile.bak
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Local development files
+.env.local
+.env.*.local
+
+# Temporary files
+*.tmp
+*.temp

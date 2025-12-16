@@ -10,7 +10,7 @@ This is a Next.js 16+ embeddable frontend application designed to gradually migr
 - TypeScript with strict mode
 - shadcn/ui for components (built on Radix UI primitives)
 - Tailwind CSS v4 for styling  
-- MongoDB 5.0 (local development) / AWS DocumentDB (production) with connection pooling
+- MongoDB 8.0 (local development) / AWS DocumentDB 8 (production) with connection pooling
 - AI SDK with OpenAI and Anthropic for AI processing
 - JWT-based session management
 
@@ -262,7 +262,7 @@ const templateId = uid(); // e.g. 'aB3k9ZpQ1x'
 ### Version Compliance Requirements
 **MANDATORY**: When recommending or writing code, ALWAYS reference the EXACT versions specified in `package.json`. Never assume or use outdated API patterns.
 
-**Current Exact Versions (as of package.json) (MongoDB driver downgraded for AWS DocumentDB compatibility):**
+**Current Exact Versions (as of package.json) (MongoDB driver upgraded for AWS DocumentDB 8 compatibility):**
 - **Next.js**: `16.0.6` - Use App Router patterns, Turbopack features (matches `package.json`)
 - **React**: `19.2.0` - Follow React 19 patterns and hooks (matches `package.json`)
 - **React DOM**: `19.2.0` - Matches React version (matches `package.json`)
@@ -272,7 +272,7 @@ const templateId = uid(); // e.g. 'aB3k9ZpQ1x'
 - **Zod**: `^4` - Use Zod v4 API for validation (matches `package.json`)
 - **TypeScript**: `^5` - Use TypeScript 5 features
 - **AI SDK**: `@ai-sdk/react@^2.0.87`, `@ai-sdk/anthropic@^2.0.41` - Use latest AI SDK patterns
-- **MongoDB**: `mongodb@^5.9.0` - Driver aligned to MongoDB 5.x API surface (AWS DocumentDB compatible)
+- **MongoDB**: `mongodb@^6.12.0` - Driver aligned to MongoDB 8.x API surface (AWS DocumentDB 8 compatible)
 - **json-rules-engine**: `^7.3.1` - Use v7 API for workflow rules
 - **react-md-editor**: `@uiw/react-md-editor@^4.0.8` - Use v4 API
 - **Mermaid**: `^11.12.0` - Use Mermaid v11 syntax
@@ -397,31 +397,43 @@ npm test
 
 ### Database Integration
 - **Connection Pool**: ALWAYS use the MongoDB connection pool utility (`@/app/utils/mongodb-connection`) for ALL database operations
-- **MongoDB Version**: Use MongoDB 5.0 compatible syntax and features only (AWS DocumentDB compatibility)
-- **Environment Support**: Support both local MongoDB and AWS DocumentDB (MongoDB 5.0 compatible) based on environment flags
+- **MongoDB/DocumentDB Version**: Use MongoDB 8.0 compatible syntax and features (AWS DocumentDB 8 released November 2025)
+- **Environment Support**: Support both local MongoDB 8.0+ and AWS DocumentDB 8 based on environment flags
 - **Connection Pattern**: 
   ```typescript
   import { getMongoDatabase } from '@/app/utils/mongodb-connection';
   const db = await getMongoDatabase();
   const collection = db.collection('collectionName');
   ```
-- **Query Syntax**: Use MongoDB 5.0 compatible aggregation pipelines, operators, and query syntax
-  - Avoid unsupported aggregation stages in DocumentDB: `$facet`, `$graphLookup`, `$setWindowFields`, `$bucket`, `$bucketAuto`, advanced window operators, and vector-only operators outside `$search`.
-  - Do NOT rely on aggregation-level `collation` (unsupported): for case-insensitive sorts use pattern: `$addFields: { sortKey: { $toLower: <field> } }` then `$sort: { sortKey: 1 }` and `$project` to remove temporary fields.
-  - Prefer regex with `$options: 'i'` for case-insensitive matching instead of collation.
-  - Avoid retryable writes (`retryWrites=false` for DocumentDB) and journaling expectations (`j` unsupported) – already handled by connection utility.
-  - Explicitly specify `$exists` when leveraging sparse indexes; DocumentDB requires it for index utilization.
-  - Always include explicit `$sort` rather than assuming natural ordering (DocumentDB does not guarantee implicit ordering).
-  - Use `$lookup` only for supported equality join / uncorrelated subquery patterns; avoid correlated subqueries and plan hints unless necessary.
-  - When needing case-insensitive uniqueness or ordering, compute canonicalized lowercase keys into separate fields rather than collation.
+- **Query Syntax**: Use MongoDB 8.0 compatible aggregation pipelines, operators, and query syntax
+  - **Collation is NOW FULLY SUPPORTED** in DocumentDB 8: Use native collation for case-insensitive operations (no workarounds needed)
+  - **New aggregation stages now supported**: `$bucket`, `$bucketAuto`, `$merge`, `$set`, `$unset`, `$replaceWith` available in DocumentDB 8
+  - **New aggregation operators in DocumentDB 8**: `$pow`, `$rand`, `$dateTrunc` (use these for DocumentDB 8+ deployments)
+  - Still avoid: `$facet`, `$graphLookup`, `$setWindowFields`, and advanced window operators not yet supported
+  - Vector indexes via `$vectorSearch` and `$search` now supported in DocumentDB 8
+  - Use explicit `$sort` for consistent ordering (DocumentDB does not guarantee implicit ordering)
+  - Use `$lookup` for equality joins and uncorrelated subqueries; avoid correlated subqueries
+  - Explicitly specify `$exists` when leveraging sparse indexes for proper index utilization
+- **Collation Support**: DocumentDB 8 now supports full collation specification
+  ```typescript
+  // Example: Case-insensitive sort with collation (DocumentDB 8+)
+  db.collection('users').find({}).collation({ locale: 'en', strength: 2 }).sort({ name: 1 })
+  
+  // Example: Case-insensitive aggregation with collation (DocumentDB 8+)
+  db.collection('users').aggregate([
+    { $sort: { name: 1 } },
+    { $group: { _id: null, users: { $push: '$$ROOT' } } }
+  ], { collation: { locale: 'en', strength: 2 } })
+  ```
 - **Error Handling**: Always wrap database operations in try-catch blocks with proper MongoDB error handling
-  - Treat `MongoServerError` code 9 (`Unrecognized field: 'txnNumber'`) as indication of retryable writes misconfiguration.
-  - Fallback behavior for unsupported commands should degrade gracefully (e.g., skip serverStatus metrics if not available).
+  - Treat `MongoServerError` code 9 (`Unrecognized field: 'txnNumber'`) as indication of retryable writes misconfiguration
+  - Fallback behavior for unsupported commands should degrade gracefully
 - **Schema Design**: Design schemas that align with existing Rails models for gradual migration
 - **Data Migration**: Plan for data migration scenarios between PostgreSQL and MongoDB
 - **Database Scripts**: **CRITICAL** - When user stories require new database objects (collections, indexes, migrations, etc.), ALL database operations must be scripted and stored in the `db-scripts/` folder at project root. Include collection creation scripts, index definitions, data migration scripts, and usage examples. Never create database objects directly in application code without corresponding scripts in `db-scripts/`.
-  - Index definitions must avoid unsupported properties (e.g., hashed indexes, wildcard indexes); use compound, TTL, multikey as supported.
-  - If requiring case-insensitive search on a field, consider storing a pre-normalized lowercase field and indexing that instead of relying on collation or text indexes (text indexes limited in DocumentDB compatibility).
+  - Index definitions can now include case-insensitive indexes (new in DocumentDB 8): `createIndex({ name: 1 }, { collation: { locale: 'en', strength: 2 } })`
+  - Compound and multikey indexes are fully supported
+  - TTL indexes for automatic document expiration are supported
 - **AI-Generated Documentation**: **CRITICAL** - All AI-generated documentation, implementation summaries, usage examples, and explanatory markdown files must be stored in the `ai-implementation-summaries/` folder at project root (outside `src/`). This includes documentation generated during development, implementation notes, and any markdown files that explain code or provide usage examples. Only executable scripts should remain in `db-scripts/` - all documentation belongs in `ai-implementation-summaries/`.
 
 ### Performance Considerations

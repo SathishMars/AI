@@ -1,0 +1,6 @@
+# MongoDB Docker volumes
+mongodb-data/
+mongodb-config/
+
+# Docker build artifacts
+.dockerignore

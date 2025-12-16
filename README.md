@@ -10,7 +10,7 @@ A Next.js 16+ embeddable frontend application for workflow automation with AI-po
 - **TypeScript** with strict mode
 - **shadcn/ui** for components (built on Radix UI primitives)
 - **Tailwind CSS v4** for styling
-- **MongoDB 5.0** (local development) / **AWS DocumentDB** (production)
+- **MongoDB 8.0** (local development) / **AWS DocumentDB 8.0** (production)
 - **AI Integration**: OpenAI GPT and Anthropic Claude via AI SDK
 - **Workflow Engine**: json-rules-engine v7
 - **Testing**: Jest with React Testing Library
@@ -22,7 +22,8 @@ A Next.js 16+ embeddable frontend application for workflow automation with AI-po
 - **asdf** - Version manager for Node.js (see setup below)
 - **Node.js 18+** (recommended: Node.js 20) - managed via asdf
 - **npm** (comes with Node.js)
-- **MongoDB 5.0** for local development
+- **Docker** and **Docker Compose** - For MongoDB 8.0 (recommended)
+- **MongoDB 8.0** - Via Docker (easiest) or local installation
 - **Git** for version control
 
 ### 0. Install asdf Version Manager and Node.js
@@ -125,35 +126,87 @@ NEXT_PUBLIC_ENABLE_MOCK_DATA=true
 
 ### 3. Database Setup
 
-#### Option A: Local MongoDB Setup
+#### Option A: MongoDB 8.0 with Docker (Recommended)
 
-1. **Install MongoDB 5.0**:
+This is the easiest and most consistent way to run MongoDB locally.
+
+1. **Start MongoDB 8.0 in Docker**:
+   ```bash
+   npm run mongodb up
+   ```
+
+   This command:
+   - Builds a MongoDB 8.0 Docker image
+   - Creates and starts the container
+   - Initializes the database with user and authentication
+   - Enables automatic health checks
+
+2. **Verify MongoDB is Running**:
+   ```bash
+   npm run mongodb health
+   ```
+
+   Expected output: ✓ All health checks passed!
+
+3. **View MongoDB Logs** (optional):
+   ```bash
+   npm run mongodb logs        # Live logs (press Ctrl+C to exit)
+   npm run mongodb logs:recent # Last 100 lines
+   ```
+
+4. **Access MongoDB Shell** (optional):
+   ```bash
+   npm run mongodb shell
+   ```
+
+**Essential Commands**:
+- `npm run mongodb up` - Start MongoDB
+- `npm run mongodb down` - Stop MongoDB
+- `npm run mongodb status` - Check if MongoDB is running
+- `npm run mongodb health` - Run health checks
+- `npm run mongodb reset` - Delete all data and start fresh
+- `npm run mongodb info` - Display connection details
+- `npm run mongodb menu` - Show interactive menu
+
+**Interactive Menu** (recommended for beginners):
+Simply run `npm run mongodb` without arguments to see an interactive menu with all available options.
+
+For detailed Docker MongoDB setup, see [`local-dev/mongodb/README.md`](./local-dev/mongodb/README.md)
+
+#### Option B: Local MongoDB Installation
+
+If you prefer to install MongoDB locally instead of Docker:
+
+1. **Install MongoDB 8.0**:
    ```bash
    brew tap mongodb/brew
-   brew install mongodb-community@5.0
+   brew install mongodb-community@8.0
    ```
 
 2. **Start MongoDB**:
    ```bash
-   brew services start mongodb/brew/mongodb-community@5.0
+   brew services start mongodb-community@8.0
    ```
 
 3. **Set up Database and User**:
    ```bash
-   # Run the setup script
-   mongosh < db-scripts/setup-mongodb.js
-   
-   # Or run commands manually in mongosh:
-   mongosh
+   # Run the setup script from db-scripts folder
+   mongosh < db-scripts/01-initialize-fresh-database.js
    ```
 
-4. **Verify Connection**:
+   Or manually create the user in mongosh:
    ```bash
-   # Test the connection
-   npm test mongodb-connection
+   mongosh
+   # In mongosh shell:
+   use admin
+   db.createUser({
+     user: 'groupize_app',
+     pwd: 'gr0up!zeapP',
+     roles: [{ role: 'root', db: 'admin' }]
+   })
    ```
 
-#### Option B: MongoDB Atlas (Cloud)
+#### Option C: MongoDB Atlas (Cloud)
 
 1. Create a MongoDB Atlas account
 2. Create a cluster (free tier available)
@@ -409,7 +462,9 @@ npm run lint
    ```
 
 3. **MongoDB Connection Issues**:
-   - Ensure MongoDB is running: `brew services start mongodb-community@5.0`
+   - Ensure MongoDB is running: `npm run mongodb status`
+   - For Docker: Check container health: `npm run mongodb health`
+   - For local: Ensure MongoDB is running: `brew services start mongodb-community@8.0`
    - Check connection string in `.env.local`
    - Verify user credentials: `mongosh "mongodb://groupize_app:gr0up!zeapP@localhost:27017/groupize-workflows"`
 

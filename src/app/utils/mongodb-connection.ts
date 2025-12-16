@@ -3,9 +3,16 @@ import { env } from '@/app/lib/env';
 
 /**
  * MongoDB Connection Pool Utility
- * Provides validated MongoDB connections with automatic connection pooling
- * Supports both local MongoDB and AWS DocumentDB (MongoDB 5.0 compatible)
+ * Provides validated MongoDB 8.0 connections with automatic connection pooling
+ * Supports both local MongoDB 8.0+ and AWS DocumentDB 8.0 (MongoDB 8.0 compatible, released November 2025)
  * Follows the singleton pattern to ensure only one connection pool is created
+ * 
+ * DocumentDB 8.0 Features:
+ * - Full MongoDB 8.0 API compatibility
+ * - Collation support (case-insensitive operations without workarounds)
+ * - New aggregation stages: $replaceWith, $merge, $set, $unset, $bucket
+ * - New operators: $pow, $rand, $dateTrunc
+ * - Planner Version 3 with extended performance optimizations
  */
 
 interface MongoConnection {

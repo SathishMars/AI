@@ -13,11 +13,13 @@ export async function proxy(request: NextRequest) {
   try {
     const pathname = request.nextUrl.pathname;
 
+    console.log('[Auth Middleware] Processing request for:', pathname);
     if (
       pathname.startsWith('/_next') ||
       pathname.startsWith('/static') ||
       pathname === '/favicon.ico' ||
-      pathname.match(/\.(png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$/)
+      pathname.match(/\.(png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$/) ||
+      pathname === '/health'
     ) {
       return NextResponse.next();
     }
@@ -42,8 +44,14 @@ export async function proxy(request: NextRequest) {
       return NextResponse.next();
     }
 
-    // Skip internal API routes - they use service token auth via withServiceAuth wrapper
-    if (pathname.startsWith('/api/internal/') || pathname.startsWith(`${env.basePath}/api/internal/`)) {
+    // Skip database initialization endpoint - called during deployment, not on every request
+    if (
+      pathname.startsWith('/api/initialize') || 
+      pathname.startsWith(`${env.basePath}/api/initialize`)||
+      pathname.startsWith('/initialize') || 
+      pathname.startsWith(`${env.basePath}/initialize`)
+    ) {
+      console.log('[Auth Middleware] Skipping database initialization endpoint');
       return NextResponse.next();
     }
 

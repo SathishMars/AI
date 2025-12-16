@@ -12,7 +12,11 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "postinstall": "npm rebuild lightningcss --silent || true",
-    "docker-build": "docker build -t groupize-workflows ."
+    "docker-build": "docker build -t groupize-workflows .",
+    "mongodb": "bash local-dev/mongodb/mongodb.sh",
+    "nginx": "bash local-dev/nginx/start.sh",
+    "setup": "bash local-dev/setup.sh",
+    "local-setup-cleanup": "bash local-dev/cleanup.sh"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.41",
@@ -41,7 +45,7 @@
     "json-rules-engine": "^7.3.1",
     "lucide-react": "^0.552.0",
     "mermaid": "^11.12.0",
-    "mongodb": "^5.9.0",
+    "mongodb": "^6.12.0",
     "next": "16.0.6",
     "next-themes": "^0.4.6",
     "react": "19.2.0",

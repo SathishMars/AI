@@ -13,6 +13,9 @@ coverage
 *.spec.tsx
 src/test
 
+#localSetup files
+local-dev/
+
 # Next.js
 .next/
 out/

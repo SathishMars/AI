@@ -44,7 +44,7 @@ ENV HOST=0.0.0.0
 ARG BASE_PATH=/aime
 
 # (Optional) Pass runtime base path if needed for dynamic overrides
-ENV NEXT_PUBLIC_BASE_PATH=${BASE_PATH}
+ENV NEXT_PUBLIC_BASE_PATH=/aime
 
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs \
