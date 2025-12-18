@@ -544,7 +544,8 @@ const workflowCheckConditionStepLLMInstructions: string = `### This step functio
 ** \`functionParams\`:**
 - \`evaluate\` *(object, required)* — A condition object following the json-rules-engine format to evaluate.  
 **Rules:**
-- \`evaluate\` is **mandatory**; construct based on workflow context. Use facts available in the workflow or mrf or request data.  Use the tool getMRFFacts or getRequestFacts to get a list of available facts based on what triggered the workflow.
+- \`evaluate\` is **mandatory**; construct based on workflow context. Use facts available in the workflow or request data. Use the tool getRequestFacts to get a list of available facts based on what triggered the workflow.
+<!-- Original: - \`evaluate\` is **mandatory**; construct based on workflow context. Use facts available in the workflow or mrf or request data.  Use the tool getMRFFacts or getRequestFacts to get a list of available facts based on what triggered the workflow. -->
 **Minimal Example:**
 \`\`\`json
 {
@@ -617,9 +618,11 @@ const workflowSwitchConditionStepSchema =
 
 const workflowSwitchConditionStepLLMInstructions: string = `### This step function is to be used when we want to evaluate a value and branch the workflow based on multiple possible cases.
 ** \`functionParams\`:**
-- \`evaluate\` *(string, required)* — A value or variable in the workflow context or mrf or request data to evaluate against multiple cases.  
+- \`evaluate\` *(string, required)* — A value or variable in the workflow context or request data to evaluate against multiple cases.
+<!-- Original: - \`evaluate\` *(string, required)* — A value or variable in the workflow context or mrf or request data to evaluate against multiple cases. -->  
 **Rules:**
-- \`evaluate\` is **mandatory**; construct based on workflow context. Use facts available in the workflow or mrf or request data. Use the tool getMRFFacts or getRequestFacts to get a list of available facts based on what triggered the workflow.
+- \`evaluate\` is **mandatory**; construct based on workflow context. Use facts available in the workflow or request data. Use the tool getRequestFacts to get a list of available facts based on what triggered the workflow.
+<!-- Original: - \`evaluate\` is **mandatory**; construct based on workflow context. Use facts available in the workflow or mrf or request data. Use the tool getMRFFacts or getRequestFacts to get a list of available facts based on what triggered the workflow. -->
 **Minimal Example:**
 \`\`\`json
 {
@@ -823,10 +826,11 @@ export const workflowStepFunctions: Array<{ schema: unknown, llmInstructions: st
         schema: workflowOnRequestStepSchema,
         llmInstructions: workflowOnRequestStepLLMInstructions
     },
-    {
-        schema: workflowOnMRFStepSchema,
-        llmInstructions: workflowOnMRFStepLLMInstructions
-    },
+    // DISABLED: MRF functionality is not currently available
+    // {
+    //     schema: workflowOnMRFStepSchema,
+    //     llmInstructions: workflowOnMRFStepLLMInstructions
+    // },
     // TASK FUNCTIONS
     {
         schema: workflowNotifyStepSchema,
