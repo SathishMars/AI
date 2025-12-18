@@ -26,6 +26,8 @@ export const GET = withServiceAuth(async (request: NextRequest, context): Promis
     const status = statusParam 
       ? statusParam.split(',').map(s => s.trim() as TemplateStatus)
       : undefined;
+    const typeParam = searchParams.get('type');
+    const type = typeParam === 'Request' || typeParam === 'MRF' ? typeParam : undefined;
     const account = context.accountId;
     const organization = context.organizationId || undefined;
     
@@ -35,6 +37,7 @@ export const GET = withServiceAuth(async (request: NextRequest, context): Promis
       page,
       pageSize,
       status,
+      type,
     });
 
     return NextResponse.json({ 

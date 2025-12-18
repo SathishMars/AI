@@ -237,7 +237,7 @@ describe('WorkflowTemplateDbUtil', () => {
       expect(pipeline.some((stage: any) => stage.$match?.['metadata.status'] === 'published')).toBe(true);
     });
 
-    it('should filter by organization', async () => {
+    it('should filter by organization (org-level query returns both account-level and org-level)', async () => {
       const mockAggregate = {
         toArray: jest.fn().mockResolvedValueOnce([]),
       };
@@ -252,7 +252,84 @@ describe('WorkflowTemplateDbUtil', () => {
       );
 
       const pipeline = (mockCollection.aggregate as jest.Mock).mock.calls[0][0];
-      expect(pipeline.some((stage: any) => stage.$match?.organization === 'org-456')).toBe(true);
+      const matchStage = pipeline.find((stage: any) => stage.$match);
+      expect(matchStage.$match.organization).toEqual({ $in: [null, 'org-456'] });
+    });
+
+    it('should filter by organization (account-level query returns only account-level templates)', async () => {
+      const mockAggregate = {
+        toArray: jest.fn().mockResolvedValueOnce([]),
+      };
+
+      mockCollection.aggregate.mockReturnValueOnce(mockAggregate as any);
+
+      await WorkflowTemplateDbUtil.list(
+        'account-123',
+        { organization: null },
+        1,
+        20
+      );
+
+      const pipeline = (mockCollection.aggregate as jest.Mock).mock.calls[0][0];
+      const matchStage = pipeline.find((stage: any) => stage.$match);
+      expect(matchStage.$match.organization).toBe(null);
+    });
+
+    it('should filter by organization (undefined returns only account-level templates)', async () => {
+      const mockAggregate = {
+        toArray: jest.fn().mockResolvedValueOnce([]),
+      };
+
+      mockCollection.aggregate.mockReturnValueOnce(mockAggregate as any);
+
+      await WorkflowTemplateDbUtil.list(
+        'account-123',
+        {},
+        1,
+        20
+      );
+
+      const pipeline = (mockCollection.aggregate as jest.Mock).mock.calls[0][0];
+      const matchStage = pipeline.find((stage: any) => stage.$match);
+      expect(matchStage.$match.organization).toBe(null);
+    });
+
+    it('should filter by type (Request)', async () => {
+      const mockAggregate = {
+        toArray: jest.fn().mockResolvedValueOnce([]),
+      };
+
+      mockCollection.aggregate.mockReturnValueOnce(mockAggregate as any);
+
+      await WorkflowTemplateDbUtil.list(
+        'account-123',
+        { type: 'Request' },
+        1,
+        20
+      );
+
+      const pipeline = (mockCollection.aggregate as jest.Mock).mock.calls[0][0];
+      const matchStage = pipeline.find((stage: any) => stage.$match);
+      expect(matchStage.$match['metadata.type']).toBe('Request');
+    });
+
+    it('should filter by type (MRF)', async () => {
+      const mockAggregate = {
+        toArray: jest.fn().mockResolvedValueOnce([]),
+      };
+
+      mockCollection.aggregate.mockReturnValueOnce(mockAggregate as any);
+
+      await WorkflowTemplateDbUtil.list(
+        'account-123',
+        { type: 'MRF' },
+        1,
+        20
+      );
+
+      const pipeline = (mockCollection.aggregate as jest.Mock).mock.calls[0][0];
+      const matchStage = pipeline.find((stage: any) => stage.$match);
+      expect(matchStage.$match['metadata.type']).toBe('MRF');
     });
 
     it('should apply pagination correctly', async () => {
@@ -405,6 +482,373 @@ describe('WorkflowTemplateDbUtil', () => {
       );
 
       expect(result).toBe(false);
+    });
+  });
+
+  describe('upsert', () => {
+    it('should upsert a workflow template', async () => {
+      const templateToUpsert = {
+        ...sampleTemplate,
+        id: 'upsert-test',
+        version: '2.0.0',
+      };
+
+      mockCollection.replaceOne.mockResolvedValueOnce({ upsertedCount: 1 });
+      mockCollection.findOne.mockResolvedValueOnce(templateToUpsert);
+
+      const result = await WorkflowTemplateDbUtil.upsert(
+        'account-123',
+        'org-456',
+        'upsert-test',
+        '2.0.0',
+        templateToUpsert
+      );
+
+      expect(mockCollection.replaceOne).toHaveBeenCalledWith(
+        { account: 'account-123', id: 'upsert-test', version: '2.0.0', organization: 'org-456' },
+        expect.any(Object),
+        { upsert: true }
+      );
+      expect(result.id).toBe('upsert-test');
+    });
+
+    it('should auto-extract requestTemplateId from workflow steps', async () => {
+      const templateWithRequest = {
+        ...sampleTemplate,
+        workflowDefinition: {
+          steps: [
+            {
+              id: 'trigger',
+              label: 'On Request',
+              type: 'trigger',
+              stepFunction: 'onRequest',
+              functionParams: {
+                requestTemplateId: 'req-template-123',
+              },
+            },
+          ],
+        },
+      };
+
+      mockCollection.replaceOne.mockResolvedValueOnce({ upsertedCount: 1 });
+      mockCollection.findOne.mockResolvedValueOnce({
+        ...templateWithRequest,
+        metadata: {
+          ...templateWithRequest.metadata,
+          requestTemplateId: 'req-template-123',
+        },
+      });
+
+      const result = await WorkflowTemplateDbUtil.upsert(
+        'account-123',
+        null,
+        'test-id',
+        '1.0.0',
+        templateWithRequest
+      );
+
+      expect(mockCollection.replaceOne).toHaveBeenCalled();
+      // Check the document (second argument) passed to replaceOne
+      const replaceOneCall = (mockCollection.replaceOne as jest.Mock).mock.calls[0];
+      const documentArg = replaceOneCall[1];
+      expect(documentArg.metadata.requestTemplateId).toBe('req-template-123');
+    });
+
+    it('should auto-extract workflow type (Request) from workflow steps', async () => {
+      const templateWithRequest = {
+        ...sampleTemplate,
+        workflowDefinition: {
+          steps: [
+            {
+              id: 'trigger',
+              label: 'On Request',
+              type: 'trigger',
+              stepFunction: 'onRequest',
+            },
+          ],
+        },
+      };
+
+      mockCollection.replaceOne.mockResolvedValueOnce({ upsertedCount: 1 });
+      mockCollection.findOne.mockResolvedValueOnce({
+        ...templateWithRequest,
+        metadata: {
+          ...templateWithRequest.metadata,
+          type: 'Request',
+        },
+      });
+
+      const result = await WorkflowTemplateDbUtil.upsert(
+        'account-123',
+        null,
+        'test-id',
+        '1.0.0',
+        templateWithRequest
+      );
+
+      expect(mockCollection.replaceOne).toHaveBeenCalled();
+      // Check the document (second argument) passed to replaceOne
+      const replaceOneCall = (mockCollection.replaceOne as jest.Mock).mock.calls[0];
+      const documentArg = replaceOneCall[1];
+      expect(documentArg.metadata.type).toBe('Request');
+    });
+
+    it('should auto-extract workflow type (MRF) from workflow steps', async () => {
+      const templateWithMRF = {
+        ...sampleTemplate,
+        workflowDefinition: {
+          steps: [
+            {
+              id: 'trigger',
+              label: 'On MRF',
+              type: 'trigger',
+              stepFunction: 'onMRF',
+            },
+          ],
+        },
+      };
+
+      mockCollection.replaceOne.mockResolvedValueOnce({ upsertedCount: 1 });
+      mockCollection.findOne.mockResolvedValueOnce({
+        ...templateWithMRF,
+        metadata: {
+          ...templateWithMRF.metadata,
+          type: 'MRF',
+        },
+      });
+
+      const result = await WorkflowTemplateDbUtil.upsert(
+        'account-123',
+        null,
+        'test-id',
+        '1.0.0',
+        templateWithMRF
+      );
+
+      expect(mockCollection.replaceOne).toHaveBeenCalled();
+      // Check the document (second argument) passed to replaceOne
+      const replaceOneCall = (mockCollection.replaceOne as jest.Mock).mock.calls[0];
+      const documentArg = replaceOneCall[1];
+      expect(documentArg.metadata.type).toBe('MRF');
+    });
+
+    it('should handle organization as null in upsert', async () => {
+      const templateToUpsert = {
+        ...sampleTemplate,
+        organization: null,
+      };
+
+      mockCollection.replaceOne.mockResolvedValueOnce({ upsertedCount: 1 });
+      mockCollection.findOne.mockResolvedValueOnce(templateToUpsert);
+
+      await WorkflowTemplateDbUtil.upsert(
+        'account-123',
+        null,
+        'test-id',
+        '1.0.0',
+        templateToUpsert
+      );
+
+      expect(mockCollection.replaceOne).toHaveBeenCalledWith(
+        { account: 'account-123', id: 'test-id', version: '1.0.0', organization: null },
+        expect.any(Object),
+        { upsert: true }
+      );
+    });
+
+    it('should handle organization as undefined in upsert (not included in filter)', async () => {
+      const templateToUpsert = {
+        ...sampleTemplate,
+      };
+      delete templateToUpsert.organization;
+
+      mockCollection.replaceOne.mockResolvedValueOnce({ upsertedCount: 1 });
+      mockCollection.findOne.mockResolvedValueOnce(templateToUpsert);
+
+      await WorkflowTemplateDbUtil.upsert(
+        'account-123',
+        undefined,
+        'test-id',
+        '1.0.0',
+        templateToUpsert
+      );
+
+      const replaceOneCall = (mockCollection.replaceOne as jest.Mock).mock.calls[0];
+      const filterArg = replaceOneCall[0];
+      expect(filterArg).not.toHaveProperty('organization');
+      expect(filterArg).toEqual({ account: 'account-123', id: 'test-id', version: '1.0.0' });
+    });
+  });
+
+  describe('findRequestTemplateId', () => {
+    it('should extract requestTemplateId from onRequest trigger step', () => {
+      const steps = [
+        {
+          id: 'trigger',
+          label: 'On Request',
+          type: 'trigger',
+          stepFunction: 'onRequest',
+          functionParams: {
+            requestTemplateId: 'req-template-123',
+          },
+        },
+      ];
+
+      const result = WorkflowTemplateDbUtil.findRequestTemplateId(steps as any);
+      expect(result).toBe('req-template-123');
+    });
+
+    it('should return null when no onRequest trigger found', () => {
+      const steps = [
+        {
+          id: 'trigger',
+          label: 'On Submit',
+          type: 'trigger',
+          stepFunction: 'onSubmit',
+        },
+      ];
+
+      const result = WorkflowTemplateDbUtil.findRequestTemplateId(steps as any);
+      expect(result).toBeNull();
+    });
+
+    it('should return null when steps is empty', () => {
+      const result = WorkflowTemplateDbUtil.findRequestTemplateId([]);
+      expect(result).toBeNull();
+    });
+
+    it('should return null when steps is undefined', () => {
+      const result = WorkflowTemplateDbUtil.findRequestTemplateId(undefined);
+      expect(result).toBeNull();
+    });
+
+    it('should extract requestTemplateId from nested steps', () => {
+      const steps = [
+        {
+          id: 'start',
+          label: 'Start',
+          type: 'task',
+          next: [
+            {
+              id: 'trigger',
+              label: 'On Request',
+              type: 'trigger',
+              stepFunction: 'onRequest',
+              functionParams: {
+                requestTemplateId: 'req-template-456',
+              },
+            },
+          ],
+        },
+      ];
+
+      const result = WorkflowTemplateDbUtil.findRequestTemplateId(steps as any);
+      expect(result).toBe('req-template-456');
+    });
+
+    it('should return null when requestTemplateId is not a string', () => {
+      const steps = [
+        {
+          id: 'trigger',
+          label: 'On Request',
+          type: 'trigger',
+          stepFunction: 'onRequest',
+          functionParams: {
+            requestTemplateId: 123, // Not a string
+          },
+        },
+      ];
+
+      const result = WorkflowTemplateDbUtil.findRequestTemplateId(steps as any);
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('findWorkflowType', () => {
+    it('should return Request for onRequest trigger', () => {
+      const steps = [
+        {
+          id: 'trigger',
+          label: 'On Request',
+          type: 'trigger',
+          stepFunction: 'onRequest',
+        },
+      ];
+
+      const result = WorkflowTemplateDbUtil.findWorkflowType(steps as any);
+      expect(result).toBe('Request');
+    });
+
+    it('should return MRF for onMRF trigger', () => {
+      const steps = [
+        {
+          id: 'trigger',
+          label: 'On MRF',
+          type: 'trigger',
+          stepFunction: 'onMRF',
+        },
+      ];
+
+      const result = WorkflowTemplateDbUtil.findWorkflowType(steps as any);
+      expect(result).toBe('MRF');
+    });
+
+    it('should return null when no trigger step found', () => {
+      const steps = [
+        {
+          id: 'task',
+          label: 'Task',
+          type: 'task',
+        },
+      ];
+
+      const result = WorkflowTemplateDbUtil.findWorkflowType(steps as any);
+      expect(result).toBeNull();
+    });
+
+    it('should return null when steps is empty', () => {
+      const result = WorkflowTemplateDbUtil.findWorkflowType([]);
+      expect(result).toBeNull();
+    });
+
+    it('should return null when steps is undefined', () => {
+      const result = WorkflowTemplateDbUtil.findWorkflowType(undefined);
+      expect(result).toBeNull();
+    });
+
+    it('should extract workflow type from nested steps', () => {
+      const steps = [
+        {
+          id: 'start',
+          label: 'Start',
+          type: 'task',
+          next: [
+            {
+              id: 'trigger',
+              label: 'On Request',
+              type: 'trigger',
+              stepFunction: 'onRequest',
+            },
+          ],
+        },
+      ];
+
+      const result = WorkflowTemplateDbUtil.findWorkflowType(steps as any);
+      expect(result).toBe('Request');
+    });
+
+    it('should return null for non-trigger step types', () => {
+      const steps = [
+        {
+          id: 'trigger',
+          label: 'On Request',
+          type: 'task', // Not a trigger type
+          stepFunction: 'onRequest',
+        },
+      ];
+
+      const result = WorkflowTemplateDbUtil.findWorkflowType(steps as any);
+      expect(result).toBeNull();
     });
   });
 });

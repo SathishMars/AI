@@ -1,5 +1,5 @@
 import { getMongoDatabase } from './mongodb-connection';
-import { WorkflowTemplate, WorkflowTemplateSchema } from '@/app/types/workflowTemplate';
+import { WorkflowTemplate, WorkflowTemplateSchema, WorkflowStep } from '@/app/types/workflowTemplate';
 import type { Document } from 'mongodb';
 
 const COLLECTION = 'workflowTemplates';
@@ -11,6 +11,7 @@ export type ListFilters = {
   tags?: string[];
   createdAfter?: Date;
   createdBefore?: Date;
+  type?: 'Request' | 'MRF'; // filter by workflow type
 };
 
 export class WorkflowTemplateDbUtil {
@@ -52,8 +53,18 @@ export class WorkflowTemplateDbUtil {
     const collection = db.collection<Document>(COLLECTION);
 
     const match: Record<string, unknown> = { account };
-    // Only filter by organization if explicitly provided (undefined = all orgs, null = account-level only, "id" = specific org)
-    if (filters.organization !== undefined) match.organization = filters.organization;
+    // Organization filtering logic:
+    // - undefined or null (account-level query): return only account-level templates (organization: null)
+    // - string (org-level query): return both account-level (null) and org-level (string) templates
+    //   This allows org users to see both account-wide templates and their org-specific templates
+    if (filters.organization === undefined || filters.organization === null) {
+      // Account-level query: only account-level templates
+      match.organization = null;
+    } else {
+      // Org-level query: return both account-level (null) and org-level (specific org) templates
+      // Account is already enforced above, so this matches both account AND organization
+      match.organization = { $in: [null, filters.organization] };
+    }
     if (filters.status) match['metadata.status'] = Array.isArray(filters.status) ? { $in: filters.status } : filters.status;
     if (filters.tags && filters.tags.length) match['metadata.tags'] = { $in: filters.tags };
     if (filters.createdAfter || filters.createdBefore) {
@@ -64,6 +75,9 @@ export class WorkflowTemplateDbUtil {
     }
     if (filters.label) {
       match['metadata.label'] = { $regex: filters.label, $options: 'i' };
+    }
+    if (filters.type) {
+      match['metadata.type'] = filters.type;
     }
 
     // Aggregate to deduplicate by id keeping latest updatedAt and perform case-insensitive label sort (DocumentDB compatible, no collation)
@@ -129,13 +143,23 @@ export class WorkflowTemplateDbUtil {
     const collection = db.collection<Document>(COLLECTION);
 
     // Ensure composite key fields are set on the template we will persist
-    const copy = JSON.parse(JSON.stringify(template)) as Record<string, unknown>;
+    const copy = JSON.parse(JSON.stringify(template)) as WorkflowTemplate;
     copy.account = account;
     copy.id = id;
     copy.version = version;
     // Explicitly set organization to provided value (can be null)
     if (organization !== undefined) {
       copy.organization = organization;
+    }
+
+    // Auto-extract and store requestTemplateId and type in metadata from workflow definition
+    const requestTemplateId = WorkflowTemplateDbUtil.findRequestTemplateId(copy.workflowDefinition?.steps);
+    if (requestTemplateId) {
+      copy.metadata.requestTemplateId = requestTemplateId;
+    }
+    const workflowType = WorkflowTemplateDbUtil.findWorkflowType(copy.workflowDefinition?.steps);
+    if (workflowType) {
+      copy.metadata.type = workflowType;
     }
 
     // Validate shape (result not needed beyond validation)
@@ -193,6 +217,64 @@ export class WorkflowTemplateDbUtil {
       if (md.lastUsedAt) md.lastUsedAt = toIso(md.lastUsedAt);
     }
     return copy as unknown as WorkflowTemplate;
+  }
+
+  /**
+   * Extracts requestTemplateId from workflow steps by finding onRequest trigger
+   */
+  static findRequestTemplateId(steps: WorkflowStep[] | undefined): string | null {
+    if (!steps || !Array.isArray(steps)) return null;
+    
+    for (const step of steps) {
+      if (step.type === 'trigger' && step.stepFunction === 'onRequest') {
+        const requestTemplateId = step.functionParams?.requestTemplateId;
+        if (typeof requestTemplateId === 'string') {
+          return requestTemplateId;
+        }
+      }
+      
+      // Check nested steps
+      if (step.next) {
+        for (const nextStep of step.next) {
+          if (typeof nextStep === 'object') {
+            const result = WorkflowTemplateDbUtil.findRequestTemplateId([nextStep]);
+            if (result) return result;
+          }
+        }
+      }
+    }
+    
+    return null;
+  }
+
+  /**
+   * Extracts workflow type (Request or MRF) from workflow steps by finding trigger step
+   */
+  static findWorkflowType(steps: WorkflowStep[] | undefined): 'Request' | 'MRF' | null {
+    if (!steps || !Array.isArray(steps)) return null;
+    
+    for (const step of steps) {
+      if (step.type === 'trigger') {
+        if (step.stepFunction === 'onRequest') {
+          return 'Request';
+        }
+        if (step.stepFunction === 'onMRF') {
+          return 'MRF';
+        }
+      }
+      
+      // Check nested steps
+      if (step.next) {
+        for (const nextStep of step.next) {
+          if (typeof nextStep === 'object') {
+            const result = WorkflowTemplateDbUtil.findWorkflowType([nextStep]);
+            if (result) return result;
+          }
+        }
+      }
+    }
+    
+    return null;
   }
 }
 

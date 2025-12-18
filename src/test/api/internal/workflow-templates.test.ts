@@ -168,6 +168,111 @@ describe('Internal Workflow Templates API Routes', () => {
       );
     });
 
+    it('should filter templates by type (Request) in internal API', async () => {
+      mockListTemplates.mockResolvedValue({
+        templates: [],
+        totalCount: 0,
+        page: 1,
+        pageSize: 20,
+        hasMore: false,
+      });
+
+      const request = createTestRequest('http://localhost:3000/api/internal/workflow-templates?type=Request', {
+        method: 'GET',
+        headers: {
+          'authorization': 'Bearer valid-service-token',
+        },
+      });
+
+      const response = await getInternalTemplates(request);
+
+      expect(response.status).toBe(200);
+      expect(mockListTemplates).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'Request',
+        })
+      );
+    });
+
+    it('should filter templates by type (MRF) in internal API', async () => {
+      mockListTemplates.mockResolvedValue({
+        templates: [],
+        totalCount: 0,
+        page: 1,
+        pageSize: 20,
+        hasMore: false,
+      });
+
+      const request = createTestRequest('http://localhost:3000/api/internal/workflow-templates?type=MRF', {
+        method: 'GET',
+        headers: {
+          'authorization': 'Bearer valid-service-token',
+        },
+      });
+
+      const response = await getInternalTemplates(request);
+
+      expect(response.status).toBe(200);
+      expect(mockListTemplates).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'MRF',
+        })
+      );
+    });
+
+    it('should ignore invalid type parameter in internal API', async () => {
+      mockListTemplates.mockResolvedValue({
+        templates: [],
+        totalCount: 0,
+        page: 1,
+        pageSize: 20,
+        hasMore: false,
+      });
+
+      const request = createTestRequest('http://localhost:3000/api/internal/workflow-templates?type=InvalidType', {
+        method: 'GET',
+        headers: {
+          'authorization': 'Bearer valid-service-token',
+        },
+      });
+
+      const response = await getInternalTemplates(request);
+
+      expect(response.status).toBe(200);
+      expect(mockListTemplates).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: undefined,
+        })
+      );
+    });
+
+    it('should combine status and type filters in internal API', async () => {
+      mockListTemplates.mockResolvedValue({
+        templates: [],
+        totalCount: 0,
+        page: 1,
+        pageSize: 20,
+        hasMore: false,
+      });
+
+      const request = createTestRequest('http://localhost:3000/api/internal/workflow-templates?status=published&type=Request', {
+        method: 'GET',
+        headers: {
+          'authorization': 'Bearer valid-service-token',
+        },
+      });
+
+      const response = await getInternalTemplates(request);
+
+      expect(response.status).toBe(200);
+      expect(mockListTemplates).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: ['published'],
+          type: 'Request',
+        })
+      );
+    });
+
     it('should use account from service token context', async () => {
       mockListTemplates.mockResolvedValue({
         templates: [],

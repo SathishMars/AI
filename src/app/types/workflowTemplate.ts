@@ -25,6 +25,8 @@ export interface WorkflowTemplateMetadata {
     parentVersion?: number | null;                               // Optional parent version for drafts
     copiedFromTemplateId?: string | null;                        // Optional ID of template copied from
     copiedFromVersion?: number | null;                           // Optional version of template copied from
+    requestTemplateId?: string | null;                           // Optional request template ID extracted from workflow definition
+    type?: 'Request' | 'MRF' | null;                             // Workflow type determined from trigger step
 }
 
 export interface WorkflowStepMetadata {
@@ -104,6 +106,8 @@ export const WorkflowTemplateMetadataSchema = z.object({
     parentVersion: z.number().int().optional().nullable(),
     copiedFromTemplateId: z.string().optional().nullable(),
     copiedFromVersion: z.number().int().optional().nullable(),
+    requestTemplateId: z.string().optional().nullable(),
+    type: z.enum(['Request', 'MRF']).optional().nullable(),
 });
 
 export const WorkflowStepMetadataSchema = z.object({

@@ -13,13 +13,14 @@ import { WorkflowTemplate, WorkflowTemplateSchema, TemplateStatus } from '@/app/
  */
 export interface ListTemplatesParams {
   account: string;
-  organization: string | null | undefined; // undefined = all orgs, null = account-level only, string = specific org
+  organization: string | null | undefined; // undefined/null = account-level only, string = account-level + org-level templates
   page: number;
   pageSize: number;
   status?: TemplateStatus[];
   tags?: string[];
   createdAfter?: Date;
   createdBefore?: Date;
+  type?: 'Request' | 'MRF'; // filter by workflow type
 }
 
 /**
@@ -47,7 +48,8 @@ export async function listTemplates(params: ListTemplatesParams) {
     status, 
     tags, 
     createdAfter, 
-    createdBefore 
+    createdBefore,
+    type
   } = params;
   
   // Validate pagination
@@ -71,6 +73,7 @@ export async function listTemplates(params: ListTemplatesParams) {
     tags,
     createdAfter,
     createdBefore,
+    type,
   }, page, pageSize);
   
   return result;
@@ -104,6 +107,16 @@ export async function createTemplate(params: CreateTemplateParams) {
   }
   
   const templateInput = validationResult.data as WorkflowTemplate;
+  
+  // Auto-extract and store requestTemplateId and type in metadata from workflow definition
+  const requestTemplateId = WorkflowTemplateDbUtil.findRequestTemplateId(templateInput.workflowDefinition?.steps);
+  if (requestTemplateId) {
+    templateInput.metadata.requestTemplateId = requestTemplateId;
+  }
+  const workflowType = WorkflowTemplateDbUtil.findWorkflowType(templateInput.workflowDefinition?.steps);
+  if (workflowType) {
+    templateInput.metadata.type = workflowType;
+  }
   
   // Create in database
   const created = await WorkflowTemplateDbUtil.create(templateInput);

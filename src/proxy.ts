@@ -44,6 +44,12 @@ export async function proxy(request: NextRequest) {
       return NextResponse.next();
     }
 
+    // Skip internal API routes - they use service token auth via withServiceAuth wrapper
+    if (pathname.startsWith('/api/internal/') || pathname.startsWith(`${env.basePath}/api/internal/`)) {
+      console.log('[Auth Middleware] Skipping internal API route (uses service auth)');
+      return NextResponse.next();
+    }
+
     // Skip database initialization endpoint - called during deployment, not on every request
     if (
       pathname.startsWith('/api/initialize') || 
