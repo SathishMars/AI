@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "NODE_EXTRA_CA_CERTS=\"./local-dev/nginx/certs/mkcert-ca-cert.pem\" PORT=3000 next dev",
-    "dev:embedded": "PORT=3001 next dev",
+    "dev:local-rails": "PORT=3001 next dev",
     "build": "next build",
     "start": "PORT=3001 next start",
     "lint": "eslint",
@@ -15,8 +15,11 @@
     "docker-build": "docker build -t groupize-workflows .",
     "mongodb": "bash local-dev/mongodb/mongodb.sh",
     "nginx": "bash local-dev/nginx/start.sh",
-    "setup": "bash local-dev/setup.sh",
-    "local-setup-cleanup": "bash local-dev/cleanup.sh"
+    "nginx:local-rails": "bash local-dev/nginx-local-rails/start.sh",
+    "setup:remote-groupize": "bash local-dev/remote-groupize-setup.sh",
+    "setup:local-rails:init": "bash local-dev/local-groupize-hosts-setup.sh && npm run nginx:local-rails",
+    "setup:local-rails:cleanup": "npm run nginx:local-rails stop; bash local-dev/local-groupize-hosts-cleanup.sh",
+    "cleanup:remote-groupize": "bash local-dev/remote-groupize-cleanup.sh"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.41",

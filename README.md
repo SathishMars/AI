@@ -1,6 +1,5 @@
 # Groupize Workflows
 
-
 A Next.js 16+ embeddable frontend application for workflow automation with AI-powered workflow generation. Built to gradually migrate features from a Ruby on Rails monolith while maintaining independent functionality.
 
 ## 🚀 Tech Stack
@@ -44,21 +43,23 @@ This project uses **asdf** to manage the Node.js version automatically. asdf is 
    ```bash
    # Install asdf
    brew install asdf
-   
+
    # Add to your shell configuration (for zsh - default on macOS)
    echo -e "\n. $(brew --prefix asdf)/libexec/asdf.sh" >> ~/.zshrc
    source ~/.zshrc
-   
+
    # Verify installation
    asdf --version
    ```
 
 2. **Add Node.js Plugin**:
+
    ```bash
    asdf plugin add nodejs https://github.com/asdf-vm/asdf-nodejs.git
    ```
 
 3. **Install Node.js** (run from project directory):
+
    ```bash
    cd groupize-workflows
    asdf install  # Installs Node.js 20.10.0 from .tool-versions
@@ -104,6 +105,7 @@ nano .env.local  # or use your preferred editor
 ```
 
 **Required Configuration:**
+
 - `OPENAI_API_KEY` - Your OpenAI API key (required)
 - `ANTHROPIC_API_KEY` - Your Anthropic API key (required)
 
@@ -114,10 +116,11 @@ All other settings use defaults suitable for local development.
 This script sets up SSL certificates and adds testing.app.groupize.com to your /etc/hosts file:
 
 ```bash
-npm run setup
+npm run setup:remote-groupize
 ```
 
 **What this does:**
+
 - Generates browser-trusted SSL certificates using mkcert
 - Adds `127.0.0.1 testing.app.groupize.com` to `/etc/hosts`
 - Installs mkcert CA certificate in your system keychain
@@ -137,6 +140,7 @@ npm run mongodb
 ```
 
 **Verify MongoDB is running:**
+
 ```bash
 npm run mongodb health
 # Expected output: ✓ All health checks passed!
@@ -165,11 +169,13 @@ npm run nginx
 ```
 
 **What this does:**
+
 - Routes `/aime/*` → Your local Next.js dev server (port 3000)
 - Routes everything else → Real testing.app.groupize.com Rails API
 - Forwards authentication cookies from Rails to Next.js
 
 **Verify nginx is running:**
+
 ```bash
 npm run nginx status
 ```
@@ -202,6 +208,7 @@ If this is your first time setting up:
 3. Wait for confirmation that all collections and indexes are created
 
 **What this creates:**
+
 - `workflowTemplates` collection with indexes
 - `aimeConversations` collection with indexes
 - Initial test data (if configured)
@@ -226,6 +233,7 @@ Access your local app at: **https://testing.app.groupize.com/aime/**
 See step 4 above for Docker setup instructions.
 
 **Essential MongoDB Commands:**
+
 - `npm run mongodb up` - Start MongoDB
 - `npm run mongodb down` - Stop MongoDB
 - `npm run mongodb status` - Check if MongoDB is running
@@ -239,8 +247,7 @@ For detailed Docker MongoDB setup, see [`local-dev/mongodb/README.md`](./local-d
 
 #### Option B: Local MongoDB Installation (Alternative)
 
-If you prefer to install MongoDB locally without Docker:
----
+## If you prefer to install MongoDB locally without Docker:
 
 ## 🔄 Daily Development Workflow
 
@@ -250,7 +257,7 @@ Once you've completed the setup above, your daily workflow is simple:
 # Start MongoDB (if not already running)
 npm run mongodb up
 
-# Start nginx reverse proxy (if not already running)  
+# Start nginx reverse proxy (if not already running)
 npm run nginx
 
 # Start Next.js dev server
@@ -261,6 +268,7 @@ open https://testing.app.groupize.com/aime/
 ```
 
 **Stopping Services:**
+
 ```bash
 # Stop Next.js (Ctrl+C in terminal)
 
@@ -279,7 +287,7 @@ To remove the local development setup:
 
 ```bash
 # Remove /etc/hosts entry and uninstall certificate
-npm run local-setup-cleanup
+npm run cleanup:remote-groupize
 
 # Stop and remove MongoDB container
 npm run mongodb down
@@ -299,23 +307,27 @@ The application supports additional development modes beyond the standard setup:
 If you prefer to install MongoDB locally without Docker:
 
 1. **Install MongoDB 8.0**:
+
    ```bash
    brew tap mongodb/brew
    brew install mongodb-community@8.0
    ```
 
 2. **Start MongoDB**:
+
    ```bash
    brew services start mongodb-community@8.0
    ```
 
 3. **Set up Database and User**:
+
    ```bash
    # Run the setup script from db-scripts folder
    mongosh < db-scripts/01-initialize-fresh-database.js
    ```
 
    Or manually create the user in mongosh:
+
    ```bash
    mongosh
    # In mongosh shell:
@@ -340,9 +352,145 @@ If you prefer to install MongoDB locally without Docker:
 
 The application also supports other development configurations:
 
+#### Local Rails + Next.js Mode (Full Local Development)
+
+**Features:**
+
+- Both Rails and Next.js running locally
+- Complete local development environment
+- No external dependencies
+- Full control over both applications
+- HTTP only (no SSL certificates required)
+
+**Architecture:**
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Browser: http://groupize.local                        │
+└─────────────────────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────┐
+│  nginx Reverse Proxy (port 80)                         │
+│  - Routes /aime/* → Next.js (port 3001)                │
+│  - Routes /* → Rails (port 3000)                       │
+└─────────────────────────────────────────────────────────┘
+         │                              │
+         ▼                              ▼
+┌──────────────────┐         ┌─────────────────────────┐
+│  Next.js         │         │  Rails                  │
+│  localhost:3001  │         │  localhost:3000         │
+│  /aime routes    │         │  All other routes       │
+└──────────────────┘         └─────────────────────────┘
+```
+
+**Quick Setup:**
+
+```bash
+# 1. Initialize local Rails setup (adds to /etc/hosts and starts nginx)
+npm run setup:local-rails:init
+
+# 2. Start Rails (in separate terminal)
+cd <your-rails-app-path>
+rails s -p 3000
+
+# 3. Start Next.js
+npm run dev:local-rails
+
+# 4. Access applications
+# Next.js: http://groupize.local/aime
+# Rails: http://groupize.local
+```
+
+**What's Needed:**
+
+- Checks Docker is running
+- Adds `groupize.local` to `/etc/hosts`
+- Starts nginx Docker container with reverse proxy configuration
+- Works on both macOS and Linux
+
+**Requirements:**
+
+- **Docker** and **Docker Compose** installed and running
+- Rails application ready to run on port 3000
+- Next.js application (this repo)
+
+**Key Features:**
+
+- nginx running in Docker container (no local nginx installation needed)
+- WebSocket support for Next.js HMR and Rails ActionCable
+- Cookie forwarding for JWT authentication
+- Extended timeouts for AI operations (5+ minutes)
+- Gzip compression enabled
+- Health check endpoint
+
+**Management Commands:**
+
+```bash
+# Check nginx status
+npm run nginx:local-rails status
+
+# View logs
+npm run nginx:local-rails logs
+
+# Health check (checks Rails and Next.js connectivity)
+npm run nginx:local-rails health
+
+# Restart nginx
+npm run nginx:local-rails restart
+
+# Stop nginx
+npm run nginx:local-rails stop
+
+# Check ports
+lsof -i :80    # nginx
+lsof -i :3000  # Rails
+lsof -i :3001  # Next.js
+```
+
+**Troubleshooting:**
+
+```bash
+# If nginx won't start, check if port 80 is in use
+lsof -i :80
+
+# View container logs
+docker logs groupize-workflows-nginx-local
+
+# Check Docker is running
+docker info
+
+# Verify Rails is accessible
+curl http://localhost:3000
+
+# Verify Next.js is accessible
+curl http://localhost:3001/aime
+```
+
+**Cleanup:**
+
+```bash
+# Complete cleanup with npm script
+npm run setup:local-rails:cleanup
+```
+
+**npm Scripts:**
+
+- `npm run setup:local-rails:init` - Initialize (adds /etc/hosts + starts nginx)
+- `npm run setup:local-rails:cleanup` - Cleanup (stops nginx + removes /etc/hosts)
+- `npm run nginx:local-rails` - Start nginx Docker container
+- `npm run nginx:local-rails status` - Check nginx status
+- `npm run nginx:local-rails logs` - View nginx logs
+- `npm run nginx:local-rails health` - Run health checks
+- `npm run nginx:local-rails stop` - Stop nginx container
+- `npm run dev:local-rails` - Start Next.js on port 3001
+
+---
+
 #### Split-Routing Mode (Real Testing API + Local Next.js)
 
 **Features:**
+
 - Runs on **port 3000**
 - **No local Rails needed** - uses real testing Rails API
 - Real authentication and JWT tokens from testing environment
@@ -353,11 +501,13 @@ The application also supports other development configurations:
 
 **How It Works:**
 This setup uses a **local HTTP reverse proxy (nginx)** to route requests:
+
 - Requests to `/aime/*` → proxied to your local Next.js dev server
 - All other requests → proxied to the real testing Rails API
 - **JWT authentication cookies** from the Rails app are forwarded to Next.js, allowing seamless authentication
 
 **Setup Steps:**
+
 1. Configure nginx proxy for split-routing (see section 5 below)
 2. Create `.env.testing` from `.env.example` with split-routing values
 3. Start Next.js: `npm run dev` (automatically uses `.env.testing` if present)
@@ -376,14 +526,17 @@ When running alongside the Rails application (either locally or with split-routi
 
 The application supports two proxy modes:
 
-1. **Local Embedded** - Both Rails and Next.js running locally
-   - nginx config: `local-dev/nginx.local.conf`
+1. **Local Rails + Next.js** - Both Rails and Next.js running locally
+   - nginx in Docker: `local-dev/nginx-local-rails/` (auto-started by setup script)
    - URL: `http://groupize.local/aime/`
    - Rails on port 3000, Next.js on port 3001
    - nginx forwards JWT cookies between Rails and Next.js
+   - **Automated Setup:** `npm run setup:local-rails:init`
+   - **Uses Docker nginx** - no local nginx installation required
+   - See "Local Rails + Next.js Mode" section above for full details
 
 2. **Split-Routing** - Local Next.js with real testing Rails API
-   - nginx config: `local-dev/nginx.testing.conf` (create from `nginx.testing.example`)
+   - nginx in Docker: `local-dev/nginx/` (Docker Compose setup)
    - URL: `https://testing.app.groupize.com/aime/`
    - Next.js on port 3000, Rails API at testing environment
    - **Authentication:** Go to `https://testing.app.groupize.com/ops/tools/aime_ai` to select account/org and get JWT cookie
@@ -392,19 +545,14 @@ The application supports two proxy modes:
 #### Quick Start
 
 ```bash
-# One-time setup
-cd local-dev
+# For Local Rails + Next.js mode (Docker nginx):
+npm run setup:local-rails:init  # Add to /etc/hosts and start nginx
+# Then start Rails and Next.js
 
-# For Local Embedded mode:
-cp nginx.local.conf /opt/homebrew/etc/nginx/servers/groupize.local.conf
-
-# For Split-Routing mode:
-cp nginx.testing.example nginx.testing.conf
-# Edit nginx.testing.conf to replace YOUR_USERNAME with your username
-cp nginx.testing.conf /opt/homebrew/etc/nginx/servers/testing.app.groupize.com.conf
-
-# Restart nginx
-brew services restart nginx
+# For Split-Routing mode (Docker nginx with SSL):
+npm run setup:remote-groupize  # Generates SSL certs and updates /etc/hosts
+npm run nginx  # Starts nginx Docker container
+npm run dev    # Starts Next.js
 ```
 
 #### URL Structure
@@ -417,6 +565,7 @@ The nginx proxy uses Next.js `basePath` configuration:
 - Everything else → Rails app
 
 **Example:**
+
 ```
 User visits:     http://groupize.local/aime/workflows/configure/123
 nginx proxies:   /aime/workflows/configure/123 → Next.js
@@ -424,6 +573,7 @@ Next.js serves:  src/app/workflows/configure/[id]/page.tsx
 ```
 
 **Important Notes:**
+
 - ✅ Next.js `<Link>` components automatically prepend basePath
 - ⚠️ Images require basePath: `src={`${NEXT_PUBLIC_BASE_PATH}/image.png`}` (see `src/app/utils/api.ts`)
 - ✅ API fetch calls use `apiFetch()` helper which adds basePath
@@ -502,11 +652,11 @@ groupize-workflows/
 
 ```typescript
 // ✅ Correct way - Always use connection pool
-import { getMongoDatabase } from '@/app/utils/mongodb-connection';
+import { getMongoDatabase } from "@/app/utils/mongodb-connection";
 
 async function example() {
   const db = await getMongoDatabase();
-  const collection = db.collection('workflowTemplates');
+  const collection = db.collection("workflowTemplates");
   // ... your operations
 }
 
@@ -561,24 +711,26 @@ npm run lint
 ### Common Issues
 
 1. **Node.js Version Issues**:
+
    ```bash
    # Ensure asdf is properly installed
    asdf --version
-   
+
    # Check if Node.js plugin is installed
    asdf plugin list
-   
+
    # Reinstall the correct Node.js version
    asdf install nodejs 20.10.0
-   
+
    # Verify the version in the project directory
    cd groupize-workflows
    node --version  # Should show v20.10.0
    ```
-   
+
    For more help, see the [asdf troubleshooting guide](https://asdf-vm.com/guide/getting-started.html)
 
 2. **Dependency Conflicts**:
+
    ```bash
    rm -rf node_modules package-lock.json
    npm install --legacy-peer-deps
