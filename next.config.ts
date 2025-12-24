@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
   basePath: '/aime',
   assetPrefix: '/aime',
   trailingSlash: true,
+  serverExternalPackages: ["pg"], // Required for PostgreSQL support in insights
   env: {
     NEXT_TELEMETRY_DISABLED: '1',
     NEXT_PUBLIC_BASE_PATH: '/aime',

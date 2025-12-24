@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import TopNavigation from './components/TopNavigation';
+import { ConditionalLayout } from './components/ConditionalLayout';
 import { UserSessionProvider } from './components/UserSessionProvider';
 import { Open_Sans, Roboto, Lato } from 'next/font/google';
 import { ThemeProvider } from "./components/ThemeProvider";
@@ -60,10 +60,9 @@ export default async function RootLayout({
           storageKey="groupize-theme"
         >
           <UserSessionProvider>
-            <TopNavigation />
-            <div className="w-full h-[calc(100vh-64px)]">
-            {children}
-            </div>
+            <ConditionalLayout>
+              {children}
+            </ConditionalLayout>
           </UserSessionProvider>
         </ThemeProvider>
         {/* Hidden SVG filter that creates a subtle liquid distortion */}

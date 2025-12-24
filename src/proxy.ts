@@ -61,6 +61,28 @@ export async function proxy(request: NextRequest) {
       return NextResponse.next();
     }
 
+    // Skip insights routes - they don't require authentication
+    if (
+      pathname.startsWith('/insights') || 
+      pathname.startsWith('/arrivals') ||
+      pathname.startsWith(`${env.basePath}/insights`) ||
+      pathname.startsWith(`${env.basePath}/arrivals`)
+    ) {
+      console.log('[Auth Middleware] Skipping insights route (no auth required)');
+      return NextResponse.next();
+    }
+
+    // Skip insights API routes - chat and graphql don't require workflow authentication
+    if (
+      pathname.startsWith('/api/chat') ||
+      pathname.startsWith('/api/graphql') ||
+      pathname.startsWith(`${env.basePath}/api/chat`) ||
+      pathname.startsWith(`${env.basePath}/api/graphql`)
+    ) {
+      console.log('[Auth Middleware] Skipping insights API route (no auth required)');
+      return NextResponse.next();
+    }
+
     return await handleUserAuth(request, pathname);
 
   } catch (err) {

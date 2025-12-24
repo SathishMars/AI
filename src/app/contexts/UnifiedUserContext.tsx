@@ -179,6 +179,12 @@ export function UnifiedUserProvider({ children, initialCurrentUser }: UnifiedUse
           setIsLoading(false);
           return;
         }
+        // For 401 (Unauthorized), gracefully handle - insights pages don't require auth
+        if (response.status === 401) {
+          console.log('[UnifiedUserContext] 401 Unauthorized - continuing without authentication (insights mode)');
+          setIsLoading(false);
+          return;
+        }
         throw new Error(`User Session API error: ${response.status}`);
       }
 
