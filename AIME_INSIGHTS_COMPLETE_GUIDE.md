@@ -31,10 +31,7 @@ npm install
 # 3. Setup PostgreSQL (first time only)
 psql -U postgres -f db-scripts/attendee_setup.sql
 
-# 4. Start MongoDB (if needed)
-npm run mongodb up
-
-# 5. Run the application
+# 4. Run the application
 npm run dev:insights
 ```
 
@@ -55,8 +52,6 @@ src/app/
 ├── lib/
 │   └── insights/                    ← ALL insights lib files here
 │       ├── db.ts                    ← PostgreSQL for insights (separate from workflow DB)
-│       ├── mongo.ts                 ← MongoDB for insights chat (separate from workflow MongoDB)
-│       ├── chatRepo.ts              ← Insights chat storage
 │       ├── data.ts                  ← Insights mock data
 │       ├── ui-store.tsx             ← Insights UI state
 │       ├── sql/
@@ -116,8 +111,6 @@ src/app/
 
 **Function/Component Prefixes:**
 - ✅ `getInsightsPool()` - PostgreSQL pool for insights
-- ✅ `getInsightsMongoDb()` - MongoDB for insights chat
-- ✅ `upsertInsightsConversation()` - Insights chat storage
 - ✅ `InsightsAppShell` - Insights shell component
 - ✅ `InsightsSidebar` - Insights sidebar
 - ✅ `InsightsAimePanel` - Insights chat panel
@@ -130,21 +123,17 @@ src/app/
 - ✅ `insightsSuggestions` - Chat suggestions
 - ✅ `insightsAttendeeColumns` - Column definitions
 
-**MongoDB Collections:**
-- ✅ `insights_conversations` - Insights chat conversations
-- ✅ `insights_messages` - Insights chat messages
-- (Workflow uses: `workflowTemplates`, `aimeConversations`, etc.)
+**Note:** Insights does not use MongoDB. Chat conversations are not persisted.
 
 ### Key Separation Points
 
 1. **Database Connections:**
-   - Workflow: `utils/mongodb-connection.ts`
-   - Insights: `lib/insights/mongo.ts` (separate connection)
-   - Insights: `lib/insights/db.ts` (PostgreSQL, new)
+   - Workflow: `utils/mongodb-connection.ts` (MongoDB)
+   - Insights: `lib/insights/db.ts` (PostgreSQL only - no MongoDB)
 
-2. **MongoDB Collections:**
-   - Workflow: `workflowTemplates`, `aimeConversations`, etc.
-   - Insights: `insights_conversations`, `insights_messages` (separate collections)
+2. **Data Storage:**
+   - Workflow: Uses MongoDB for `workflowTemplates`, `aimeConversations`, etc.
+   - Insights: Uses PostgreSQL only - no conversation persistence
 
 3. **Naming Conventions:**
    - All insights functions/components prefixed with `Insights`
@@ -186,6 +175,8 @@ npm install
 - `remark-gfm` - GitHub Flavored Markdown support
 - `cross-env` - Cross-platform environment variables (for Windows)
 
+**Note:** MongoDB is not required for insights. Only PostgreSQL is needed.
+
 ### 2. Environment Variables
 
 Create a `.env.local` file in the project root with:
@@ -194,15 +185,13 @@ Create a `.env.local` file in the project root with:
 # PostgreSQL Database (for attendee data)
 DATABASE_URL=postgresql://postgres:your_password@localhost:5432/attendee
 
-# MongoDB (for chat history)
-MONGO_URI=mongodb://localhost:27017
-MONGO_DB=aime
-
 # AI API Keys (required for chat functionality)
 OPENAI_API_KEY=your_openai_key_here
 ANTHROPIC_API_KEY=your_anthropic_key_here
 GROQ_API_KEY=your_groq_key_here  # Optional
 ```
+
+**Note:** MongoDB environment variables are not required for insights. Chat conversations are not persisted.
 
 **Important:** Replace:
 - `your_password` with your PostgreSQL password
@@ -236,14 +225,7 @@ GROQ_API_KEY=your_groq_key_here  # Optional
 
 #### MongoDB Setup
 
-MongoDB is used for storing chat conversations. If you're already running MongoDB for workflows, you can use the same instance. Otherwise:
-
-1. **Start MongoDB** (if using Docker):
-   ```powershell
-   npm run mongodb up
-   ```
-
-2. **Or use existing MongoDB connection** from your workflow setup
+**Note:** MongoDB is NOT required for insights. Chat conversations are not persisted. Only PostgreSQL is needed for insights functionality.
 
 ---
 
@@ -400,11 +382,12 @@ set PORT=3000 && next dev
 ### Test 3: Test Arrivals Page
 
 1. Navigate to: http://localhost:3000/aime/arrivals
-2. Click "Load Attendee Data" button
+2. Data should automatically load on page mount
 3. You should see:
-   - Attendee data loaded from PostgreSQL
+   - Attendee data automatically loaded from PostgreSQL
    - Table with attendee information
-   - Search functionality working
+   - Search functionality working (press Enter to search)
+   - Page fits viewport without vertical scrolling
 
 ### Test 4: Test GraphQL API
 
@@ -423,13 +406,13 @@ Or use a GraphQL client like Postman or Insomnia.
 ### Success Checklist
 
 - [ ] Dependencies installed (`npm install` completed)
-- [ ] `.env.local` file created with all required variables
+- [ ] `.env.local` file created with PostgreSQL and AI API keys
 - [ ] PostgreSQL database `attendee` created and populated
-- [ ] MongoDB running and accessible
 - [ ] Development server starts without errors
 - [ ] Can access http://localhost:3000/aime/insights
 - [ ] Chat functionality works (can ask questions)
-- [ ] Arrivals page loads data from PostgreSQL
+- [ ] Arrivals page auto-loads data from PostgreSQL
+- [ ] Page layout fits viewport without vertical scrolling
 
 ---
 
@@ -465,29 +448,9 @@ SELECT COUNT(*) FROM public.attendee;
 SELECT * FROM public.attendee LIMIT 5;
 ```
 
-#### 2. MongoDB Connection Errors
+#### 2. MongoDB Not Required
 
-**Error:** `MONGO_URI is missing in env`
-
-**Solution:**
-- Add `MONGO_URI` to `.env.local`
-- Ensure MongoDB is running
-- Check connection string format: `mongodb://host:port/database`
-
-**Check MongoDB:**
-```powershell
-# Check MongoDB status (Docker)
-npm run mongodb status
-
-# Connect to MongoDB
-mongosh mongodb://localhost:27017/aime
-
-# Check collections
-show collections
-
-# View conversations
-db.insights_conversations.find().limit(5)
-```
+**Note:** MongoDB is NOT required for insights. If you see MongoDB-related errors, they can be ignored as insights does not use MongoDB. Only PostgreSQL is needed.
 
 #### 3. AI API Errors
 
@@ -573,6 +536,14 @@ npm install cross-env --save-dev
 
 ## 📝 Usage Guide
 
+### Layout & Design
+
+The insights pages are optimized for viewport fit:
+- **No Vertical Scrolling**: Pages fit within the viewport height
+- **Flexbox Layout**: Uses flexbox for proper space distribution
+- **Auto-Loading**: Data automatically loads on page mount
+- **Responsive**: Adapts to different screen sizes
+
 ### Accessing Insights
 
 1. Navigate to `http://localhost:3000/aime/insights`
@@ -580,6 +551,7 @@ npm install cross-env --save-dev
    - My Reports section
    - Shared Reports section
    - System Reports section
+   - All content fits within viewport (no page scrolling)
 
 ### Using the Chat Feature
 
@@ -601,9 +573,10 @@ npm install cross-env --save-dev
 ### Viewing Arrivals Data
 
 1. Navigate to `http://localhost:3000/aime/arrivals`
-2. Click "Load Attendee Data" to fetch from PostgreSQL
-3. Use search to filter attendees
+2. Data automatically loads from PostgreSQL on page mount
+3. Use search box and press Enter to filter attendees
 4. Export data using the Export button
+5. Page layout fits viewport - no vertical scrolling required
 
 ### API Endpoints
 
@@ -611,7 +584,7 @@ npm install cross-env --save-dev
 - Accepts natural language questions
 - Converts to SQL queries
 - Returns formatted answers
-- Stores conversation history in MongoDB
+- Note: Conversation history is not persisted (no MongoDB)
 
 **GraphQL API** (`/api/graphql`):
 - Provides `arrivals` query for attendee data
@@ -635,8 +608,8 @@ The `next.config.ts` has been updated to include:
 
 **GraphQL API** (`/api/graphql`):
 - Accepts GET and POST requests
-- Supports GraphQL queries and mutations
-- Context includes MongoDB connection
+- Supports GraphQL queries for arrivals data
+- Note: Chat mutation has been removed (no MongoDB persistence)
 
 ---
 
@@ -645,9 +618,11 @@ The `next.config.ts` has been updated to include:
 The insights features are designed to coexist with existing workflow features:
 
 - **Separate Routes**: Insights use `/insights` and `/arrivals` routes
-- **Shared Dependencies**: Both use MongoDB and similar AI SDKs
+- **Separate Databases**: Insights uses PostgreSQL only (no MongoDB), workflows use MongoDB
+- **Shared Dependencies**: Both use similar AI SDKs
 - **Independent State**: UI state is managed separately
 - **No Conflicts**: File paths are organized to avoid conflicts
+- **Layout**: Insights pages fit viewport without vertical scrolling
 
 **Both systems can run simultaneously without any interference!**
 
@@ -686,14 +661,8 @@ npm run dev:insights
 # Start development server (standard)
 npm run dev
 
-# Start MongoDB (Docker)
-npm run mongodb up
-
-# Check MongoDB status
-npm run mongodb status
-
-# Stop MongoDB
-npm run mongodb down
+# Note: MongoDB not required for insights
+# (Only needed if using workflow features)
 
 # Build for production
 npm run build
@@ -716,12 +685,19 @@ npm run lint
 - ✅ Zero conflicts with workflow files
 - ✅ Clear naming conventions (`Insights` prefix)
 - ✅ Dedicated directory structure (`lib/insights/`)
-- ✅ Separate database connections
-- ✅ Separate MongoDB collections
+- ✅ Separate database connections (PostgreSQL for insights, MongoDB for workflows)
+- ✅ No MongoDB dependency for insights
 - ✅ Clear file headers
 - ✅ Workflow files completely untouched
+- ✅ Layout optimized for viewport fit (no vertical scrolling)
 
 **Both systems can run simultaneously without any interference!**
+
+**Recent Changes:**
+- ✅ Removed MongoDB dependency for insights (conversations not persisted)
+- ✅ Removed "Load Attendee Data" button (data auto-loads on page mount)
+- ✅ Optimized layout to fit viewport without vertical scrolling
+- ✅ Auto-loading data on Arrivals page
 
 ---
 

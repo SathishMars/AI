@@ -43,7 +43,7 @@ export function InsightsReportsAccordion() {
   const [openShared, setOpenShared] = useState(true);
 
   return (
-    <div>
+    <div className="pb-4">
       <Section
         title="My Reports"
         count={3}

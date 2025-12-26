@@ -14,20 +14,20 @@ function InsightsShellInner({ children }: { children: React.ReactNode }) {
   // - Main fills
   // - Aime panel appears/disappears, with floating pill when hidden
   return (
-    <div className="h-screen w-full overflow-hidden bg-[#f5f5f7]">
+    <div className="flex h-screen w-full flex-col overflow-hidden bg-[#f5f5f7]">
       <InsightsTopbar />
 
       <div
-        className="grid h-[calc(100vh-56px)]"
+        className="grid flex-1 overflow-hidden"
         style={{
           gridTemplateColumns: `${sidebarCollapsed ? 72 : 260}px 1fr ${aimeOpen ? 360 : 0}px`,
         }}
       >
         <InsightsSidebar />
 
-        <main className="h-full overflow-hidden">
+        <main className="flex h-full flex-col overflow-hidden">
           {/* Main scroll area (like PNG center area) */}
-          <div className="h-full overflow-y-auto px-4 py-4">{children}</div>
+          <div className="flex-1 overflow-y-auto px-4 py-4">{children}</div>
         </main>
 
         {/* Right panel */}

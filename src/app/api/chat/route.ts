@@ -13,8 +13,6 @@ import { formatResultToAnswer } from "@/app/lib/insights/sql/format";
 
 import { detectScopeAndCategory, outOfScopeMessage } from "@/app/lib/insights/nlp/scope";
 import { buildContextSummary, type InsightsChatMsg } from "@/app/lib/insights/nlp/context";
-import { getInsightsMongoDb } from "@/app/lib/insights/mongo";
-import { upsertInsightsConversation, saveInsightsMessage } from "@/app/lib/insights/chatRepo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,23 +53,6 @@ export async function POST(req: Request) {
     const question = body.question.trim();
     const history = (body.history ?? []) as InsightsChatMsg[];
     const conversationId = body.conversationId ?? "fallback-session";
-
-    // 0) MongoDB Logging Start
-    let db: any = null;
-    try {
-      db = await getInsightsMongoDb();
-      await upsertInsightsConversation(db, {
-        conversationId,
-        title: "Aime Insights Chat",
-      });
-      await saveInsightsMessage(db, {
-        conversationId,
-        role: "user",
-        content: question,
-      });
-    } catch (mongoErr) {
-      console.error("[Chat API] MongoDB pre-log failed:", mongoErr);
-    }
 
     // 1) Fast scope detection (no LLM) — ensures graceful out-of-scope
     const scope = detectScopeAndCategory(question);
@@ -133,12 +114,29 @@ Hard rules:
       prompt: `Context: ${ctx}\n\nUser Question: ${question}\n\nReturn JSON.`,
     });
 
-    const jsonMatch = sqlResult.text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("No valid JSON found in AI response");
-    }
+    // CRITICAL FIX #3: Safe JSON parsing with proper error handling
+    let parsedSql;
+    try {
+      const jsonMatch = sqlResult.text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error("No valid JSON found in AI response");
+      }
 
-    const parsedSql = SqlOut.parse(JSON.parse(jsonMatch[0]));
+      // Validate JSON structure before parsing
+      const jsonStr = jsonMatch[0];
+      let parsedJson;
+      try {
+        parsedJson = JSON.parse(jsonStr);
+      } catch (parseError) {
+        throw new Error(`Invalid JSON format in AI response: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+      }
+
+      // Validate parsed JSON matches expected schema
+      parsedSql = SqlOut.parse(parsedJson);
+    } catch (parseError) {
+      console.error("[Chat API] JSON parsing error:", parseError);
+      throw new Error(`Failed to parse AI response: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+    }
 
     // CHECK FOR PII IN GENERATED SQL
     if (containsPII(parsedSql.sql)) {
@@ -182,19 +180,6 @@ Tone & Style:
       system: answerSystem,
       prompt: `Question: ${question}\nSQL Query: ${sql}\nData Result: ${JSON.stringify(rows)}\n\nPlease provide a natural language answer.`,
     });
-    // 4) MongoDB Log Answer
-    if (db) {
-      try {
-        await saveInsightsMessage(db, {
-          conversationId,
-          role: "assistant",
-          content: answerResult.text,
-          meta: { sql, rowCount: rows?.length || 0 },
-        });
-      } catch (mongoErr) {
-        console.error("[Chat API] MongoDB post-log failed:", mongoErr);
-      }
-    }
 
     return NextResponse.json({
       ok: true,

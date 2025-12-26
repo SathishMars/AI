@@ -38,9 +38,9 @@ export default function InsightsArrivalsTable({ rows, columnOrder, loading, show
   });
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className={`overflow-hidden rounded-2xl border border-[#e5e7eb] bg-white max-w-full ${showAll ? "h-full" : ""}`}>
-        <div className={`overflow-x-auto w-full ${showAll ? "overflow-y-auto h-full" : ""}`}>
+    <div className="flex h-full flex-col">
+      <div className="h-full overflow-hidden rounded-2xl border border-[#e5e7eb] bg-white">
+        <div className="h-full w-full overflow-auto">
           <table className="w-full border-collapse">
             <thead className="bg-[#f3f4f6] sticky top-0 z-10">
               <tr className="text-left text-[12px] text-[#111827]">

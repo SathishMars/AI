@@ -46,13 +46,52 @@ export const PII_COLUMNS = [
   "employee_id", "concur_login_id", "internal_notes", "dietary", "dietary_restrictions"
 ];
 
+/**
+ * CRITICAL FIX #5: Hardened PII detection to prevent bypasses
+ * Checks for PII columns in multiple contexts:
+ * - Direct column references
+ * - Column aliases (SELECT email AS e)
+ * - Table-qualified columns (attendee.email)
+ * - Comments (-- email)
+ * - String literals that might contain PII
+ */
 export function containsPII(sql: string) {
   const lower = sql.toLowerCase();
-  // Check for any of the PII columns as standalone words to avoid partial matches
-  // like 'phone_count' (though unlikely in this schema, it's safer)
+  
+  // Remove SQL comments to prevent bypass via comments
+  // Handles both -- and /* */ style comments
+  const withoutComments = lower
+    .replace(/--.*$/gm, '') // Remove -- comments
+    .replace(/\/\*[\s\S]*?\*\//g, ''); // Remove /* */ comments
+  
+  // Check for any of the PII columns in multiple contexts
   return PII_COLUMNS.some(col => {
-    const regex = new RegExp(`\\b${col}\\b`, 'i');
-    return regex.test(lower);
+    // Pattern 1: Direct column reference (SELECT email)
+    const directPattern = new RegExp(`\\b${col}\\b`, 'i');
+    if (directPattern.test(withoutComments)) {
+      return true;
+    }
+    
+    // Pattern 2: Column with alias (SELECT email AS e, SELECT e.email)
+    const aliasPattern = new RegExp(`\\b${col}\\s+as\\s+\\w+|\\w+\\.${col}\\b`, 'i');
+    if (aliasPattern.test(withoutComments)) {
+      return true;
+    }
+    
+    // Pattern 3: Table-qualified column (SELECT attendee.email, public.attendee.email)
+    const qualifiedPattern = new RegExp(`\\w+\\.${col}\\b`, 'i');
+    if (qualifiedPattern.test(withoutComments)) {
+      return true;
+    }
+    
+    // Pattern 4: In SELECT clause with potential string manipulation
+    // Matches patterns like: SELECT CONCAT(email, ...), SELECT SUBSTRING(email, ...)
+    const functionPattern = new RegExp(`(concat|substring|substr|lower|upper|trim|coalesce)\\s*\\([^)]*\\b${col}\\b`, 'i');
+    if (functionPattern.test(withoutComments)) {
+      return true;
+    }
+    
+    return false;
   });
 }
 

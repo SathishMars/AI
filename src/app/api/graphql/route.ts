@@ -1,7 +1,6 @@
 // INSIGHTS-SPECIFIC: GraphQL API endpoint
 import { createYoga } from "graphql-yoga";
 import { typeDefs, resolvers } from "./schema";
-import { getInsightsMongoDb } from "@/app/lib/insights/mongo";
 import { createSchema } from "graphql-yoga";
 
 export const runtime = "nodejs";
@@ -18,7 +17,6 @@ const yoga = createYoga({
     fetchAPI: { Response },
     context: async ({ request }: { request: Request }) => {
         return {
-            mongo: await getInsightsMongoDb(),
             user: null, // later: attach logged-in user id/email
             requestId: request.headers.get("x-request-id") ??
                 (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(7)),

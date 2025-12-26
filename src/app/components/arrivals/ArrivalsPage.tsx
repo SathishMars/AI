@@ -1,7 +1,7 @@
 // INSIGHTS-SPECIFIC: Arrivals page component
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import InsightsArrivalsTable from "./ArrivalsTable";
 import { useInsightsUI } from "@/app/lib/insights/ui-store";
 import { Lock, LayoutTemplate, Upload, Search, ChevronLeft, Columns3, Calendar } from "lucide-react";
@@ -27,6 +27,11 @@ export default function InsightsArrivalsPage() {
 
   const displayedRows = showAll ? rows : rows.slice(0, 10);
   const displayedColumns = columns;
+
+  // Auto-load data on component mount
+  useEffect(() => {
+    fetchArrivals();
+  }, []);
 
   async function fetchArrivals(search?: string) {
     setLoading(true);
@@ -113,7 +118,7 @@ export default function InsightsArrivalsPage() {
   }
 
   return (
-    <div className="max-w-full">
+    <div className="flex h-full max-w-full flex-col">
       {/* Row 1: Back + Actions */}
       <div className="mb-4 flex items-center justify-between pt-4">
         <button
@@ -163,25 +168,6 @@ export default function InsightsArrivalsPage() {
       <div className="mb-3 flex items-end justify-between">
         <div className="flex flex-col gap-1">
           <div className="text-[12px] text-[#6b7280]">Realtime data from your event</div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => fetchArrivals(q)}
-              disabled={loading}
-              className="rounded-md bg-[#a855f7] px-3 py-1 text-[11px] font-medium text-white hover:bg-[#9333ea] disabled:opacity-50"
-            >
-              {loading ? "Loading..." : "Load Attendee Data"}
-            </button>
-            {fetchStatus === "success" && (
-              <span className="text-[11px] font-medium text-green-600">
-                Attendee data is fetched
-              </span>
-            )}
-            {fetchStatus === "error" && (
-              <span className="text-[11px] font-medium text-red-600">
-                Fetch failed
-              </span>
-            )}
-          </div>
         </div>
 
         <div className="flex items-center gap-2">
@@ -221,7 +207,7 @@ export default function InsightsArrivalsPage() {
       </div>
 
       {/* Table Area */}
-      <div className="pb-4 max-w-full">
+      <div className="flex-1 overflow-hidden pb-4">
         {loading ? (
           <div className="p-4 text-center text-gray-500">Loading data...</div>
         ) : fetchStatus === "error" ? (
@@ -229,18 +215,14 @@ export default function InsightsArrivalsPage() {
             Error loading data. Please check the console for details.
           </div>
         ) : rows.length > 0 ? (
-          <div className={showAll ? "h-[600px] overflow-hidden" : ""}>
+          <div className="h-full overflow-hidden">
             <InsightsArrivalsTable rows={displayedRows} columnOrder={displayedColumns} loading={loading} showAll={showAll} />
           </div>
         ) : fetchStatus === "success" ? (
           <div className="p-4 text-center text-gray-500">
             No data found. The query returned 0 rows.
           </div>
-        ) : (
-          <div className="p-4 text-center text-gray-500">
-            Click "Load Attendee Data" to fetch data from PostgreSQL.
-          </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

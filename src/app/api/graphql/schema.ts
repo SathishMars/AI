@@ -1,6 +1,5 @@
 // INSIGHTS-SPECIFIC: GraphQL schema definitions
 import { insightsArrivalsRows, insightsAttendeeColumns } from "@/app/lib/insights/data";
-import { upsertInsightsConversation, saveInsightsMessage } from "@/app/lib/insights/chatRepo";
 
 export const typeDefs = /* GraphQL */ `
   type Attendee {
@@ -37,17 +36,9 @@ export const typeDefs = /* GraphQL */ `
     offset: Int!
   }
 
-  type ChatResponse {
-    answer: String!
-  }
-
   type Query {
     arrivals(q: String, limit: Int = 50, offset: Int = 0): ArrivalsResult!
     arrivalColumns: [String!]!
-  }
-
-  type Mutation {
-    chat(conversationId: String!, text: String!): ChatResponse!
   }
 `;
 
@@ -79,9 +70,28 @@ export const resolvers = {
       console.log("[GraphQL] arrivals resolver called with args:", args);
       console.time("arrivals-resolver");
 
-      const q = (args.q || "").trim().toLowerCase();
-      const limit = Math.max(1, Math.min(args.limit ?? 50, 200));
-      const offset = Math.max(0, args.offset ?? 0);
+      // CRITICAL FIX #2: Input validation
+      // Validate and sanitize inputs
+      let q: string | null = null;
+      if (args.q !== undefined && args.q !== null) {
+        const sanitized = String(args.q).trim();
+        if (sanitized.length > 200) {
+          throw new Error("Search query exceeds maximum length of 200 characters");
+        }
+        // Only allow alphanumeric, spaces, and common search characters
+        if (!/^[a-zA-Z0-9\s@._-]*$/.test(sanitized)) {
+          throw new Error("Search query contains invalid characters");
+        }
+        q = sanitized.toLowerCase();
+      }
+
+      // Validate limit and offset are integers
+      const limit = Math.max(1, Math.min(Math.floor(Number(args.limit) || 50), 200));
+      const offset = Math.max(0, Math.floor(Number(args.offset) || 0));
+
+      if (!Number.isInteger(limit) || !Number.isInteger(offset)) {
+        throw new Error("Limit and offset must be integers");
+      }
 
       try {
         const { getInsightsPool } = await import("@/app/lib/insights/db");
@@ -91,44 +101,65 @@ export const resolvers = {
           throw new Error("Database pool not available");
         }
 
-        const where = q
-          ? `
+        // CRITICAL FIX #1: Use fully parameterized queries - no string interpolation
+        let dataSql: string;
+        let countSql: string;
+        let dataParams: (string | number)[];
+        let countParams: (string | number)[];
+
+        if (q && q.length > 0) {
+          const searchPattern = `%${q}%`;
+          // Fully parameterized WHERE clause - no string interpolation
+          dataSql = `
+            SELECT *
+            FROM public.attendee
             WHERE
               COALESCE(first_name,'') ILIKE $1 OR
               COALESCE(last_name,'') ILIKE $1 OR
               COALESCE(email,'') ILIKE $1 OR
               COALESCE(company_name,'') ILIKE $1
-          `
-          : "";
+            LIMIT $2
+            OFFSET $3
+          `;
+          dataParams = [searchPattern, limit, offset];
 
-        const params: (string | number)[] = [];
-        if (q) params.push(`%${q}%`);
-        params.push(limit, offset);
+          countSql = `
+            SELECT COUNT(*)::int AS total
+            FROM public.attendee
+            WHERE
+              COALESCE(first_name,'') ILIKE $1 OR
+              COALESCE(last_name,'') ILIKE $1 OR
+              COALESCE(email,'') ILIKE $1 OR
+              COALESCE(company_name,'') ILIKE $1
+          `;
+          countParams = [searchPattern];
+        } else {
+          // No search - still use parameterized queries
+          dataSql = `
+            SELECT *
+            FROM public.attendee
+            LIMIT $1
+            OFFSET $2
+          `;
+          dataParams = [limit, offset];
 
-        const dataSql = `
-          SELECT *
-          FROM public.attendee
-          ${where}
-          LIMIT $${q ? 2 : 1}
-          OFFSET $${q ? 3 : 2};
-        `;
+          countSql = `
+            SELECT COUNT(*)::int AS total
+            FROM public.attendee
+          `;
+          countParams = [];
+        }
 
         console.log(
           "[GraphQL] Executing data query:",
           dataSql.replace(/\n\s+/g, " "),
           "with params:",
-          params
+          dataParams
         );
 
-        const countSql = `
-          SELECT COUNT(*)::int AS total
-          FROM public.attendee
-          ${where};
-        `;
-
         const [dataRes, countRes] = await Promise.all([
-          pool.query(dataSql, params),
-          pool.query(countSql, q ? [`%${q}%`] : []),
+          pool.query(dataSql, dataParams),
+          pool.query(countSql, countParams),
         ]);
 
         console.timeEnd("arrivals-resolver");
@@ -200,50 +231,6 @@ export const resolvers = {
           offset,
         };
       }
-    },
-  },
-
-  Mutation: {
-    chat: async (_: unknown, args: { conversationId: string; text: string }, ctx: any) => {
-      const { conversationId, text } = args;
-
-      const db = ctx?.mongo;
-      if (!db) {
-        // This means route.ts context isn't passing mongo yet
-        throw new Error("MongoDB not available in context. Ensure route.ts sets ctx.mongo.");
-      }
-
-      const userId = ctx?.user?.id ?? null;
-
-      // 1) Upsert conversation record
-      await upsertInsightsConversation(db, {
-        conversationId,
-        userId,
-        title: "Aime Insights Chat",
-      });
-
-      // 2) Save user message
-      await saveInsightsMessage(db, {
-        conversationId,
-        userId,
-        role: "user",
-        content: text,
-      });
-
-      // 3) Generate answer (POC placeholder — replace with your Text-to-SQL agent later)
-      const answer =
-        "Thanks — your message has been logged successfully. (Next: connect this mutation to the Text-to-SQL agent pipeline.)";
-
-      // 4) Save assistant message
-      await saveInsightsMessage(db, {
-        conversationId,
-        userId,
-        role: "assistant",
-        content: answer,
-        meta: { poc: true },
-      });
-
-      return { answer };
     },
   },
 };
