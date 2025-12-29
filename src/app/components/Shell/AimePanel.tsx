@@ -39,6 +39,27 @@ export function InsightsAimePanel() {
     setTimeout(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
   }
 
+  /**
+   * Checks if data is substantial enough to warrant Excel export.
+   * Only exports tabular data with multiple rows and columns.
+   */
+  function shouldShowExport(data: any[]): boolean {
+    if (!data || data.length === 0) return false;
+    
+    // Skip single-row results (likely aggregates like COUNT, SUM, etc.)
+    if (data.length < 2) return false;
+    
+    // Check if it's tabular data (array of objects)
+    const firstRow = data[0];
+    if (!firstRow || typeof firstRow !== 'object' || Array.isArray(firstRow)) return false;
+    
+    // Must have multiple columns to be worth exporting
+    const keys = Object.keys(firstRow);
+    if (keys.length < 2) return false;
+    
+    return true;
+  }
+
   function handleExport(data: any[], format: "xlsx", filename = "aime-export") {
     if (format === "xlsx") {
       const ws = XLSX.utils.json_to_sheet(data);
@@ -174,11 +195,12 @@ export function InsightsAimePanel() {
                     </ReactMarkdown>
                   </div>
 
-                  {m.data && m.data.length > 0 && (
+                  {m.data && m.data.length > 0 && shouldShowExport(m.data) && (
                     <div className="mt-2 flex flex-wrap gap-2">
                       <button
-                        onClick={() => handleExport(m.data!, "xlsx")}
+                        onClick={() => handleExport(m.data!, "xlsx", `aime-export-${new Date().toISOString().split('T')[0]}`)}
                         className="flex items-center gap-1.5 rounded-lg border border-[#e5e7eb] bg-white px-2.5 py-1.5 text-[10px] font-medium text-[#374151] hover:bg-gray-50 transition-colors"
+                        title="Export to Excel"
                       >
                         <span className="text-[#10b981]">⬇</span> Excel
                       </button>
