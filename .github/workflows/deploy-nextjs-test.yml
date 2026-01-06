@@ -1,0 +1,111 @@
+name: Deploy to Test Environment
+
+on:
+  push:
+    branches: [ develop ]
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  #BUNDLE_RUBYGEMS__PKG__GITHUB__COM: ${{ secrets.GH_PKG_AUTH_TOKEN }}
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+  # Common parameters
+  CLUSTER_NAME: groupize-test-ecs-cluster
+  TASK_EXECUTION_ROLE: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/groupize-test-ECSExecutionRole
+  SECRETS_ARN: arn:aws:secretsmanager:${{ secrets.AWS_REGION }}:${{ secrets.AWS_ACCOUNT_ID }}:secret
+  TARGET_GROUP_ARN: arn:aws:elasticloadbalancing:${{ secrets.AWS_REGION }}:${{ secrets.AWS_ACCOUNT_ID }}:targetgroup/groupize-test-nextjs/44e503ade78df12b
+  SUBNET_1: subnet-03fab71bcb454a945
+  SUBNET_2: subnet-083962d3f4b1f091a
+  SUBNET_3: subnet-0ef381d2ea797b0cc
+  SUBNET_4: subnet-0f908afe8cbbc1a52
+  SECURITY_GROUP_ID: sg-06499409774a16016
+  ENVIRONMENT_NAME: test
+
+jobs:
+  deploy:
+    name: Build and Deploy to Test
+    runs-on: ubuntu-latest
+    #environment: groupizereg-testing
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Login to Amazon ECR
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Build and Push Docker Image to ECR
+      #if: false
+      run: |
+        echo "🔧 Setting up environment variables... for Account ${{ secrets.AWS_ACCOUNT_ID }}"
+        IMAGE_TAG=${{ github.sha }}
+        ECR_REPO=${{ env.ECR_REGISTRY }}/nextjs-workflow-test-app
+
+        echo "🔧 Building Docker image with BuildKit..."
+        DOCKER_BUILDKIT=1 docker build \
+          -t $ECR_REPO:$IMAGE_TAG .
+
+        echo "📦 Tagging and pushing image to ECR..."
+        docker tag $ECR_REPO:$IMAGE_TAG $ECR_REPO:latest
+        docker push $ECR_REPO:$IMAGE_TAG
+        docker push $ECR_REPO:latest
+        echo "IMAGE_URI=$ECR_REPO:$IMAGE_TAG" >> $GITHUB_ENV
+        echo "✅ Image pushed: $ECR_REPO:$IMAGE_TAG"
+
+    - name: Deploy App CloudFormation Stack
+      run: |
+        IMAGE_TAG=${{ github.sha }}
+        STACK_NAME=groupize-test-nextjs-app-deployment
+
+        # Get current stack status (if it exists)
+        STATUS=$(aws cloudformation describe-stacks \
+          --stack-name $STACK_NAME \
+          --query "Stacks[0].StackStatus" \
+          --output text 2>/dev/null || echo "STACK_NOT_FOUND")
+
+        echo "Current stack status: $STATUS"
+
+        # If stack is updating, wait for it to complete
+        if [[ "$STATUS" == *"_IN_PROGRESS" ]]; then
+          echo "⏳ Stack is currently in progress ($STATUS). Waiting for it to finish..."
+
+          if [[ "$STATUS" == "UPDATE_IN_PROGRESS" ]]; then
+            aws cloudformation wait stack-update-complete --stack-name $STACK_NAME
+          elif [[ "$STATUS" == "CREATE_IN_PROGRESS" ]]; then
+            aws cloudformation wait stack-create-complete --stack-name $STACK_NAME
+          elif [[ "$STATUS" == "DELETE_IN_PROGRESS" ]]; then
+            aws cloudformation wait stack-delete-complete --stack-name $STACK_NAME
+            STATUS="STACK_NOT_FOUND"  # After delete, it won’t exist
+          else
+            echo "⚠️ Unknown progress state: $STATUS"
+            exit 1
+          fi
+
+          echo "✅ Stack is now stable. Proceeding with deployment..."
+        fi
+
+        aws cloudformation deploy \
+          --stack-name groupize-test-nextjs-app-deployment \
+          --template-file cloudformation/test/ecs-nextjs-test-app.yaml \
+          --capabilities CAPABILITY_NAMED_IAM \
+          --parameter-overrides \
+            ClusterName=${{ env.CLUSTER_NAME }} \
+            ServiceName=groupize-test-nextjs-app \
+            TaskDefinitionName=groupize-test-nextjs \
+            EnvironmentName=${{ env.ENVIRONMENT_NAME }} \
+            ContainerImage=${{ env.ECR_REGISTRY }}/nextjs-workflow-test-app:$IMAGE_TAG \
+            TaskExecutionRoleArn=${{ env.TASK_EXECUTION_ROLE }} \
+            Subnet1=${{ env.SUBNET_1 }} \
+            Subnet2=${{ env.SUBNET_2 }} \
+            Subnet3=${{ env.SUBNET_3 }} \
+            Subnet4=${{ env.SUBNET_4 }} \
+            SecurityGroupId=${{ env.SECURITY_GROUP_ID }} \
+            AppSecretsArn=${{ env.SECRETS_ARN }} \
+            TargetGroupArn=${{ env.TARGET_GROUP_ARN }}
+        echo "CloudFormation stack deployed successfully."

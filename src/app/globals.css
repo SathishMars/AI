@@ -1,0 +1,242 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@theme {
+
+  /* Font Variables */
+  --font-open-sans: var(--font-open-sans);
+  --font-roboto: var(--font-roboto);
+  --font-lato: var(--font-lato);
+  --font-sans: var(--font-open-sans), sans-serif;
+  --font-heading: var(--font-roboto), sans-serif;
+  /* shadcn/ui Slate Theme */
+
+  /* Border Radius */
+  --radius: 0.5rem;
+  --radius-lg: 0.5rem;
+  --radius-md: calc(0.5rem - 2px);
+  --radius-sm: calc(0.5rem - 4px);
+
+  /* Light Mode Colors - Slate */
+  --color-background: #ffffff;
+  --color-foreground: #020817;
+
+  --color-card: #ffffff;
+  --color-card-foreground: #020817;
+
+  --color-popover: #ffffff;
+  --color-popover-foreground: #020817;
+
+  /* Primary - Slate */
+  --color-primary: #0f172a;
+  --color-primary-foreground: #f8fafc;
+
+  /* Secondary - Slate */
+  --color-secondary: #f1f5f9;
+  --color-secondary-foreground: #0f172a;
+
+  /* Muted - Slate */
+  --color-muted: #f1f5f9;
+  --color-muted-foreground: #64748b;
+
+  /* Accent - Slate */
+  --color-accent: #f1f5f9;
+  --color-accent-foreground: #0f172a;
+
+  /* Destructive - Red */
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #f8fafc;
+
+  --color-border: #e2e8f0;
+  --color-input: #e2e8f0;
+  --color-ring: #020817;
+
+  /* Chart colors - Slate palette */
+  --color-chart-1: #0f172a;
+  --color-chart-2: #0ea5e9;
+  --color-chart-3: #f97316;
+  --color-chart-4: #22c55e;
+  --color-chart-5: #a855f7;
+
+  /* Sidebar - Slate */
+  --color-sidebar-background: #f8fafc;
+  --color-sidebar-foreground: #020817;
+  --color-sidebar-primary: #0f172a;
+  --color-sidebar-primary-foreground: #f8fafc;
+  --color-sidebar-accent: #f1f5f9;
+  --color-sidebar-accent-foreground: #0f172a;
+  --color-sidebar-border: #e2e8f0;
+  --color-sidebar-ring: #020817;
+}
+
+@layer theme {
+
+  :root,
+  :host {
+    @variant dark {
+      /* Font Variables */
+      --font-open-sans: var(--font-open-sans);
+      --font-roboto: var(--font-roboto);
+      --font-lato: var(--font-lato);
+      --font-sans: var(--font-open-sans), sans-serif;
+      --font-heading: var(--font-roboto), sans-serif;
+
+      /* Dark Mode Colors - Slate */
+      --color-background: #020817;
+      --color-foreground: #f8fafc;
+
+      --color-card: #020817;
+      --color-card-foreground: #f8fafc;
+
+      --color-popover: #020817;
+      --color-popover-foreground: #f8fafc;
+
+      /* Primary - Slate (lighter for dark mode) */
+      --color-primary: #f8fafc;
+      --color-primary-foreground: #0f172a;
+
+      /* Secondary - Slate */
+      --color-secondary: #1e293b;
+      --color-secondary-foreground: #f8fafc;
+
+      /* Muted - Dark slate */
+      --color-muted: #1e293b;
+      --color-muted-foreground: #94a3b8;
+
+      /* Accent - Dark slate */
+      --color-accent: #1e293b;
+      --color-accent-foreground: #f8fafc;
+
+      /* Destructive - Red (lighter) */
+      --color-destructive: #7f1d1d;
+      --color-destructive-foreground: #f8fafc;
+
+      --color-border: #1e293b;
+      --color-input: #1e293b;
+      --color-ring: #cbd5e1;
+
+      /* Chart colors - Dark mode slate palette */
+      --color-chart-1: #f8fafc;
+      --color-chart-2: #38bdf8;
+      --color-chart-3: #fb923c;
+      --color-chart-4: #4ade80;
+      --color-chart-5: #c084fc;
+
+      /* Sidebar - Dark mode slate */
+      --color-sidebar-background: #0f172a;
+      --color-sidebar-foreground: #f8fafc;
+      --color-sidebar-primary: #f8fafc;
+      --color-sidebar-primary-foreground: #0f172a;
+      --color-sidebar-accent: #1e293b;
+      --color-sidebar-accent-foreground: #f8fafc;
+      --color-sidebar-border: #1e293b;
+      --color-sidebar-ring: #cbd5e1;
+    }
+  }
+}
+
+
+@layer base {
+  body {
+    font-feature-settings: "rlig" 1, "calt" 1;
+    font-family: var(--font-open-sans);
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+  }
+
+  * {
+    border-color: var(--color-border);
+  }
+}
+
+/* Liquid Glass Effect Utility Classes - Theme Aware */
+@layer utilities {
+  /* Basic glass effect - adapts to light/dark mode */
+
+  @keyframes subtle-ripple {
+    0% {
+      transform: scale(1);
+    }
+
+    50% {
+      transform: scale(1.002);
+    }
+
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  .glass,
+  .glass-hover {
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 16px;
+    /* backdrop-filter: blur(20px) saturate(180%); */
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    background-image: linear-gradient(135deg,
+        rgba(255, 255, 255, 0.25) 0%,
+        rgba(255, 255, 255, 0.05) 100%);
+    animation: subtle-ripple 3s infinite alternate ease-in-out;
+    transition: all 0.3s ease;
+    color: var(--color-foreground);
+     /* Apply the standard blur AND the SVG filter for refraction */
+    backdrop-filter: blur(8px) url(#liquid-glass-refraction); 
+    
+    /* Ensure the element has a position defined so the filter works correctly */
+    /* position: relative; */
+  }
+
+  /* Optional hover effect to mimic liquid movement */
+  .glass-hover:hover {
+    background: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.25);
+    transform: translateY(-2px);
+  }
+
+  
+
+  @variant dark {
+
+    .glass,
+    .glass-hover {
+      /* darker translucent base */
+      background: rgba(17, 25, 40, 0.55);
+      background-image: linear-gradient(135deg,
+          rgba(255, 255, 255, 0.06) 0%,
+          rgba(255, 255, 255, 0.02) 60%,
+          rgba(0, 0, 0, 0.20) 100%);
+
+      color: rgba(255, 255, 255, 0.92);
+      border-radius: 16px;
+
+      /* frosted blur + richer behind-colors */
+      backdrop-filter: blur(8px) url(#liquid-glass-refraction); 
+
+      /* subtle, cool-toned edge */
+      border: 1px solid rgba(255, 255, 255, 0.08);
+
+      /* deeper drop shadow + faint inner highlight */
+      box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.50),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+
+      transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+    }
+
+    .glass-hover:hover {
+      background: rgba(17, 25, 40, 0.62);
+      box-shadow:
+        0 12px 48px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0 rgba(255, 255, 255, 0.10);
+      transform: translateY(-2px);
+    }
+
+  }
+}

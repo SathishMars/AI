@@ -1,0 +1,22 @@
+# MongoDB 8.0 Docker Image for Local Development
+# Builds MongoDB 8.0 with initialized database and user
+
+FROM mongo:8.2.2
+
+# Set environment variables
+ENV MONGO_INITDB_ROOT_USERNAME=admin
+ENV MONGO_INITDB_ROOT_PASSWORD=admin123
+ENV MONGO_INITDB_DATABASE=groupize-workflows
+
+# Copy initialization script
+COPY init-mongo.js /docker-entrypoint-initdb.d/01-init-mongo.js
+
+# Expose MongoDB port
+EXPOSE 27017
+
+# Health check
+HEALTHCHECK --interval=5s --timeout=3s --start-period=5s --retries=3 \
+  CMD mongosh --authenticationDatabase admin -u admin -p admin123 --eval "db.adminCommand('ping')" || exit 1
+
+# Run MongoDB
+CMD ["mongod", "--auth"]

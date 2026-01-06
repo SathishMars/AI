@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: groupize-workflows-nginx
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      # Mount SSL certificates from local certs directory
+      # Using +2 versions that include IP addresses: 127.0.0.1 and ::1
+      - ./certs/testing.app.groupize.com+2.pem:/etc/nginx/certs/testing.app.groupize.com+2.pem:ro
+      - ./certs/testing.app.groupize.com+2-key.pem:/etc/nginx/certs/testing.app.groupize.com+2-key.pem:ro
+    environment:
+      - TZ=America/New_York
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped

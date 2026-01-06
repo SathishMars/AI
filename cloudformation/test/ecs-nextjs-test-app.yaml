@@ -1,0 +1,184 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: ECS Fargate Task Definition and Service for groupize-test-nextjs
+
+Parameters:
+  ClusterName:
+    Type: String
+    Description: The name of the ECS cluster
+  ServiceName:
+    Type: String
+    Description: The ECS service name
+  TaskDefinitionName:
+    Type: String
+    Description: The ECS task definition name
+  ContainerImage:
+    Type: String
+    Description: The Docker image URI in ECR
+  TaskExecutionRoleArn:
+    Type: String
+    Description: ARN of the IAM role for ECS task execution
+  Subnet1:
+    Type: String
+    Description: First private subnet ID
+  Subnet2:
+    Type: String
+    Description: Second private subnet ID
+  Subnet3:
+    Type: String
+    Description: Third private subnet ID
+  Subnet4:
+    Type: String
+    Description: Forth private subnet ID
+  SecurityGroupId:
+    Type: String
+    Description: Security group ID for the ECS service
+  TargetGroupArn:
+    Type: String
+    Description: ARN of the existing target group (groupize-test-nextjs)
+  AppSecretsArn:
+    Type: String
+    Description: The ARN of the AWS Secrets Manager secret for the application.
+  EnvironmentName:
+    Type: String
+    Description: EnvironmentName for the deployment (e.g., test, stag, prod)
+
+Resources:
+  NextjsTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Ref TaskDefinitionName
+      RequiresCompatibilities: [FARGATE]
+      Cpu: '4096'
+      Memory: '8192'
+      NetworkMode: awsvpc
+      ExecutionRoleArn: !Ref TaskExecutionRoleArn
+      TaskRoleArn: !Ref TaskExecutionRoleArn
+      ContainerDefinitions:
+        - Name: nextjs-container
+          Image: !Ref ContainerImage
+          Cpu: 2048
+          Memory: 3072
+          Essential: true
+          Environment:
+            - Name: TEST_VAR
+              Value: test
+            - Name: AUTH_MODE
+              Value: embedded
+            - Name: JWT_AUDIENCE
+              Value: workflows
+            - Name: RAILS_BASE_URL
+              Value: https://testing.app.groupize.com
+            - Name: DATABASE_ENVIRONMENT
+              Value: documentdb
+            - Name: JWT_SECRET
+              Value: dev-secret-change-me
+            - Name: JWT_ISSUER
+              Value: groupize
+            - Name: COOKIE_NAME
+              Value: gpw_session
+            - Name: NEXT_PUBLIC_RAILS_BASE_URL
+              Value: https://testing.app.groupize.com
+            - Name: NEXT_PUBLIC_APP_URL
+              Value: https://testing.app.groupize.com
+          LinuxParameters:
+            InitProcessEnabled: true
+          PortMappings:
+            - ContainerPort: 3000
+              Protocol: tcp
+              AppProtocol: http
+              Name: nextjs-container-80-tcp
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub /ecs/groupize-test/app
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
+              mode: non-blocking
+              max-buffer-size: 25m
+          Secrets:
+            - Name: ANTHROPIC_API_KEY
+              ValueFrom: !Sub "${AppSecretsArn}:nextjs/ANTHROPIC_API_KEY"
+            - Name: ANTHROPIC_MODEL_WORKFLOW
+              ValueFrom: !Sub "${AppSecretsArn}:nextjs/ANTHROPIC_MODEL_WORKFLOW"
+            - Name: DOCUMENTDB_URI
+              ValueFrom: !Sub "${AppSecretsArn}:nextjs/DOCUMENTDB_URI"
+            - Name: NEXT_PUBLIC_APP_ENV
+              ValueFrom: !Sub "${AppSecretsArn}:nextjs/NEXT_PUBLIC_APP_ENV"
+            - Name: NEXT_PUBLIC_ENABLE_MOCK_DATA
+              ValueFrom: !Sub "${AppSecretsArn}:nextjs/NEXT_PUBLIC_ENABLE_MOCK_DATA"
+            - Name: NODE_ENV
+              ValueFrom: !Sub "${AppSecretsArn}:nextjs/NODE_ENV"
+            - Name: OPENAI_API_KEY
+              ValueFrom: !Sub "${AppSecretsArn}:nextjs/OPENAI_API_KEY"
+            - Name: OPENAI_MODEL_WORKFLOW
+              ValueFrom: !Sub "${AppSecretsArn}:nextjs/OPENAI_MODEL_WORKFLOW"
+
+        - Name: datadog-agent
+          Image: public.ecr.aws/datadog/agent:latest
+          Essential: true
+          Cpu: 512
+          Memory: 1024
+          Environment:
+            - Name: DD_SITE
+              Value: datadoghq.com
+            - Name: ECS_FARGATE
+              Value: "true"
+            - Name: DD_APM_ENABLED
+              Value: "true"
+            - Name: DD_LOGS_ENABLED
+              Value: "true"
+            - Name: DD_TAGS
+              Value: env:aws-apptesting,service:groupize-apptesting
+            - Name: DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL
+              Value: "true"
+            - Name: DD_DOGSTATSD_NON_LOCAL_TRAFFIC
+              Value: "true"
+          Secrets:
+            - Name: DD_API_KEY
+              ValueFrom: !Sub "${AppSecretsArn}:DD_API_KEY-srmLXc"
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub /ecs/groupize-test/datadog-agent
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: agent
+              mode: non-blocking
+              max-buffer-size: 25m
+
+  GroupizeNextJSTestService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref ClusterName
+      ServiceName: !Ref ServiceName
+      LaunchType: FARGATE
+      DesiredCount: 1
+      TaskDefinition: !Ref NextjsTaskDefinition
+      HealthCheckGracePeriodSeconds: 60
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          Subnets:
+            - !Ref Subnet1
+            - !Ref Subnet2
+            - !Ref Subnet3
+            - !Ref Subnet4
+          SecurityGroups:
+            - !Ref SecurityGroupId
+      LoadBalancers:
+        - ContainerName: nextjs-container
+          ContainerPort: 3000
+          TargetGroupArn: !Ref TargetGroupArn
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 50
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
+
+Outputs:
+  ServiceName:
+    Description: Name of the ECS Service
+    Value: !Ref GroupizeNextJSTestService
+  TaskDefinitionArn:
+    Description: ARN of the ECS Task Definition
+    Value: !Ref NextjsTaskDefinition

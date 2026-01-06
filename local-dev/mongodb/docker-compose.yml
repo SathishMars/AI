@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  mongodb:
+    build:
+      context: .
+      dockerfile: Dockerfile.mongodb
+    container_name: groupize-mongodb-8
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin123
+      MONGO_INITDB_DATABASE: groupize-workflows
+    volumes:
+      - mongodb-data:/data/db
+      - mongodb-config:/data/configdb
+      - ./init-mongo.js:/docker-entrypoint-initdb.d/01-init-mongo.js
+    networks:
+      - groupize-network
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - mongosh
+        - --authenticationDatabase
+        - admin
+        - -u
+        - admin
+        - -p
+        - admin123
+        - --eval
+        - "db.adminCommand('ping')"
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  mongodb-data:
+    driver: local
+  mongodb-config:
+    driver: local
+
+networks:
+  groupize-network:
+    driver: bridge
