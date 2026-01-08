@@ -32,7 +32,7 @@ export default function InsightsArrivalsPage() {
   const [exportStatus, setExportStatus] = useState<"idle" | "exporting" | "error">("idle");
   const [exportProgress, setExportProgress] = useState(0);
   const [exportMessage, setExportMessage] = useState("");
-  const { setPickColumnsOpen, setAimeOpen, setPickColumnsData, aimeAction, setAimeAction } = useInsightsUI();
+  const { setPickColumnsOpen, setAimeOpen, setPickColumnsData, aimeAction, setAimeAction, eventId, setEventId } = useInsightsUI();
 
   // Handle AIME actions
   useEffect(() => {
@@ -150,18 +150,25 @@ export default function InsightsArrivalsPage() {
   const displayedRows = showAll ? processedRows : processedRows.slice(0, 10);
   const displayedColumns = selectedColumns.length > 0 ? selectedColumns : columns;
 
-  // Auto-load data on component mount
+  // Auto-load data on component mount or eventId change (debounced)
   useEffect(() => {
-    fetchArrivals();
-  }, []);
+    const timer = setTimeout(() => {
+      if (eventId > 0) {
+        fetchArrivals(q, eventId);
+      }
+    }, 500);
 
-  async function fetchArrivals(search?: string) {
+    return () => clearTimeout(timer);
+  }, [eventId]);
+
+  async function fetchArrivals(search?: string, targetEventId?: number) {
     setLoading(true);
     setFetchStatus("loading");
+    const currentEventId = targetEventId || eventId;
     const query = `
-      query Arrivals($q: String, $limit: Int!, $offset: Int!) {
+      query Arrivals($q: String, $eventId: Int, $limit: Int!, $offset: Int!) {
         arrivalColumns
-        arrivals(q: $q, limit: $limit, offset: $offset) {
+        arrivals(q: $q, eventId: $eventId, limit: $limit, offset: $offset) {
           total
           limit
           offset
@@ -170,25 +177,19 @@ export default function InsightsArrivalsPage() {
             middle_name
             last_name
             email
+            companion_count
+            company_name
             phone
             mobile
-            title
-            mailing_address
-            city
-            state
-            postal_code
-            country
-            company_name
-            prefix
-            employee_id
-            concur_login_id
             attendee_type
+            emergency_contact
             registration_status
             manual_status
             room_status
             air_status
             created_at
             updated_at
+            concur_login_id
             internal_notes
           }
         }
@@ -201,7 +202,7 @@ export default function InsightsArrivalsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           query,
-          variables: { q: search?.trim() || null, limit: 100, offset: 0 },
+          variables: { q: search?.trim() || null, eventId: currentEventId, limit: 100, offset: 0 },
         }),
       });
 
@@ -310,31 +311,31 @@ export default function InsightsArrivalsPage() {
       }));
 
       const XLSX = await import("xlsx");
-      
+
       // Format date: "Wednesday, December 10, 2025, 6:23 AM"
       const now = new Date();
-      const dateStr = now.toLocaleDateString('en-US', { 
-        weekday: 'long', 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
+      const dateStr = now.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
       });
-      const timeStr = now.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
+      const timeStr = now.toLocaleTimeString('en-US', {
+        hour: 'numeric',
         minute: '2-digit',
-        hour12: true 
+        hour12: true
       });
       const downloadedTime = `${dateStr}, ${timeStr}`;
-      
+
       // Create worksheet from data
       const ws = XLSX.utils.json_to_sheet(dataToExport);
-      
+
       // Get the range of existing data
       const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
-      
+
       // Create new worksheet data object
       const newData: any = {};
-      
+
       // Copy header row (row 0) to row 5
       for (let C = range.s.c; C <= range.e.c; C++) {
         const headerCell = XLSX.utils.encode_cell({ r: 0, c: C });
@@ -343,7 +344,7 @@ export default function InsightsArrivalsPage() {
           newData[newHeaderCell] = ws[headerCell];
         }
       }
-      
+
       // Shift data rows (rows 1+) down by 5 rows (to rows 6+)
       for (let R = 1; R <= range.e.r; R++) {
         for (let C = range.s.c; C <= range.e.c; C++) {
@@ -354,14 +355,14 @@ export default function InsightsArrivalsPage() {
           }
         }
       }
-      
+
       // Add header rows at the top
       newData['A1'] = { t: 's', v: 'Event Data' };
       newData['A2'] = { t: 's', v: 'Downloaded data' };
       newData['A3'] = { t: 's', v: downloadedTime };
       newData['A4'] = { t: 's', v: 'Notice: This report may contain personally identifiable and other client confidential data. Usage and distribution of this report should be governed by relevant regulations and your own organization\'s policies.' };
       // Row 5 is empty (no cell added)
-      
+
       // Clear old cells and update worksheet with new data
       Object.keys(ws).forEach(key => {
         if (key.startsWith('!')) {
@@ -371,13 +372,13 @@ export default function InsightsArrivalsPage() {
         delete ws[key];
       });
       Object.assign(ws, newData);
-      
+
       // Update the range to include header rows
       ws['!ref'] = XLSX.utils.encode_range({
         s: { r: 0, c: range.s.c },
         e: { r: range.e.r + 5, c: range.e.c }
       });
-      
+
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Arrivals");
       XLSX.writeFile(wb, `Arrivals_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
@@ -460,6 +461,15 @@ export default function InsightsArrivalsPage() {
       <div className="mb-2 flex items-end justify-between flex-shrink-0">
         <div className="flex flex-col gap-1">
           <div className="text-[12px] text-[#6b7280]">Realtime data from your event</div>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-[11px] font-medium text-[#374151]">Event ID:</span>
+            <input
+              type="number"
+              value={eventId}
+              onChange={(e) => setEventId(Number(e.target.value))}
+              className="w-20 rounded-md border border-[#e5e7eb] bg-white px-2 py-1 text-[11px] outline-none focus:ring-1 focus:ring-[#a855f7]"
+            />
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
@@ -471,7 +481,7 @@ export default function InsightsArrivalsPage() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") fetchArrivals(q);
+                if (e.key === "Enter") fetchArrivals(q, eventId);
               }}
             />
           </div>

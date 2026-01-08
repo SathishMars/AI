@@ -20,7 +20,7 @@ function nowTime() {
 }
 
 export function InsightsAimePanel() {
-  const { aimeOpen, setAimeOpen, setAimeAction } = useInsightsUI();
+  const { aimeOpen, setAimeOpen, setAimeAction, eventId } = useInsightsUI();
   const [conversationId] = useState(() => crypto.randomUUID());
 
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -59,31 +59,31 @@ export function InsightsAimePanel() {
   async function handleExport(data: any[], format: "xlsx", filename = "aime-export") {
     if (format === "xlsx") {
       const XLSX = await import("xlsx");
-      
+
       // Format date: "Wednesday, December 10, 2025, 6:23 AM"
       const now = new Date();
-      const dateStr = now.toLocaleDateString('en-US', { 
-        weekday: 'long', 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
+      const dateStr = now.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
       });
-      const timeStr = now.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
+      const timeStr = now.toLocaleTimeString('en-US', {
+        hour: 'numeric',
         minute: '2-digit',
-        hour12: true 
+        hour12: true
       });
       const downloadedTime = `${dateStr}, ${timeStr}`;
-      
+
       // Create worksheet from data
       const ws = XLSX.utils.json_to_sheet(data);
-      
+
       // Get the range of existing data
       const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
-      
+
       // Create new worksheet data object
       const newData: any = {};
-      
+
       // Copy header row (row 0) to row 5
       for (let C = range.s.c; C <= range.e.c; C++) {
         const headerCell = XLSX.utils.encode_cell({ r: 0, c: C });
@@ -92,7 +92,7 @@ export function InsightsAimePanel() {
           newData[newHeaderCell] = ws[headerCell];
         }
       }
-      
+
       // Shift data rows (rows 1+) down by 5 rows (to rows 6+)
       for (let R = 1; R <= range.e.r; R++) {
         for (let C = range.s.c; C <= range.e.c; C++) {
@@ -103,14 +103,14 @@ export function InsightsAimePanel() {
           }
         }
       }
-      
+
       // Add header rows at the top
       newData['A1'] = { t: 's', v: 'Event Data' };
       newData['A2'] = { t: 's', v: 'Downloaded data' };
       newData['A3'] = { t: 's', v: downloadedTime };
       newData['A4'] = { t: 's', v: 'Notice: This report may contain personally identifiable and other client confidential data. Usage and distribution of this report should be governed by relevant regulations and your own organization\'s policies.' };
       // Row 5 is empty (no cell added)
-      
+
       // Clear old cells and update worksheet with new data
       Object.keys(ws).forEach(key => {
         if (key.startsWith('!')) {
@@ -120,13 +120,13 @@ export function InsightsAimePanel() {
         delete ws[key];
       });
       Object.assign(ws, newData);
-      
+
       // Update the range to include header rows
       ws['!ref'] = XLSX.utils.encode_range({
         s: { r: 0, c: range.s.c },
         e: { r: range.e.r + 5, c: range.e.c }
       });
-      
+
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Data");
       XLSX.writeFile(wb, `${filename}.xlsx`);
@@ -142,19 +142,36 @@ export function InsightsAimePanel() {
     setIsTyping(true);
 
     try {
-      const response = await apiFetch("/api/chat", {
+      const response = await apiFetch("/api/graphql", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          conversationId,
-          question: q,
-          history: messages.map(m => ({ role: m.role, text: m.text }))
+          query: `
+            mutation chat($input: ChatInput!) {
+              chat(input: $input) {
+                ok
+                answer
+                sql
+                rows
+                meta
+              }
+            }
+          `,
+          variables: {
+            input: {
+              conversationId,
+              question: q,
+              eventId,
+              history: messages.map(m => ({ role: m.role, text: m.text }))
+            }
+          }
         }),
       });
 
-      const data = await response.json();
+      const resJson = await response.json();
+      const data = resJson.data?.chat;
 
-      if (data.ok) {
+      if (data && data.ok) {
         push("assistant", data.answer, data.sql, data.rows);
 
         // Handle UI actions from AIME

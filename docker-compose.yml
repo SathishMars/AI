@@ -1,0 +1,19 @@
+services:
+  insights-backend:
+    container_name: aime-insights-backend
+    image: sathishmaykumar/aime-insights-backend:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.insights
+    env_file:
+      - .env
+    environment:
+      - PORT=4000
+      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_INIT_LOGGING=verbose
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./src:/app/src
+    # networks:
+    #   - app-network 

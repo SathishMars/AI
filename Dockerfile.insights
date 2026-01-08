@@ -1,0 +1,18 @@
+# Use Node.js 20 Alpine
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install dependencies
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+# Copy source code (needed for reusing schema imports)
+COPY . .
+
+# Expose port
+EXPOSE 4000
+
+# Use npx tsx to run the typescript file directly
+# tsx automatically uses tsconfig.json for path aliases (@/...)
+CMD ["npx", "tsx", "src/insights-server.ts"]

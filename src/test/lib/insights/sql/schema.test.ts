@@ -42,11 +42,12 @@ describe('SQL Schema Utilities', () => {
         rows: [{ column_name: 'id', data_type: 'integer' }],
       });
 
-      const result = await getAttendeeSchemaText();
+      const result = await getAttendeeSchemaText(5281);
 
       expect(result).toContain('Only use SELECT');
-      expect(result).toContain('Always include LIMIT');
-      expect(result).toContain('created_at::timestamp');
+      expect(result).toContain('Event ID: 5281');
+      expect(result).not.toContain('Always include LIMIT'); // Verified removal
+      expect(result).toContain('created_at and updated_at are TIMESTAMP type');
     });
 
     it('should format columns correctly', async () => {

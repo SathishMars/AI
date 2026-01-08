@@ -10,16 +10,16 @@ export type InsightsReport = {
 };
 
 export const insightsMyReports: InsightsReport[] = [
- // { id: "my-1", title: "Dashboard Export 1", date: "Oct 19, 2025", section: "my" },
- // { id: "my-2", title: "Dashboard Export 2", date: "Oct 19, 2025", section: "my" },
- // { id: "my-3", title: "Dashboard Export 3", date: "Oct 19, 2025", section: "my" },
+  // { id: "my-1", title: "Dashboard Export 1", date: "Oct 19, 2025", section: "my" },
+  // { id: "my-2", title: "Dashboard Export 2", date: "Oct 19, 2025", section: "my" },
+  // { id: "my-3", title: "Dashboard Export 3", date: "Oct 19, 2025", section: "my" },
 ];
 
 export const insightsSharedReports: InsightsReport[] = [
- // { id: "sh-1", title: "Dashboard Export 4", date: "Oct 19, 2025", section: "shared" },
- // { id: "sh-2", title: "Dashboard Export 5", date: "Oct 19, 2025", section: "shared" },
- // { id: "sh-3", title: "Dashboard Export 6", date: "Oct 19, 2025", section: "shared" },
- // { id: "sh-4", title: "Dashboard Export 7", date: "Oct 19, 2025", section: "shared" },
+  // { id: "sh-1", title: "Dashboard Export 4", date: "Oct 19, 2025", section: "shared" },
+  // { id: "sh-2", title: "Dashboard Export 5", date: "Oct 19, 2025", section: "shared" },
+  // { id: "sh-3", title: "Dashboard Export 6", date: "Oct 19, 2025", section: "shared" },
+  // { id: "sh-4", title: "Dashboard Export 7", date: "Oct 19, 2025", section: "shared" },
 ];
 
 export const insightsAttendanceReports: InsightsReport[] = [
@@ -49,25 +49,19 @@ export const insightsAttendeeColumns = [
   "Middle Name",
   "Last Name",
   "Email",
+  "Companion(s)",
+  "Company Name",
   "Phone",
   "Mobile",
-  "Title",
-  "Mailing Address",
-  "City",
-  "State",
-  "Postal Code",
-  "Country",
-  "Company Name",
-  "Prefix",
-  "Employee Id",
-  "Concur Login Id",
   "Attendee Type",
+  "Emergency Contact",
   "Registration Status",
   "Manual Status",
   "Room Status",
   "Air Status",
   "Created At",
   "Updated At",
+  "Concur Login Id",
   "Internal Notes"
 ];
 

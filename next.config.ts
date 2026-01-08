@@ -38,6 +38,10 @@ const nextConfig: NextConfig = {
         source: '/accounts/:accountId/:rest*',
         destination: '/:rest*',
       },
+      {
+        source: '/api/graphql',
+        destination: process.env.GRAPHQL_URL || 'http://localhost:4000/graphql',
+      },
     ];
   },
   turbopack: {

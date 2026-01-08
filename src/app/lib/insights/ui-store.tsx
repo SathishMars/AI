@@ -34,6 +34,9 @@ type InsightsUIState = {
   aimeAction: AimeAction;
   setAimeAction: (action: AimeAction) => void;
 
+  eventId: number;
+  setEventId: (id: number) => void;
+
   // when Customize is clicked anywhere -> ensure aime opens
   openAime: () => void;
 };
@@ -46,6 +49,7 @@ export function InsightsUIProvider({ children }: { children: React.ReactNode }) 
   const [pickColumnsOpen, setPickColumnsOpen] = useState(false);
   const [pickColumnsData, setPickColumnsData] = useState<PickColumnsData>(null);
   const [aimeAction, setAimeAction] = useState<AimeAction>(null);
+  const [eventId, setEventId] = useState(5281);
 
   const value = useMemo<InsightsUIState>(
     () => ({
@@ -59,12 +63,14 @@ export function InsightsUIProvider({ children }: { children: React.ReactNode }) 
       setPickColumnsData,
       aimeAction,
       setAimeAction,
+      eventId,
+      setEventId,
       openAime: () => {
         setAimeOpen(true);
         // Don't close pick columns - let user manage both panels
       },
     }),
-    [sidebarCollapsed, aimeOpen, pickColumnsOpen, pickColumnsData, aimeAction]
+    [sidebarCollapsed, aimeOpen, pickColumnsOpen, pickColumnsData, aimeAction, eventId]
   );
 
   return <InsightsUICtx.Provider value={value}>{children}</InsightsUICtx.Provider>;

@@ -1,11 +1,5 @@
-@import "tailwindcss";
-
+@import "../../node_modules/tailwindcss/index.css";
 @custom-variant dark (&:where(.dark, .dark *));
-
-
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 
 @theme {
 
@@ -186,9 +180,9 @@
     animation: subtle-ripple 3s infinite alternate ease-in-out;
     transition: all 0.3s ease;
     color: var(--color-foreground);
-     /* Apply the standard blur AND the SVG filter for refraction */
-    backdrop-filter: blur(8px) url(#liquid-glass-refraction); 
-    
+    /* Apply the standard blur AND the SVG filter for refraction */
+    backdrop-filter: blur(8px) url(#liquid-glass-refraction);
+
     /* Ensure the element has a position defined so the filter works correctly */
     /* position: relative; */
   }
@@ -200,7 +194,7 @@
     transform: translateY(-2px);
   }
 
-  
+
 
   @variant dark {
 
@@ -217,7 +211,7 @@
       border-radius: 16px;
 
       /* frosted blur + richer behind-colors */
-      backdrop-filter: blur(8px) url(#liquid-glass-refraction); 
+      backdrop-filter: blur(8px) url(#liquid-glass-refraction);
 
       /* subtle, cool-toned edge */
       border: 1px solid rgba(255, 255, 255, 0.08);
