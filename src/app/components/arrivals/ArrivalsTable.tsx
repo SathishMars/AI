@@ -171,7 +171,7 @@ export default function InsightsArrivalsTable({
               {displayedRows.length > 0 ? (
                 displayedRows.map((row, idx) => (
                   <tr
-                    key={row.email || idx}
+                    key={row.id || row.email || idx}
                     className="border-t border-[#e5e7eb] text-[12px] text-[#111827] hover:bg-gray-50 transition-colors"
                   >
                     {displayedHeaders.map((col) => (

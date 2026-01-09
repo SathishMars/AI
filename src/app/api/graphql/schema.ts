@@ -19,6 +19,7 @@ import { buildContextSummary, type InsightsChatMsg } from "@/app/lib/insights/nl
 const SqlOut = z.object({
   sql: z.string().min(10),
   intent: z.string().optional(),
+  action: z.any().optional(),
 });
 
 function normalizeRows(rows: any[]): any[] {
@@ -66,6 +67,11 @@ function normalizeColumnName(name: string): string {
     "registration status": "registration_status",
     "attendee type": "attendee_type",
     "attendee_type": "attendee_type",
+    "middle name": "middle_name",
+    "middle_name": "middle_name",
+    // Common typos
+    "comapny": "company_name",
+    "compnay": "company_name",
   };
 
   if (mappings[normalized]) return mappings[normalized];
@@ -78,27 +84,74 @@ function normalizeColumnName(name: string): string {
 }
 
 function detectUIAction(question: string): any {
-  const q = question.toLowerCase().trim();
-  const movePatterns = [
-    /move\s+(.+?)\s+(?:to\s+)?(?:the\s+)?(front|beginning|start|first)/i,
-    /move\s+(.+?)\s+(?:to\s+)?(?:the\s+)?(back|end|last)/i,
-    /move\s+(.+?)\s+after\s+(.+)/i,
-    /move\s+(.+?)\s+before\s+(.+)/i,
-  ];
+  // Strip quotes and normalize
+  let q = question.toLowerCase().trim();
+  q = q.replace(/^["']|["']$/g, ''); // Remove leading/trailing quotes
 
-  for (const pattern of movePatterns) {
-    const match = q.match(pattern);
-    if (match) {
-      const column = normalizeColumnName(match[1].trim());
-      if (match[2] && /front|beginning|start|first/.test(match[2])) return { type: "reorder_column", column, position: 0 };
-      if (match[2] && /back|end|last/.test(match[2])) return { type: "reorder_column", column, position: -1 };
-      if (match[3]) return { type: "reorder_column", column, afterColumn: normalizeColumnName(match[3].trim()) };
-    }
+  console.log(`[detectUIAction] Input: "${question}" -> Normalized: "${q}"`);
+
+  // 1. Reset (Highest Priority)
+  if (q.match(/(?:reset|restore|original|default)\s+(?:column\s+)?(?:order|position|columns|layout)/i) ||
+    q.includes("back to original") ||
+    q.includes("original order")) {
+    console.log(`[detectUIAction] Matched: reset_columns`);
+    return { type: "reset_columns" };
   }
 
-  const beforeMatch = q.match(/move\s+(.+?)\s+before\s+(.+)/i);
-  if (beforeMatch) return { type: "reorder_column", column: normalizeColumnName(beforeMatch[1].trim()), beforeColumn: normalizeColumnName(beforeMatch[2].trim()) };
+  // 2. Reorder column
+  if (q.includes("move")) {
+    console.log(`[detectUIAction] Contains "move", testing patterns...`);
 
+    const front = q.match(/move\s+(.+?)\s+(?:to\s+)?(?:the\s+)?(front|beginning|start|first)/i);
+    if (front) {
+      console.log(`[detectUIAction] Matched: move to front`);
+      return { type: "reorder_column", column: normalizeColumnName(front[1]), position: 0 };
+    }
+
+    const back = q.match(/move\s+(.+?)\s+(?:to\s+)?(?:the\s+)?(back|end|last)/i);
+    if (back) {
+      console.log(`[detectUIAction] Matched: move to back`);
+      return { type: "reorder_column", column: normalizeColumnName(back[1]), position: -1 };
+    }
+
+    const after = q.match(/move\s+(.+?)\s+after\s+(.+)/i);
+    if (after) {
+      console.log(`[detectUIAction] Matched: move after`);
+      return { type: "reorder_column", column: normalizeColumnName(after[1]), afterColumn: normalizeColumnName(after[2]) };
+    }
+
+    const before = q.match(/move\s+(.+?)\s+before\s+(.+)/i);
+    if (before) {
+      console.log(`[detectUIAction] Matched: move before`);
+      return { type: "reorder_column", column: normalizeColumnName(before[1]), beforeColumn: normalizeColumnName(before[2]) };
+    }
+
+    // Match "move X to 4 position" or "move X to position 4"
+    const toPosition = q.match(/move\s+(.+?)\s+to\s+(?:the\s+)?(\d+)(?:st|nd|rd|th)?\s+position/i);
+    if (toPosition) {
+      console.log(`[detectUIAction] Matched: move to X position - column: "${toPosition[1]}", pos: ${toPosition[2]}`);
+      const pos = parseInt(toPosition[2], 10) - 1;
+      return { type: "reorder_column", column: normalizeColumnName(toPosition[1]), index: Math.max(0, pos) };
+    }
+
+    const ordinal = q.match(/move\s+(.+?)\s+(?:to\s+)?(?:the\s+)?(\d+)(?:st|nd|rd|th)?\s+(?:place|index)/i);
+    if (ordinal) {
+      console.log(`[detectUIAction] Matched: ordinal position`);
+      const pos = parseInt(ordinal[2], 10) - 1; // 1-based to 0-based
+      return { type: "reorder_column", column: normalizeColumnName(ordinal[1]), index: Math.max(0, pos) };
+    }
+
+    const positionX = q.match(/move\s+(.+?)\s+(?:to\s+)?(?:the\s+)?(?:position|place|index)\s+(\d+)/i);
+    if (positionX) {
+      console.log(`[detectUIAction] Matched: position X`);
+      const pos = parseInt(positionX[2], 10) - 1;
+      return { type: "reorder_column", column: normalizeColumnName(positionX[1]), index: Math.max(0, pos) };
+    }
+
+    console.log(`[detectUIAction] No move pattern matched`);
+  }
+
+  // 3. Filter
   const filterMatch = q.match(/(?:show|filter|display|only)\s+(?:only\s+)?(?:attendees|records|rows|data)\s+(?:from|with|where|that\s+have|that\s+are)\s+(.+?)(?:\s+companies?|\s+status|\s+type)?$/i);
   if (filterMatch) {
     const colVal = filterMatch[1].trim().match(/(.+?)\s+(?:is|are|contains?|equals?|like)\s+(.+)/i);
@@ -106,12 +159,106 @@ function detectUIAction(question: string): any {
     if (filterMatch[1].includes("healthcare") || filterMatch[1].includes("health care")) return { type: "filter", column: "company_name", value: "healthcare" };
   }
 
+  // 4. Sort
   const sortMatch = q.match(/sort\s+(?:by|on)\s+(.+?)(?:\s+(ascending|descending|asc|desc))?$/i);
   if (sortMatch) return { type: "sort", column: normalizeColumnName(sortMatch[1]), direction: sortMatch[2]?.toLowerCase().includes("desc") ? "desc" : "asc" };
 
+  // 5. Clear
   if (q.match(/clear\s+(?:all\s+)?(?:filters?|filtering)/i)) return { type: "clear_filter" };
   if (q.match(/clear\s+(?:sort|sorting)/i)) return { type: "clear_sort" };
 
+  // 6. Visibility - ONLY support removing/hiding columns (no adding, columns are pre-defined)
+  // Must explicitly use hide/remove/delete/exclude verbs at the START of the query
+  const hideMatch = q.match(/^(?:remove|hide|delete|exclude)\s+(?:the\s+)?(.+?)(?:\s+column)?$/i);
+  if (hideMatch) {
+    const colName = hideMatch[1].trim();
+
+    // Fuzzy match against known column patterns
+    const columnMappings: Record<string, string> = {
+      // Concur variations
+      "concur": "concur_login_id",
+      "concur id": "concur_login_id",
+      "concur login": "concur_login_id",
+      "concur login id": "concur_login_id",
+      "login id": "concur_login_id",
+
+      // Name variations
+      "first": "first_name",
+      "first name": "first_name",
+      "last": "last_name",
+      "last name": "last_name",
+      "middle": "middle_name",
+      "middle name": "middle_name",
+
+      // Company variations
+      "company": "company_name",
+      "company name": "company_name",
+
+      // Status variations
+      "status": "registration_status",
+      "registration status": "registration_status",
+      "reg status": "registration_status",
+      "attendee type": "attendee_type",
+      "type": "attendee_type",
+
+      // Contact variations
+      "email": "email",
+      "phone": "phone",
+      "mobile": "mobile",
+      "emergency": "emergency_contact",
+      "emergency contact": "emergency_contact",
+
+      // Address variations
+      "address": "mailing_address",
+      "mailing address": "mailing_address",
+      "city": "city",
+      "state": "state",
+      "postal": "postal_code",
+      "postal code": "postal_code",
+      "zip": "postal_code",
+      "country": "country",
+
+      // Other fields
+      "title": "title",
+      "prefix": "prefix",
+      "employee": "employee_id",
+      "employee id": "employee_id",
+      "companion": "companion_count",
+      "companion count": "companion_count",
+      "room": "room_status",
+      "room status": "room_status",
+      "air": "air_status",
+      "air status": "air_status",
+      "flight": "air_status",
+      "notes": "internal_notes",
+      "internal notes": "internal_notes",
+      "created": "created_at",
+      "created at": "created_at",
+      "updated": "updated_at",
+      "updated at": "updated_at",
+    };
+
+    // Try exact match first
+    const normalizedCol = normalizeColumnName(colName);
+    if (columnMappings[colName.toLowerCase()]) {
+      console.log(`[detectUIAction] Matched: remove column via fuzzy match`);
+      return { type: "remove_column", column: columnMappings[colName.toLowerCase()] };
+    }
+
+    // Try partial match
+    for (const [pattern, dbColumn] of Object.entries(columnMappings)) {
+      if (colName.toLowerCase().includes(pattern)) {
+        console.log(`[detectUIAction] Matched: remove column via partial match`);
+        return { type: "remove_column", column: dbColumn };
+      }
+    }
+
+    // Fallback to normalizeColumnName
+    console.log(`[detectUIAction] Matched: remove column via normalizeColumnName`);
+    return { type: "remove_column", column: normalizedCol };
+  }
+
+  console.log(`[detectUIAction] No UI action detected, returning null`);
   return null;
 }
 
@@ -123,11 +270,14 @@ function getActionConfirmationMessage(action: any): string {
       if (action.position === -1) return `I've moved the "${col}" column to the end.`;
       if (action.afterColumn) return `I've moved the "${col}" column after "${action.afterColumn.replace(/_/g, " ")}".`;
       if (action.beforeColumn) return `I've moved the "${col}" column before "${action.beforeColumn.replace(/_/g, " ")}".`;
+      if (action.index !== undefined) return `I've moved the "${col}" column to position ${action.index + 1}.`;
       return `I've reordered the "${col}" column.`;
     case "filter": return `I've applied a filter: showing only records where "${col}" contains "${action.value}".`;
     case "clear_filter": return `I've cleared all filters.`;
     case "sort": return `I've sorted the data by "${col}" in ${action.direction === "asc" ? "ascending" : "descending"} order.`;
     case "clear_sort": return `I've cleared the sorting.`;
+    case "reset_columns": return `I've restored the column order to its original position.`;
+    case "remove_column": return `I've removed the "${col}" column from the view.`;
     default: return "Action completed.";
   }
 }
@@ -136,6 +286,7 @@ export const typeDefs = /* GraphQL */ `
   scalar JSON
 
   type Attendee {
+    id: Int
     first_name: String
     middle_name: String
     last_name: String
@@ -234,7 +385,7 @@ export const resolvers = {
         q = sanitized.toLowerCase();
       }
 
-      const limit = Math.max(1, Math.min(Math.floor(Number(args.limit) || 50), 1000));
+      const limit = Math.max(1, Math.min(Math.floor(Number(args.limit) || 50), 50000));
       const offset = Math.max(0, Math.floor(Number(args.offset) || 0));
 
       if (!Number.isInteger(limit) || !Number.isInteger(offset)) throw new Error("Limit and offset must be integers");
@@ -399,56 +550,46 @@ SECURITY RULES:
         let parsedSql;
         let isRobustParse = false;
         try {
-          const rawText = sqlResult.text.trim();
-
-          // Try simple parse first
+          const raw = sqlResult.text;
           try {
-            parsedSql = SqlOut.parse(JSON.parse(rawText));
-          } catch (simpleErr) {
-            // Robust fallback
-            isRobustParse = true;
-            let text = rawText;
-            if (text.includes("```json")) {
-              text = text.split("```json")[1].split("```")[0].trim();
-            } else if (text.includes("```")) {
-              text = text.split("```")[1].split("```")[0].trim();
-            }
-
-            const startIdx = text.indexOf("{");
-            const endIdx = text.lastIndexOf("}");
-            if (startIdx === -1 || endIdx === -1) throw new Error("No JSON found");
-
-            text = text.substring(startIdx, endIdx + 1);
+            parsedSql = SqlOut.parse(JSON.parse(raw.trim()));
+          } catch (e) {
+            console.log("[GraphQL Chat] JSON Parse failed, trying robust extraction...");
+            const jsonMatch = raw.match(/\{[\s\S]*\}/);
+            if (!jsonMatch) throw new Error("No JSON found in response");
 
             // Sanitize raw newlines inside JSON string values
-            const sanitizedText = text.replace(/("(?:[^"\\]|\\.)*")\s*:/g, (match) => match)
+            const sanitizedText = jsonMatch[0].replace(/("(?:[^"\\]|\\.)*")\s*:/g, (match) => match)
               .replace(/:\s*("(?:[^"\\]|\\.)*")/g, (match) => match.replace(/\n/g, "\\n"));
 
             parsedSql = SqlOut.parse(JSON.parse(sanitizedText));
+            isRobustParse = true;
           }
-        } catch (e) {
-          console.error("[GraphQL Chat] Failed to parse SQL JSON. Raw response:", sqlResult.text);
-          return {
-            ok: true,
-            answer: "I understood your question, but I'm having trouble formatting the specific data for you. Could you try rephrasing it?",
-            meta: { scope: "error", error: String(e), raw: sqlResult.text, ms: Date.now() - start }
-          };
-        }
 
-        if (containsPII(parsedSql.sql)) {
-          return { ok: true, answer: PII_BLOCKED_MESSAGE, meta: { scope: "pii_blocked" } };
-        }
+          // If AI detected a UI action, return it immediately (bypass SQL execution)
+          if (parsedSql.action) {
+            console.log(`[GraphQL Chat] AI-detected UI Action:`, parsedSql.action);
+            return { ok: true, answer: getActionConfirmationMessage(parsedSql.action), meta: { scope: "ui_action", action: parsedSql.action, ms: Date.now() - start } };
+          }
 
-        // Execute SQL
-        const sql = ensureSafeSelect(parsedSql.sql);
-        console.log(`[GraphQL Chat]Executing: ${sql} `);
-        const dbRes = await queryWithTimeout(sql, [], 3000);
-        const rows = normalizeRows((dbRes as any).rows);
+          if (containsPII(parsedSql.sql)) {
+            return { ok: true, answer: PII_BLOCKED_MESSAGE, meta: { scope: "pii_blocked" } };
+          }
 
-        // Answer Generation
-        const answerResult = await generateText({
-          model,
-          system: `
+          // Execute SQL
+          const sql = ensureSafeSelect(parsedSql.sql);
+          console.log(`[GraphQL Chat]Executing: ${sql}`);
+          const dbRes = await queryWithTimeout(sql, [], 3000);
+          const rows = normalizeRows((dbRes as any).rows);
+
+          // Data Truncation: Pass first 100 rows to the AI to avoid token limits
+          const summaryData = rows.slice(0, 100);
+          const dataForAi = JSON.stringify(summaryData);
+
+          // Answer Generation
+          const answerResult = await generateText({
+            model,
+            system: `
 You are Aime Insights, a sophisticated data analysis executive.
 Provide a crisp and direct executive summary.
 
@@ -462,54 +603,59 @@ HIGH PRIORITY:
 
 STRICT INSTRUCTIONS:
 - ONLY use the provided "Data Result".
+- Total matches found in database: ${rows.length}
 - FORBIDDEN: Do not use any internal training data, historical facts, or general knowledge to answer. 
-- FORMAT: For multi - row results or summaries, use clean Markdown tables with clear headers.
-- If the "Data Result" is empty / empty - array and no policy violation occurred, state "No records match the specified criteria." and stop. 
+- FORMAT: For multi-row results or summaries, use clean Markdown tables with clear headers.
+- If the "Data Result" is empty/empty-array and no policy violation occurred, state "No records match the specified criteria." and stop. 
 - Do not provide biographical, historical, or external context for people or entities not found in the data.
 
 DATE HANDLING:
-- All dates in the Data Result are in YYYY - MM - DD format(e.g., "2025-09-01").
+- All dates in the Data Result are in YYYY-MM-DD format (e.g., "2025-09-01").
 - Interpret dates EXACTLY as provided - do NOT apply any timezone conversion or date arithmetic.
 - If a date is "2025-09-01", report it as "September 1, 2025" - do NOT convert it to August 31 or any other date.
-- Dates are already normalized and correct - use them as- is.
+- Dates are already normalized and correct - use them as-is.
 
 Data Result:
-${JSON.stringify(rows)}
+${dataForAi}
 
 Original Question: ${question}
 Intent Detected: ${parsedSql.intent}
 Answer:
 
 SPECIFIC PERSON QUERIES:
-- When asked about a specific person(e.g., "phone of Rahul P. Das"), provide the exact answer directly.
-- If multiple people match, list all matches with their distinguishing information(middle name, company, etc.).
+- When asked about a specific person (e.g., "phone of Rahul P. Das"), provide the exact answer directly.
+- If multiple people match, list all matches with their distinguishing information (middle name, company, etc.).
 - If only one person matches, provide the answer directly without extra explanation.
 - Example: If asked "what is phone of Rahul P. Das?" and result shows phone: "+44 20 2257 8848", answer: "The phone number for Rahul P. Das is +44 20 2257 8848."
 
 Tone & Style:
 - Focus strictly on facts and data.
-- Do not use conversational filler, apologies, or personal pronouns(I, my).
+- Do not use conversational filler, apologies, or personal pronouns (I, my).
 - NEVER mention technical terms like "query", "result set", "database", or "empty".
 - Use structured points or tables for findings.
 - Tone: Authoritative, efficient, and sophisticated.
 `,
-          prompt: `Q: ${question} \nSql: ${sql} \nData: ${JSON.stringify(rows)} \nAnswer: `,
-        });
+            prompt: `Q: ${question} \nSql: ${sql} \nData: ${dataForAi} \nAnswer: `,
+          });
 
-        const duration = Date.now() - start;
-        console.log(`[GraphQL Chat]Completed in ${duration} ms(${(duration / 1000).toFixed(1)}s)`);
+          const duration = Date.now() - start;
+          console.log(`[GraphQL Chat]Completed in ${duration} ms(${(duration / 1000).toFixed(1)}s)`);
 
-        return {
-          ok: true,
-          answer: answerResult.text,
-          sql,
-          rows,
-          meta: { scope: "in_scope", category: scope.category, intent: parsedSql.intent, ms: duration }
-        };
+          return {
+            ok: true,
+            answer: answerResult.text,
+            sql,
+            rows,
+            meta: { scope: "in_scope", category: scope.category, intent: parsedSql.intent, ms: duration }
+          };
 
-      } catch (err: any) {
-        console.error("[GraphQL Chat Error]", err);
-        return { ok: true, answer: ERROR_MESSAGES.CONNECTION_ERROR, meta: { scope: "error", error: String(err) } };
+        } catch (err: any) {
+          console.error("[GraphQL Chat Error]", err);
+          return { ok: true, answer: ERROR_MESSAGES.CONNECTION_ERROR, meta: { scope: "error", error: String(err), raw: sqlResult.text } };
+        }
+      } catch (outerErr: any) {
+        console.error("[GraphQL Chat Outer Error]", outerErr);
+        return { ok: true, answer: ERROR_MESSAGES.CONNECTION_ERROR, meta: { scope: "error", error: String(outerErr) } };
       }
     }
   }

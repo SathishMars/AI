@@ -174,9 +174,9 @@ export function InsightsAimePanel() {
       if (data && data.ok) {
         push("assistant", data.answer, data.sql, data.rows);
 
-        // Handle UI actions from AIME
-        if (data.action) {
-          setAimeAction(data.action);
+        // Handle UI actions from AIME (actions are nested in meta)
+        if (data.meta?.action) {
+          setAimeAction(data.meta.action);
         }
       } else {
         push("assistant", ERROR_MESSAGES.PROCESSING_ERROR);

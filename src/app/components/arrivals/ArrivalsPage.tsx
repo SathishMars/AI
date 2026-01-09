@@ -66,6 +66,8 @@ export default function InsightsArrivalsPage() {
             } else {
               newCols.unshift(column);
             }
+          } else if (aimeAction.index !== undefined) {
+            newCols.splice(aimeAction.index, 0, column);
           }
 
           return newCols;
@@ -99,6 +101,17 @@ export default function InsightsArrivalsPage() {
       case "clear_sort": {
         setSortColumn(null);
         setSortDirection("asc");
+        break;
+      }
+      case "reset_columns": {
+        setSelectedColumns([]);
+        break;
+      }
+      case "remove_column": {
+        setSelectedColumns((prev) => {
+          const current = prev.length > 0 ? prev : columns;
+          return current.filter(c => c !== aimeAction.column);
+        });
         break;
       }
     }
@@ -161,7 +174,7 @@ export default function InsightsArrivalsPage() {
     return () => clearTimeout(timer);
   }, [eventId]);
 
-  async function fetchArrivals(search?: string, targetEventId?: number) {
+  async function fetchArrivals(search?: string, targetEventId?: number, requestedLimit?: number) {
     setLoading(true);
     setFetchStatus("loading");
     const currentEventId = targetEventId || eventId;
@@ -202,7 +215,7 @@ export default function InsightsArrivalsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           query,
-          variables: { q: search?.trim() || null, eventId: currentEventId, limit: 100, offset: 0 },
+          variables: { q: search?.trim() || null, eventId: currentEventId, limit: requestedLimit || 50000, offset: 0 },
         }),
       });
 
@@ -270,16 +283,17 @@ export default function InsightsArrivalsPage() {
 
     try {
       let dataToExport = processedRows;
+      const needsFullFetch = total > rows.length;
 
-      // Ensure we have data if direct export or if current rows are empty
-      if (direct || dataToExport.length === 0) {
-        setExportMessage("Fetching data for export...");
+      // Ensure we have all data if there's more on the server than in memory
+      if (direct || needsFullFetch || dataToExport.length === 0) {
+        setExportMessage("Fetching complete dataset for export...");
         try {
-          const fetched = await fetchArrivals(q);
-          if (direct) {
-            dataToExport = fetched;
-          } else {
-            // Re-apply local filters if they exist to current fetched data
+          // Fetch data with a limit equal to the total count (up to backend cap)
+          const fetched = await fetchArrivals(q, eventId, total || 50000);
+
+          if (direct || needsFullFetch) {
+            // Re-apply local filters if they exist to the newly fetched data
             let filtered = [...fetched];
             Object.entries(filters).forEach(([column, value]) => {
               if (value.trim()) {
@@ -291,7 +305,7 @@ export default function InsightsArrivalsPage() {
             dataToExport = filtered;
           }
         } catch (fetchErr: any) {
-          throw fetchErr; // Pass the structured error up
+          throw fetchErr;
         }
       }
 
