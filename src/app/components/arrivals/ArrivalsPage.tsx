@@ -66,6 +66,8 @@ export default function InsightsArrivalsPage() {
             } else {
               newCols.unshift(column);
             }
+          } else if (aimeAction.index !== undefined) {
+            newCols.splice(aimeAction.index, 0, column);
           }
 
           return newCols;
@@ -99,6 +101,17 @@ export default function InsightsArrivalsPage() {
       case "clear_sort": {
         setSortColumn(null);
         setSortDirection("asc");
+        break;
+      }
+      case "reset_columns": {
+        setSelectedColumns([]);
+        break;
+      }
+      case "remove_column": {
+        setSelectedColumns((prev) => {
+          const current = prev.length > 0 ? prev : columns;
+          return current.filter(c => c !== aimeAction.column);
+        });
         break;
       }
     }

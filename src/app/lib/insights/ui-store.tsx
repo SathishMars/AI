@@ -12,11 +12,13 @@ type PickColumnsData = {
 } | null;
 
 type AimeAction =
-  | { type: "reorder_column"; column: string; position: number; afterColumn?: string; beforeColumn?: string }
+  | { type: "reorder_column"; column: string; position?: number; afterColumn?: string; beforeColumn?: string; index?: number }
   | { type: "filter"; column: string; value: string }
   | { type: "clear_filter"; column?: string }
   | { type: "sort"; column: string; direction: "asc" | "desc" }
   | { type: "clear_sort" }
+  | { type: "reset_columns" }
+  | { type: "remove_column"; column: string }
   | null;
 
 type InsightsUIState = {

@@ -28,7 +28,12 @@ export function InsightsPickColumnsPanel({
   useEffect(() => {
     if (pickColumnsOpen) {
       setLocalSelectedColumns(selectedColumns);
-      setColumnOrder(allColumns); // Reset to original order
+
+      // Sync column order: put selected columns (in their current order) first,
+      // followed by any unselected columns in their original DB order.
+      const unselected = allColumns.filter(c => !selectedColumns.includes(c));
+      setColumnOrder([...selectedColumns, ...unselected]);
+
       setSearchQuery("");
     }
   }, [pickColumnsOpen, selectedColumns, allColumns]);
@@ -53,7 +58,7 @@ export function InsightsPickColumnsPanel({
   const handleDragOver = (e: React.DragEvent, targetColumn: string) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     if (!draggedColumn || draggedColumn === targetColumn) {
       setDragOverColumn(null);
       return;
@@ -66,7 +71,7 @@ export function InsightsPickColumnsPanel({
     const targetIndex = columnOrder.indexOf(targetColumn);
 
     if (draggedIndex === -1 || targetIndex === -1) return;
-    
+
     // Only update if position actually changed
     if (draggedIndex === targetIndex) return;
 
@@ -184,9 +189,8 @@ export function InsightsPickColumnsPanel({
             </span>
           </div>
           <ChevronDown
-            className={`h-4 w-4 text-[#6b7280] transition-transform ${
-              categoryExpanded ? "" : "-rotate-90"
-            }`}
+            className={`h-4 w-4 text-[#6b7280] transition-transform ${categoryExpanded ? "" : "-rotate-90"
+              }`}
             strokeWidth={2}
           />
         </button>
@@ -198,7 +202,7 @@ export function InsightsPickColumnsPanel({
               const isSelected = localSelectedColumns.includes(column);
               const isDragging = draggedColumn === column;
               const isDragOver = dragOverColumn === column && !isDragging;
-              
+
               return (
                 <div
                   key={column}
@@ -207,13 +211,12 @@ export function InsightsPickColumnsPanel({
                   onDragOver={(e) => handleDragOver(e, column)}
                   onDragLeave={handleDragLeave}
                   onDragEnd={handleDragEnd}
-                  className={`flex items-center gap-3 py-1.5 rounded px-2 transition-all ${
-                    isDragging
+                  className={`flex items-center gap-3 py-1.5 rounded px-2 transition-all ${isDragging
                       ? 'opacity-50 cursor-grabbing'
                       : isDragOver
-                      ? 'bg-[#ede9fe] border-t-2 border-[#7c3aed]'
-                      : 'hover:bg-[#f9fafb] cursor-move'
-                  }`}
+                        ? 'bg-[#ede9fe] border-t-2 border-[#7c3aed]'
+                        : 'hover:bg-[#f9fafb] cursor-move'
+                    }`}
                 >
                   {/* Drag Handle */}
                   <div className="text-[#9ca3af] cursor-move">
