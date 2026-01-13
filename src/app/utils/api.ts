@@ -8,7 +8,7 @@
 export const apiFetch = (
   input: string | URL,
   init?: RequestInit
-  ): Promise<Response> => {
+): Promise<Response> => {
   if (input instanceof URL || input.toString().startsWith('http')) {
     return fetch(input, init);
   }

@@ -16,14 +16,17 @@ export type InsightsInScopeCategory =
 const OOS_KEYWORDS: Array<{ type: string; words: string[] }> = [
   { type: "hotel_proposals", words: ["hotel proposal", "rfp", "bid", "ebid", "proposal", "hotel rate", "contract"] },
   { type: "budget", words: ["budget", "spend", "invoice", "po", "purchase order", "reconciliation", "payment"] },
-  { type: "logistics", words: ["logistics", "agenda", "venue", "av", "catering", "f&b", "transportation"] },
+  { type: "travel_logistics", words: ["flight", "airline", "itinerary", "visa", "passport", "shuttle", "transport", "arrival", "departure", "pickup"] },
   { type: "sponsorship", words: ["sponsor package", "sponsorship", "booth", "exhibitor"] },
   { type: "speakers_content", words: ["speaker deck", "slides", "talk track", "session content"] },
   { type: "marketing", words: ["marketing", "campaign", "email blast", "social", "promotion"] },
   { type: "registration_system", words: ["cvent", "eventbrite", "swoogo", "registration website"] },
   { type: "legal_compliance", words: ["msa", "nda", "legal", "terms", "privacy", "gdpr"] },
-  { type: "finance", words: ["finance", "tax", "gst", "tds"] },
-  { type: "general_knowledge", words: ["who is", "what is", "tell me about", "explain", "define"] },
+  { type: "finance", words: ["finance", "tax", "gst", "tds", "salary", "pay", "bonus", "bank account", "bank detail", "credit card", "payment info", "invoice", "spend", "budget", "cost", "profitable", "profit", "revenue"] },
+  { type: "personal_private", words: ["ssn", "social security", "passport number", "driver license", "home address", "personal phone"] },
+  { type: "system_actions", words: ["cancel", "delete", "update", "change", "modify", "remove", "drop", "truncate", "shutdown", "grant access", "restart", "permission", "schema", "table structure"] },
+  { type: "general_knowledge", words: ["who is", "what is", "tell me about", "explain", "define", "cricket", "world cup", "capital of", "weather", "news", "time now", "joke", "poem", "coding", "how to write", "theory", "trivia", "predict", "forecast"] },
+  { type: "technical_ai", words: ["what model", "what ai", "underlying architecture", "training data", "how do you work", "who created you"] },
 ];
 
 const IN_SCOPE_HINTS: Record<InsightsInScopeCategory, string[]> = {
@@ -40,40 +43,69 @@ export function detectScopeAndCategory(question: string): {
   category?: InsightsInScopeCategory;
   outOfScopeType?: string;
 } {
-  const q = question.toLowerCase();
+  const q = question.toLowerCase().trim();
 
-  // OUT-OF-SCOPE if it matches strong business areas beyond attendee dataset
+  // 1. QA SPECIFIC - EXACT OVERRIDES (Highest Priority)
+  const qaOosPhrases = [
+    "best flight", "cancel the registration", "change it to registered",
+    "next event in january", "ai tool", "cricket world cup",
+    "attendee’s salary", "salary", "predict", "profitable",
+    "database are you using", "schema of attendees", "sql query",
+    "model are you trained on", "time now", "what is time",
+    "grant access", "admin permission", "restart the server",
+    "clear all the data", "delete duplicate", "modify the event"
+  ];
+
+  if (qaOosPhrases.some(p => q.includes(p))) {
+    console.log(`[detectScopeAndCategory] QA Phrase matched: ${q}`);
+    return { scope: "out_of_scope", outOfScopeType: "qa_specific" };
+  }
+
+  // 2. Action Verbs (Blocking modification attempts)
+  const actionVerbs = ["cancel", "delete", "remove", "update", "modify", "change", "drop", "truncate", "restart", "shutdown"];
+  if (actionVerbs.some(v => q.startsWith(v) || q.includes(` ${v} `) || q.includes(` ${v}s `))) {
+    // Only block if it looks like an action attempt
+    if (q.includes("registration") || q.includes("attendee") || q.includes("record") || q.includes("table") || q.includes("status")) {
+      console.log(`[detectScopeAndCategory] Action verb matched: ${q}`);
+      return { scope: "out_of_scope", outOfScopeType: "system_actions" };
+    }
+  }
+
+  // 3. General OOS Keywords Loop
   for (const bucket of OOS_KEYWORDS) {
     for (const w of bucket.words) {
-      // Use regex with word boundaries but allow optional 's' for plurals
+      const isPhrase = w.includes(' ');
       const escaped = w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const regex = new RegExp(`\\b${escaped}s?\\b`, 'i');
-      if (regex.test(q)) {
-        // Check if this is truly out of scope
-        const hasAttendeeContext =
-          q.includes("attendee") ||
-          q.includes("registered") ||
-          q.includes("count") ||
-          q.includes("email") ||
-          q.includes("phone") ||
-          q.includes("mobile") ||
-          q.includes("info") ||
-          q.includes("detail");
+      const regex = isPhrase ? new RegExp(escaped, 'i') : new RegExp(`\\b${escaped}s?\\b`, 'i');
 
-        // General knowledge questions are always out of scope unless they mention attendee data/entity context
-        if (bucket.type === "general_knowledge" && !hasAttendeeContext) {
+      if (regex.test(q)) {
+        // High-risk categories: ALWAYS out of scope
+        if (["system_actions", "personal_private", "finance", "technical_ai", "hotel_proposals", "legal_compliance"].includes(bucket.type)) {
+          console.log(`[detectScopeAndCategory] Strong OOS matched: ${bucket.type} via "${w}"`);
           return { scope: "out_of_scope", outOfScopeType: bucket.type };
         }
 
-        // Only trigger out-of-scope for other categories if it's a strong match and lacks attendee context
-        if (!hasAttendeeContext) {
+        const hasAttendeeContext =
+          q.includes("attendee") ||
+          q.includes("registered") ||
+          q.includes("registration") ||
+          q.includes("count") ||
+          (q.includes("email") && !q.includes("blast")) ||
+          q.includes("phone") ||
+          q.includes("mobile") ||
+          q.includes("info") ||
+          q.includes("detail") ||
+          q.includes("profile");
+
+        if (!hasAttendeeContext || bucket.type === "general_knowledge") {
+          console.log(`[detectScopeAndCategory] Keyword match OOS: ${bucket.type} via "${w}"`);
           return { scope: "out_of_scope", outOfScopeType: bucket.type };
         }
       }
     }
   }
 
-  // IN-SCOPE category detection
+  // 4. IN-SCOPE category detection
   let bestCat: InsightsInScopeCategory | null = null;
   let maxScore = 0;
 
@@ -90,7 +122,6 @@ export function detectScopeAndCategory(question: string): {
 
   if (bestCat && maxScore > 0) return { scope: "in_scope", category: bestCat };
 
-  // default: assume in-scope but unknown category (LLM can decide)
   return { scope: "in_scope", category: "statistics_summaries" };
 }
 

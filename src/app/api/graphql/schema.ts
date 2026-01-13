@@ -12,10 +12,34 @@ import { ensureSafeSelect, forceLimit, containsPII, PII_COLUMNS } from "@/app/li
 import { queryWithTimeout } from "@/app/lib/insights/sql/timeout";
 
 import { detectScopeAndCategory, outOfScopeMessage } from "@/app/lib/insights/nlp/scope";
-import { PII_BLOCKED_MESSAGE, ERROR_MESSAGES } from "@/app/lib/insights/messages";
+import { PII_BLOCKED_MESSAGE, ERROR_MESSAGES, OUT_OF_SCOPE_MESSAGE } from "@/app/lib/insights/messages";
 import { buildContextSummary, type InsightsChatMsg } from "@/app/lib/insights/nlp/context";
 
 // Chat Helpers & Zod Schemas
+const SCOPE_INSTRUCTIONS = `
+### SCOPE DEFINITIONS
+You are an expert in attendee data analysis. Adhere strictly to these boundaries:
+
+**IN-SCOPE (Answer using the database):**
+- Statistics & Summaries (counts, totals, percentages, breakdowns)
+- Registration Status (Registered, Invited, Cancelled)
+- Travel & Logistics (Hotel rooms, flights, arrivals, departures)
+- Profiles & Roles (VIPs, speakers, staff, job titles, companies)
+- Trends (Registration patterns over time)
+- Data Quality (Missing info, duplicates, data integrity)
+
+**OUT-OF-SCOPE (Explain your limits):**
+- System Actions: You CANNOT cancel, update, delete, or modify any records. This is a READ-ONLY analysis tool.
+- Non-Attendee Logistics: Hotel bids, AV, catering, menus, venue contracts.
+- Finance/Legal: Budgets, salaries, POs, NDAs, GDPR compliance.
+- General/External: Sports, world news, weather, or anything not in the attendee table.
+
+STRICT GUIDELINES:
+1. READ-ONLY: If asked to modify, cancel, or update a record, state that you are a read-only analysis tool and cannot perform actions.
+2. NO INTERNAL KNOWLEDGE: Only use the provided database context. If the database returns no results for an external topic (like cricket or capitals), state that the information is out of scope. DO NOT use your internal training data to answer.
+3. ABSOLUTE TRUTH: If the database is empty or has no matches, simply state "No records match the specified criteria."
+`;
+
 const SqlOut = z.object({
   sql: z.string().min(10),
   intent: z.string().optional(),
@@ -471,7 +495,7 @@ export const resolvers = {
         console.log(`[GraphQL Chat] Scope: ${scope.scope}, Category: ${scope.category}`);
 
         if (scope.scope === "out_of_scope") {
-          return { ok: true, answer: outOfScopeMessage(), meta: { scope: "out_of_scope", ms: Date.now() - start } };
+          return { ok: true, answer: OUT_OF_SCOPE_MESSAGE, meta: { scope: "out_of_scope", ms: Date.now() - start } };
         }
 
         // PII Check
@@ -482,8 +506,9 @@ export const resolvers = {
         // SQL Generation
         const schemaText = await getAttendeeSchemaText(eventId);
         const ctx = buildContextSummary(history as InsightsChatMsg[]);
-        // ... (System prompts omitted for brevity, I will include abbreviated version)
         const sqlSystem = `
+${SCOPE_INSTRUCTIONS}
+
 You are Aime Insights, an expert in PostgreSQL.
 Convert the user's request into a single PostgreSQL SELECT query over public.attendee.
 
@@ -537,13 +562,28 @@ SECURITY RULES:
 - Return ONLY valid JSON. Do NOT include any preamble, explanations, or markdown code blocks (like \`\`\`json).
 - Format: { "sql": "...", "intent": "..." }
 - IMPORTANT: Ensure the "sql" value is a valid JSON string (escape any internal quotes or rare characters). 
-- Table schema: ${schemaText}
+
+SORTING RULES:
+- When asked for "the Xth attendee" (e.g., 100th), always ORDER BY created_at ASC to reflect the order of registration.
+
+Table schema: ${schemaText}
 `;
+
+        const sqlPrompt = `
+${SCOPE_INSTRUCTIONS}
+
+Context: ${ctx} 
+Question: ${question} 
+Return JSON.`;
+
+        console.log("--- AI SQL PROMPT ---");
+        console.log(sqlPrompt);
+        console.log("---------------------");
 
         const sqlResult = await generateText({
           model,
           system: sqlSystem,
-          prompt: `Context: ${ctx} \nQuestion: ${question} \nReturn JSON.`,
+          prompt: sqlPrompt,
         });
 
         // Parse JSON
@@ -577,19 +617,40 @@ SECURITY RULES:
           }
 
           // Execute SQL
-          const sql = ensureSafeSelect(parsedSql.sql);
-          console.log(`[GraphQL Chat]Executing: ${sql}`);
-          const dbRes = await queryWithTimeout(sql, [], 3000);
-          const rows = normalizeRows((dbRes as any).rows);
+          let rows: any[] = [];
+          let sql = "";
+          try {
+            sql = ensureSafeSelect(parsedSql.sql);
+            console.log(`[GraphQL Chat]Executing: ${sql}`);
+            const dbRes = await queryWithTimeout(sql, [], 3000);
+            rows = normalizeRows((dbRes as any).rows);
+          } catch (sqlErr: any) {
+            const msg = sqlErr.message || "";
+            // If it's a forbidden keyword or a syntax error on a write attempt, return a friendly refusal.
+            const isWriteAttempt = msg.includes("Only SELECT") ||
+              msg.includes("Forbidden keyword") ||
+              msg.includes("syntax error") ||
+              msg.includes("permission denied") ||
+              /insert|update|delete|drop|alter|truncate/i.test(question);
+
+            if (isWriteAttempt) {
+              return {
+                ok: true,
+                answer: "I appreciate the request, but I am a read-only data analysis tool. I cannot cancel, update, or modify any records in the database. Is there any attendee data I can help you analyze instead?",
+                meta: { scope: "out_of_scope", action_blocked: true, ms: Date.now() - start }
+              };
+            }
+            throw sqlErr; // Re-throw if it's a real DB error
+          }
 
           // Data Truncation: Pass first 100 rows to the AI to avoid token limits
           const summaryData = rows.slice(0, 100);
           const dataForAi = JSON.stringify(summaryData);
 
           // Answer Generation
-          const answerResult = await generateText({
-            model,
-            system: `
+          const answerSystem = `
+${SCOPE_INSTRUCTIONS}
+
 You are Aime Insights, a sophisticated data analysis executive.
 Provide a crisp and direct executive summary.
 
@@ -604,9 +665,10 @@ HIGH PRIORITY:
 STRICT INSTRUCTIONS:
 - ONLY use the provided "Data Result".
 - Total matches found in database: ${rows.length}
-- FORBIDDEN: Do not use any internal training data, historical facts, or general knowledge to answer. 
+- FORBIDDEN: Do not use any internal training data, common knowledge, or historical facts to answer.
+- CRITICAL: If the "Data Result" is empty/empty-array AND the question mentions an external topic (like cricket, jokes, weather, or non-attendee logistics), you MUST state: "I'm sorry, but that topic falls outside my specialized scope of attendee data analysis." and stop. Do NOT try to be helpful with your internal knowledge.
 - FORMAT: For multi-row results or summaries, use clean Markdown tables with clear headers.
-- If the "Data Result" is empty/empty-array and no policy violation occurred, state "No records match the specified criteria." and stop. 
+- If the "Data Result" is empty for a valid in-scope search (e.g., "speakers from Mars"), state "No records match the specified criteria." and stop.
 - Do not provide biographical, historical, or external context for people or entities not found in the data.
 
 DATE HANDLING:
@@ -634,8 +696,16 @@ Tone & Style:
 - NEVER mention technical terms like "query", "result set", "database", or "empty".
 - Use structured points or tables for findings.
 - Tone: Authoritative, efficient, and sophisticated.
-`,
-            prompt: `Q: ${question} \nSql: ${sql} \nData: ${dataForAi} \nAnswer: `,
+`;
+
+          console.log("--- AI ANSWER SYSTEM PROMPT ---");
+          console.log(answerSystem);
+          console.log("-------------------------------");
+
+          const answerResult = await generateText({
+            model,
+            system: answerSystem,
+            prompt: `Question: ${question} \nAnswer strictly based on data.`,
           });
 
           const duration = Date.now() - start;
@@ -651,11 +721,15 @@ Tone & Style:
 
         } catch (err: any) {
           console.error("[GraphQL Chat Error]", err);
-          return { ok: true, answer: ERROR_MESSAGES.CONNECTION_ERROR, meta: { scope: "error", error: String(err), raw: sqlResult.text } };
+          const finalScope = detectScopeAndCategory(question);
+          const answer = finalScope.scope === "out_of_scope" ? OUT_OF_SCOPE_MESSAGE : ERROR_MESSAGES.CONNECTION_ERROR;
+          return { ok: true, answer, meta: { scope: finalScope.scope === "out_of_scope" ? "out_of_scope" : "error", error: String(err), raw: sqlResult.text } };
         }
       } catch (outerErr: any) {
         console.error("[GraphQL Chat Outer Error]", outerErr);
-        return { ok: true, answer: ERROR_MESSAGES.CONNECTION_ERROR, meta: { scope: "error", error: String(outerErr) } };
+        const finalScope = detectScopeAndCategory(question);
+        const answer = finalScope.scope === "out_of_scope" ? OUT_OF_SCOPE_MESSAGE : ERROR_MESSAGES.CONNECTION_ERROR;
+        return { ok: true, answer, meta: { scope: finalScope.scope === "out_of_scope" ? "out_of_scope" : "error", error: String(outerErr) } };
       }
     }
   }
