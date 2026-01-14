@@ -24,6 +24,8 @@ export default function InsightsArrivalsPage() {
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
   const [fetchStatus, setFetchStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [retryCount, setRetryCount] = useState(0);
+  const [fetchMessage, setFetchMessage] = useState("");
   const [showAll, setShowAll] = useState(false);
   const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
   const [filters, setFilters] = useState<Record<string, string>>({});
@@ -175,95 +177,98 @@ export default function InsightsArrivalsPage() {
   }, [eventId]);
 
   async function fetchArrivals(search?: string, targetEventId?: number, requestedLimit?: number) {
-    setLoading(true);
-    setFetchStatus("loading");
-    const currentEventId = targetEventId || eventId;
-    const query = `
-      query Arrivals($q: String, $eventId: Int, $limit: Int!, $offset: Int!) {
-        arrivalColumns
-        arrivals(q: $q, eventId: $eventId, limit: $limit, offset: $offset) {
-          total
-          limit
-          offset
-          rows {
-            first_name
-            middle_name
-            last_name
-            email
-            companion_count
-            company_name
-            phone
-            mobile
-            attendee_type
-            emergency_contact
-            registration_status
-            manual_status
-            room_status
-            air_status
-            created_at
-            updated_at
-            concur_login_id
-            internal_notes
+    const maxRetries = 3;
+    const retryDelay = 5000; // 5 seconds gap
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        setLoading(true);
+        setFetchStatus("loading");
+        setRetryCount(attempt);
+        setFetchMessage(attempt > 1 ? `Trying to fetch data (Attempt ${attempt} of ${maxRetries})...` : "Loading data...");
+
+        const currentEventId = targetEventId || eventId;
+        const query = `
+          query Arrivals($q: String, $eventId: Int, $limit: Int!, $offset: Int!) {
+            arrivalColumns
+            arrivals(q: $q, eventId: $eventId, limit: $limit, offset: $offset) {
+              total
+              limit
+              offset
+              rows {
+                first_name
+                middle_name
+                last_name
+                email
+                companion_count
+                company_name
+                phone
+                mobile
+                attendee_type
+                emergency_contact
+                registration_status
+                manual_status
+                room_status
+                air_status
+                created_at
+                updated_at
+                concur_login_id
+                internal_notes
+              }
+            }
           }
+        `;
+
+        const res = await apiFetch("/api/graphql", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            query,
+            variables: { q: search?.trim() || null, eventId: currentEventId, limit: requestedLimit || 50000, offset: 0 },
+          }),
+        });
+
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error(`GraphQL Fetch Error (Attempt ${attempt}):`, res.status, errorText);
+          throw new Error(`Fetch failed: ${res.status}`);
+        }
+
+        const json = await res.json();
+        if (json.errors) {
+          console.error(`GraphQL Response Errors (Attempt ${attempt}):`, json.errors);
+          throw new Error(json.errors[0].message);
+        }
+
+        const cols = json?.data?.arrivalColumns ?? [];
+        const payload = json?.data?.arrivals;
+        const fetchedRows = payload?.rows ?? [];
+
+        setColumns(cols);
+        setRows(fetchedRows);
+        setTotal(payload?.total ?? 0);
+        setFetchStatus("success");
+        setFetchMessage("");
+        setRetryCount(0);
+        setLoading(false);
+
+        // Initialize selected columns with all columns if not set
+        setSelectedColumns((prev) => (prev.length === 0 ? cols : prev));
+
+        return fetchedRows;
+      } catch (err: any) {
+        console.error(`fetchArrivals error (Attempt ${attempt}):`, err);
+
+        if (attempt < maxRetries) {
+          setFetchMessage(`Attempt ${attempt} failed. Retrying in 5 seconds...`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+        } else {
+          setFetchStatus("error");
+          setFetchMessage(`Failed to load data after ${maxRetries} attempts. Please check the console for details.`);
+          setLoading(false);
+          throw err;
         }
       }
-    `;
-
-    try {
-      const res = await apiFetch("/api/graphql", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          query,
-          variables: { q: search?.trim() || null, eventId: currentEventId, limit: requestedLimit || 50000, offset: 0 },
-        }),
-      });
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error("GraphQL Fetch Error:", res.status, errorText);
-        throw new Error(`Fetch failed: ${res.status} ${res.statusText}`);
-      }
-
-      const json = await res.json();
-      console.log("GraphQL Response:", json);
-
-      if (json.errors) {
-        console.error("GraphQL Response Errors:", json.errors);
-        throw new Error(json.errors[0].message);
-      }
-
-      const cols = json?.data?.arrivalColumns ?? [];
-      const payload = json?.data?.arrivals;
-      const fetchedRows = payload?.rows ?? [];
-
-      console.log("Fetched columns:", cols);
-      console.log("Fetched rows:", fetchedRows);
-      console.log("Fetched total:", payload?.total ?? 0);
-
-      setColumns(cols);
-      setRows(fetchedRows);
-      setTotal(payload?.total ?? 0);
-      setFetchStatus("success");
-
-      // Initialize selected columns with all columns if not set
-      setSelectedColumns((prev) => (prev.length === 0 ? cols : prev));
-
-      return fetchedRows;
-    } catch (err: any) {
-      console.error("fetchArrivals error:", err);
-      const isNetworkError = err.message === 'Failed to fetch' || err.name === 'TypeError' || err.message.includes('network');
-      const errorMsg = isNetworkError
-        ? "Network error: Please check your internet connection or server status."
-        : (err.message || "Failed to retrieve report data.");
-
-      setFetchStatus("error");
-      // Create a more structured error for the caller
-      const structuredError = new Error(errorMsg);
-      (structuredError as any).isNetworkError = isNetworkError;
-      throw structuredError;
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -521,7 +526,7 @@ export default function InsightsArrivalsPage() {
       {/* Row 5: Status Summary */}
       <div className="pb-1 flex items-center gap-3 text-[11px] text-[#6b7280] flex-shrink-0">
         <span>
-          {loading ? "Loading..." : rows.length > 0 ? `Showing ${displayedRows.length} of ${total}` : ""}
+          {fetchMessage || (rows.length > 0 ? `Showing ${displayedRows.length} of ${total}` : "")}
         </span>
         {rows.length > 10 && (
           <button
@@ -536,10 +541,15 @@ export default function InsightsArrivalsPage() {
       {/* Table Area */}
       <div className="flex-1 min-h-0 overflow-hidden">
         {loading ? (
-          <div className="p-4 text-center text-gray-500">Loading data...</div>
+          <div className="p-4 text-center text-gray-500">
+            <div className="flex flex-col items-center gap-2">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#a855f7] border-t-transparent"></div>
+              <span>{fetchMessage || "Loading data..."}</span>
+            </div>
+          </div>
         ) : fetchStatus === "error" ? (
           <div className="p-4 text-center text-red-500">
-            Error loading data. Please check the console for details.
+            {fetchMessage || "Error loading data. Please check the console for details."}
           </div>
         ) : rows.length > 0 ? (
           <div className={`h-full ${showAll ? 'overflow-auto' : 'overflow-hidden'}`}>

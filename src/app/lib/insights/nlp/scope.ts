@@ -38,6 +38,16 @@ const IN_SCOPE_HINTS: Record<InsightsInScopeCategory, string[]> = {
   data_quality: ["missing", "null", "blank", "duplicate", "invalid", "data quality", "integrity"],
 };
 
+export function containsOosKeyword(question: string): boolean {
+  const q = question.toLowerCase().trim();
+  for (const bucket of OOS_KEYWORDS) {
+    for (const w of bucket.words) {
+      if (q.includes(w)) return true;
+    }
+  }
+  return false;
+}
+
 export function detectScopeAndCategory(question: string): {
   scope: InsightsScope;
   category?: InsightsInScopeCategory;
@@ -49,16 +59,64 @@ export function detectScopeAndCategory(question: string): {
   const qaOosPhrases = [
     "best flight", "cancel the registration", "change it to registered",
     "next event in january", "ai tool", "cricket world cup",
-    "attendee’s salary", "salary", "predict", "profitable",
+    "attendee's salary", "salary", "predict", "profitable",
     "database are you using", "schema of attendees", "sql query",
     "model are you trained on", "time now", "what is time",
     "grant access", "admin permission", "restart the server",
-    "clear all the data", "delete duplicate", "modify the event"
+    "clear all the data", "delete duplicate", "modify the event",
+    "mona lisa", "who painted", "capital of", "weather in",
+    "how do i make", "chocolate cake", "distance to the moon",
+    "story about", "what happened in 1776", "square root of",
+    "countries in africa", "tallest building", "translate",
+    "connection string", "admin password", "access logs",
+    "environment variables", "ssh keys", "memory usage",
+    "api documentation", "linux kernel", "drop all tables",
+    "docker-compose", "home address", "medical allergies",
+    "date of birth", "personal photos", "religious affiliation",
+    "private notes", "phone number of", "browser history",
+    "political leaning", "tinder profile", "bank statement",
+    "litigation history", "background check", "patent filings",
+    "banned attendees", "safety audit", "labor laws",
+    "performance rating", "disciplinary record", "resume of",
+    "vacation schedule", "grievance", "firewall rule",
+    "subnet mask", "ip address of", "ssl certificate",
+    "load balancing", "dns record", "raid configuration",
+    "mac address", "backup log", "calculate", "tip for",
+    "solve for x", "solve 2+2", "solve for", "cctv camera", "lost and found",
+    "swipe card", "restricted items", "visitor log",
+    "security protocol", "recommend a book", "bake bread",
+    "stock of", "price of", "super bowl", "who is the", "what is the", "how many",
+    "outstanding debt", "audit report", "personal photo", "private note",
+    "badge scan", "security check", "cleared security", "evacuation route"
   ];
 
-  if (qaOosPhrases.some(p => q.includes(p))) {
-    console.log(`[detectScopeAndCategory] QA Phrase matched: ${q}`);
-    return { scope: "out_of_scope", outOfScopeType: "qa_specific" };
+  // Regex for high-risk patterns
+  const oosRegexes = [
+    /who (?:won|is|painted|discovered|created|wrote|was|cleared)/i,
+    /what (?:is|are|happened|color|time|stock|price|the weather)/i,
+    /how (?:many countries|do i|to|much does|is the weather)/i,
+    /calculate|solve|translate|recommend/i,
+    /tell me (?:a joke|a story|about)/i,
+    /(?:joke|poem|story|recipe|algorithm|code) (?:about|for|to)/i,
+    /\b(?:and|then)\s+(?:solve|calculate|tell|show|what|who|how)/i
+  ];
+
+  if (qaOosPhrases.some(p => q.includes(p)) || oosRegexes.some(r => r.test(q))) {
+    // Exception: Allow "what is the status" or "what are the counts" or "who is registered"
+    const isActuallyInScope =
+      q.includes("registration_status") ||
+      q.includes("attendee_type") ||
+      (q.includes("registered") && !q.includes("won")) ||
+      q.includes("vip") ||
+      q.includes("speaker") ||
+      q.includes("total %") ||
+      (q.includes("how many") && (q.includes("attendee") || q.includes("record") || q.includes("regist")));
+
+    // Only allow if it's CLEARLY and PURELY about attendee data
+    if (!isActuallyInScope) {
+      console.log(`[detectScopeAndCategory] OOS Pattern matched: ${q}`);
+      return { scope: "out_of_scope", outOfScopeType: "regex_match" };
+    }
   }
 
   // 2. Action Verbs (Blocking modification attempts)
@@ -85,6 +143,7 @@ export function detectScopeAndCategory(question: string): {
           return { scope: "out_of_scope", outOfScopeType: bucket.type };
         }
 
+        // For General Knowledge or others, block if it's mixed intent or purely OOS
         const hasAttendeeContext =
           q.includes("attendee") ||
           q.includes("registered") ||
@@ -95,9 +154,13 @@ export function detectScopeAndCategory(question: string): {
           q.includes("mobile") ||
           q.includes("info") ||
           q.includes("detail") ||
-          q.includes("profile");
+          q.includes("profile") ||
+          q.includes("vip") ||
+          q.includes("speaker");
 
-        if (!hasAttendeeContext || bucket.type === "general_knowledge") {
+        // If it's a general OOS keyword and it EITHER has no attendee context OR it looks like a trick multi-intent (e.g. joke)
+        const isGeneral = bucket.type === "general_knowledge" || bucket.type === "marketing";
+        if (!hasAttendeeContext || isGeneral) {
           console.log(`[detectScopeAndCategory] Keyword match OOS: ${bucket.type} via "${w}"`);
           return { scope: "out_of_scope", outOfScopeType: bucket.type };
         }

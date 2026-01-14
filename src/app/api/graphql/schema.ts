@@ -11,7 +11,7 @@ import { getAttendeeSchemaText } from "@/app/lib/insights/sql/schema";
 import { ensureSafeSelect, forceLimit, containsPII, PII_COLUMNS } from "@/app/lib/insights/sql/guard";
 import { queryWithTimeout } from "@/app/lib/insights/sql/timeout";
 
-import { detectScopeAndCategory, outOfScopeMessage } from "@/app/lib/insights/nlp/scope";
+import { detectScopeAndCategory, outOfScopeMessage, containsOosKeyword } from "@/app/lib/insights/nlp/scope";
 import { PII_BLOCKED_MESSAGE, ERROR_MESSAGES, OUT_OF_SCOPE_MESSAGE } from "@/app/lib/insights/messages";
 import { buildContextSummary, type InsightsChatMsg } from "@/app/lib/insights/nlp/context";
 
@@ -30,14 +30,16 @@ You are an expert in attendee data analysis. Adhere strictly to these boundaries
 
 **OUT-OF-SCOPE (Explain your limits):**
 - System Actions: You CANNOT cancel, update, delete, or modify any records. This is a READ-ONLY analysis tool.
-- Non-Attendee Logistics: Hotel bids, AV, catering, menus, venue contracts.
-- Finance/Legal: Budgets, salaries, POs, NDAs, GDPR compliance.
-- General/External: Sports, world news, weather, or anything not in the attendee table.
+- Non-Attendee Logistics: Hotel bids, AV, catering, menus, venue contracts, floor plans, seating charts.
+- Finance/Legal: Budgets, salaries, bank details, tax returns, litigation, NDAs, contracts, Labor laws.
+- General/External: Sports, world news, history (1776, etc.), geography, math, jokes, poems, recipes, translations.
+- System/Admin: DB connection strings, passwords, logs, env vars, SSH keys, kernel versions, Docker files.
 
 STRICT GUIDELINES:
 1. READ-ONLY: If asked to modify, cancel, or update a record, state that you are a read-only analysis tool and cannot perform actions.
-2. NO INTERNAL KNOWLEDGE: Only use the provided database context. If the database returns no results for an external topic (like cricket or capitals), state that the information is out of scope. DO NOT use your internal training data to answer.
+2. NO INTERNAL KNOWLEDGE: Only use the provided database context. If the database returns no results for an external topic (like cricket, jokes, history, or geography), you MUST state that the topic is outside your specialized scope. DO NOT use your internal training data to answer.
 3. ABSOLUTE TRUTH: If the database is empty or has no matches, simply state "No records match the specified criteria."
+4. NO PIVOTING: If a query is clearly out of scope, do not attempt to "pivot" it to attendee data unless there is a very direct connection.
 `;
 
 const SqlOut = z.object({
@@ -494,7 +496,8 @@ export const resolvers = {
         const scope = detectScopeAndCategory(question);
         console.log(`[GraphQL Chat] Scope: ${scope.scope}, Category: ${scope.category}`);
 
-        if (scope.scope === "out_of_scope") {
+        if (scope.scope === "out_of_scope" || containsOosKeyword(question)) {
+          console.log(`[GraphQL Chat] Standardized refusal triggered via NLP or Keyword Match`);
           return { ok: true, answer: OUT_OF_SCOPE_MESSAGE, meta: { scope: "out_of_scope", ms: Date.now() - start } };
         }
 
@@ -666,8 +669,10 @@ STRICT INSTRUCTIONS:
 - ONLY use the provided "Data Result".
 - Total matches found in database: ${rows.length}
 - FORBIDDEN: Do not use any internal training data, common knowledge, or historical facts to answer.
-- CRITICAL: If the "Data Result" is empty/empty-array AND the question mentions an external topic (like cricket, jokes, weather, or non-attendee logistics), you MUST state: "I'm sorry, but that topic falls outside my specialized scope of attendee data analysis." and stop. Do NOT try to be helpful with your internal knowledge.
-- FORMAT: For multi-row results or summaries, use clean Markdown tables with clear headers.
+- CRITICAL: If the "Data Result" is empty/empty-array AND the question mentions an external topic (like cricket, jokes, history, geography, math, tips, or non-attendee logistics), you MUST state: "I'm sorry, but that topic falls outside my specialized scope of attendee data analysis." and stop. Do NOT try to be helpful with your internal knowledge.
+- IMPORTANT: If the question contains words like "joke", "story", "poem", "calculate", "solve", "predict", "stock", "price", "weather", "recipe", "coding", "algorithm", etc., you MUST refuse even if the data result contains attendee names. Do not pivot.
+- MATHEMATICAL OPERATIONS: If the question asks you to solve equations, calculate tips, convert units, or perform any mathematical operations, you MUST refuse with: "I'm sorry, but mathematical calculations fall outside my specialized scope of attendee data analysis."
+- SECURITY/SYSTEM QUERIES: If the question asks about "security check", "badge scans", "visitor logs", "CCTV", "firewall", "connection strings", "SSH keys", or any system/infrastructure topics, you MUST refuse immediately.
 - If the "Data Result" is empty for a valid in-scope search (e.g., "speakers from Mars"), state "No records match the specified criteria." and stop.
 - Do not provide biographical, historical, or external context for people or entities not found in the data.
 
@@ -722,14 +727,16 @@ Tone & Style:
         } catch (err: any) {
           console.error("[GraphQL Chat Error]", err);
           const finalScope = detectScopeAndCategory(question);
-          const answer = finalScope.scope === "out_of_scope" ? OUT_OF_SCOPE_MESSAGE : ERROR_MESSAGES.CONNECTION_ERROR;
-          return { ok: true, answer, meta: { scope: finalScope.scope === "out_of_scope" ? "out_of_scope" : "error", error: String(err), raw: sqlResult.text } };
+          const isOOS = finalScope.scope === "out_of_scope" || containsOosKeyword(question);
+          const answer = isOOS ? OUT_OF_SCOPE_MESSAGE : ERROR_MESSAGES.CONNECTION_ERROR;
+          return { ok: true, answer, meta: { scope: isOOS ? "out_of_scope" : "error", error: String(err), raw: sqlResult.text } };
         }
       } catch (outerErr: any) {
         console.error("[GraphQL Chat Outer Error]", outerErr);
         const finalScope = detectScopeAndCategory(question);
-        const answer = finalScope.scope === "out_of_scope" ? OUT_OF_SCOPE_MESSAGE : ERROR_MESSAGES.CONNECTION_ERROR;
-        return { ok: true, answer, meta: { scope: finalScope.scope === "out_of_scope" ? "out_of_scope" : "error", error: String(outerErr) } };
+        const isOOS = finalScope.scope === "out_of_scope" || containsOosKeyword(question);
+        const answer = isOOS ? OUT_OF_SCOPE_MESSAGE : ERROR_MESSAGES.CONNECTION_ERROR;
+        return { ok: true, answer, meta: { scope: isOOS ? "out_of_scope" : "error", error: String(outerErr) } };
       }
     }
   }
