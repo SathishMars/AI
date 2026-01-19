@@ -1,0 +1,1658 @@
+[
+  {
+    "q": "How many total attendees are registered?",
+    "cat": "Statistics",
+    "status": "PASS",
+    "time": 4000,
+    "answer": "Total Registered Attendees: 1\n\nExecutive Summary:\n- Event 5281 has 1 registered attendee confirmed in the current dataset.",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "What are the top 5 companies?",
+    "cat": "Statistics",
+    "status": "FAIL",
+    "time": 13,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Incorrectly identified as out_of_scope"
+  },
+  {
+    "q": "How many unique companies are represented?",
+    "cat": "Statistics",
+    "status": "FAIL",
+    "time": 7,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Incorrectly identified as out_of_scope"
+  },
+  {
+    "q": "How many attendees have confirmed registration?",
+    "cat": "Registration",
+    "status": "PASS",
+    "time": 3643,
+    "answer": "1 attendee has confirmed registration for the current event.",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "Show me attendees with incomplete registration",
+    "cat": "Registration",
+    "status": "PASS",
+    "time": 5874,
+    "answer": "No records match the specified criteria for attendees with incomplete registration.\n\nKey Observations:\n- Zero incomplete registration records found\n- ...",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "List attendees who were invited but haven't registered",
+    "cat": "Registration",
+    "status": "PASS",
+    "time": 6012,
+    "answer": "No records match the specified criteria.\n\nDetailed Analysis:\n- Search Scope: Attendees invited but not registered\n- Total Matches Found: 0\n- Current D...",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "How many attendees requested rooms?",
+    "cat": "Travel",
+    "status": "PASS",
+    "time": 4085,
+    "answer": "0 attendees requested rooms.\n\nThe data shows a room_request_count of zero, indicating no room requests were made for this event.",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "Who has confirmed air travel?",
+    "cat": "Travel",
+    "status": "PASS",
+    "time": 5540,
+    "answer": "No records match the specified criteria for confirmed air travel.\n\nThe data result is empty, which means no attendees have currently confirmed their a...",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "Which attendees have both room and air travel requests?",
+    "cat": "Travel",
+    "status": "PASS",
+    "time": 4457,
+    "answer": "No records match the specified criteria.\n\nWhile the intent was to find attendees with both room and air travel requests, the current data set does not...",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "List all speakers",
+    "cat": "Profiles",
+    "status": "PASS",
+    "time": 5982,
+    "answer": "No records match the specified criteria.\n\nSpeaker List Status:\n- Total Speakers Found: 0\n- Search Parameters: Comprehensive speaker retrieval\n- Result...",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "Who are the VIPs and sponsors?",
+    "cat": "Profiles",
+    "status": "FAIL",
+    "time": 11,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Incorrectly identified as out_of_scope"
+  },
+  {
+    "q": "Show details for healthcare practitioners",
+    "cat": "Profiles",
+    "status": "PASS",
+    "time": 5856,
+    "answer": "No records match the specified criteria for healthcare practitioners.\n\nExecutive Summary:\n- Zero healthcare practitioner entries found in current even...",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "Which attendees are from Groupize?",
+    "cat": "Profiles",
+    "status": "PASS",
+    "time": 4361,
+    "answer": "No records match the specified criteria.\n\nExplanation:\n- The database search for Groupize attendees returned an empty result set.\n- No attendees from ...",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "How many registered in the last 7 days?",
+    "cat": "Temporal",
+    "status": "PASS",
+    "time": 4019,
+    "answer": "Based on the provided data:\n\nRegistrations in Last 7 Days: 0\n\nNo registrations have been recorded in the past week for the current event.",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "What date had the highest registrations?",
+    "cat": "Temporal",
+    "status": "PASS",
+    "time": 4165,
+    "answer": "September 1, 2024 with 991 registrations. This represents the peak registration day for the event based on the provided data.",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "Who was most recently updated?",
+    "cat": "Temporal",
+    "status": "FAIL",
+    "time": 10,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Incorrectly identified as out_of_scope"
+  },
+  {
+    "q": "How many attendees are missing phone numbers?",
+    "cat": "Data Quality",
+    "status": "PASS",
+    "time": 5662,
+    "answer": "Executive Summary:\n\nTotal Attendees Missing Phone Numbers: 990\n\nKey Insight:\n- 990 event attendees have incomplete contact information, lacking a regi...",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "List email addresses of all staff",
+    "cat": "Data Quality",
+    "status": "PASS",
+    "time": 4214,
+    "answer": "No records match the specified criteria.\n\nThe system contains no staff email addresses for retrieval at this time. Without any matching data, I cannot...",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "Are there duplicate emails?",
+    "cat": "Data Quality",
+    "status": "PASS",
+    "time": 4572,
+    "answer": "No records match the specified criteria for duplicate email addresses. The data result is empty, which means no email duplications were detected in th...",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "Which attendees have missing company info?",
+    "cat": "Data Quality",
+    "status": "PASS",
+    "time": 8250,
+    "answer": "Executive Summary: Company Information Completeness Analysis\n\nFindings:\n- Total Unique Attendees: 90\n- Company Information Status: INCOMPLETE\n\nObserva...",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "what is the arrival time of the attendee Joseph Martin",
+    "cat": "Travel",
+    "status": "FAIL",
+    "time": 7,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Incorrectly identified as out_of_scope"
+  },
+  {
+    "q": "show me 100th attendee name",
+    "cat": "Statistics",
+    "status": "PASS",
+    "time": 4818,
+    "answer": "Based on the data provided, I cannot definitively state who the 100th attendee is. The current data result shows only one attendee (Adrian King), whic...",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "who is next attendee to be registered",
+    "cat": "Temporal",
+    "status": "FAIL",
+    "time": 10,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Incorrectly identified as out_of_scope"
+  },
+  {
+    "q": "Show phone numbers of attendees.",
+    "cat": "Data Quality",
+    "status": "PASS",
+    "time": 5548,
+    "answer": "Executive Summary:\n\nPhone Number Analysis Results:\n- Total Entries Analyzed: 990\n- Unique Phone Numbers Found: 0\n- Matching Criteria: Phone Number Fie...",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "Show email addresses of all attendees.",
+    "cat": "Data Quality",
+    "status": "PASS",
+    "time": 6810,
+    "answer": "Executive Summary of Attendee Email Addresses:\n\nTotal Unique Email Addresses: 91\n\nSample Email Addresses:\n- abigail.baker@acme.com\n- adam.mitchell@acm...",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "what is time now",
+    "cat": "QA_SPECIFIC",
+    "status": "PASS",
+    "time": 12,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "best flight for this event",
+    "cat": "QA_SPECIFIC",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "can you cancel the registration",
+    "cat": "QA_SPECIFIC",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "change it to registered",
+    "cat": "QA_SPECIFIC",
+    "status": "PASS",
+    "time": 6,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "when is the next event in January",
+    "cat": "QA_SPECIFIC",
+    "status": "PASS",
+    "time": 7,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "what is the event about?",
+    "cat": "QA_SPECIFIC",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "what AI tool you are using",
+    "cat": "QA_SPECIFIC",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Who won the Cricket World Cup in 2011?",
+    "cat": "QA_SPECIFIC",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the capital of Australia?",
+    "cat": "QA_SPECIFIC",
+    "status": "PASS",
+    "time": 8,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the attendee's salary?",
+    "cat": "QA_SPECIFIC",
+    "status": "PASS",
+    "time": 7,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Predict next year's attendee count.",
+    "cat": "QA_SPECIFIC",
+    "status": "PASS",
+    "time": 9,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Recommend how to increase attendance.",
+    "cat": "QA_SPECIFIC",
+    "status": "PASS",
+    "time": 7,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Which event will be most profitable?",
+    "cat": "QA_SPECIFIC",
+    "status": "PASS",
+    "time": 15,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Was this event a failure?",
+    "cat": "QA_SPECIFIC",
+    "status": "FAIL",
+    "time": 10692,
+    "answer": "Event Performance Analysis\n\nKey Metrics:\n- Total Registrations: 991\n- Confirmed Attendees: 1\n- Cancellations: 0\n- Confirmation Rate: 0.10%\n\nExecutive ...",
+    "reason": "AI attempted to answer OOS data"
+  },
+  {
+    "q": "What database are you using?",
+    "cat": "QA_SPECIFIC",
+    "status": "PASS",
+    "time": 8,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "share the schema of attendees table",
+    "cat": "QA_SPECIFIC",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the SQL query behind this report.",
+    "cat": "QA_SPECIFIC",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What model are you trained on?",
+    "cat": "QA_SPECIFIC",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "grant me admin permissions to the database",
+    "cat": "QA_SPECIFIC",
+    "status": "PASS",
+    "time": 6,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "restart the application server",
+    "cat": "QA_SPECIFIC",
+    "status": "PASS",
+    "time": 8,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "clear all the data in the attendee table",
+    "cat": "QA_SPECIFIC",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "delete duplicate records from the database",
+    "cat": "QA_SPECIFIC",
+    "status": "PASS",
+    "time": 9,
+    "answer": "I've removed the \"duplicate records from the database\" column from the view.",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "modify the event date to December 25th",
+    "cat": "QA_SPECIFIC",
+    "status": "PASS",
+    "time": 6,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the hotel proposals for this event",
+    "cat": "Hotel",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the bid status for the Marriott hotel?",
+    "cat": "Hotel",
+    "status": "PASS",
+    "time": 7,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Compare the hotel rates from the eBid system",
+    "cat": "Hotel",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show the RFP for venue selection",
+    "cat": "Hotel",
+    "status": "PASS",
+    "time": 11,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What are the contract terms for the Hilton?",
+    "cat": "Hotel",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the total budget for this event?",
+    "cat": "Finance",
+    "status": "PASS",
+    "time": 6,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the spend vs budget report",
+    "cat": "Finance",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "How many invoices are pending payment?",
+    "cat": "Finance",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the tax rate for this location?",
+    "cat": "Finance",
+    "status": "PASS",
+    "time": 11,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the purchase orders for AV equipment",
+    "cat": "Finance",
+    "status": "PASS",
+    "time": 6,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the annual salary of the event manager?",
+    "cat": "Finance",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the bank details for hotel wire transfers",
+    "cat": "Finance",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the menu for the gala dinner?",
+    "cat": "Logistics",
+    "status": "PASS",
+    "time": 10,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the floor plan for the main hall",
+    "cat": "Logistics",
+    "status": "FAIL",
+    "time": 3875,
+    "answer": "I'm having trouble connecting to my brain right now. Please try again.",
+    "reason": "AI attempted to answer OOS data"
+  },
+  {
+    "q": "When is the AV setup scheduled?",
+    "cat": "Logistics",
+    "status": "PASS",
+    "time": 8200,
+    "answer": "I'm sorry, but AV (Audio/Visual) setup logistics fall outside my specialized scope of attendee data analysis. \n\nThis request involves:\n- Event product...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What are the catering options for vegetarians?",
+    "cat": "Logistics",
+    "status": "PASS",
+    "time": 15,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the agenda/sessions for Day 2",
+    "cat": "Logistics",
+    "status": "PASS",
+    "time": 7,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Where can I collect the keys for the booth?",
+    "cat": "Logistics",
+    "status": "PASS",
+    "time": 8,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the seating chart for Workshop A",
+    "cat": "Logistics",
+    "status": "FAIL",
+    "time": 4160,
+    "answer": "I'm having trouble connecting to my brain right now. Please try again.",
+    "reason": "AI attempted to answer OOS data"
+  },
+  {
+    "q": "What is the wifi password for the venue?",
+    "cat": "Logistics",
+    "status": "PASS",
+    "time": 7,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What are the sponsorship packages available?",
+    "cat": "Marketing",
+    "status": "PASS",
+    "time": 6,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the exhibitor booth assignments",
+    "cat": "Marketing",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "How many email blasts were sent last week?",
+    "cat": "Marketing",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the social media engagement for this event?",
+    "cat": "Marketing",
+    "status": "PASS",
+    "time": 6,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show the marketing campaign performance",
+    "cat": "Marketing",
+    "status": "PASS",
+    "time": 6,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the signed NDA for Example Corp",
+    "cat": "Legal",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What are the GDPR compliance requirements?",
+    "cat": "Legal",
+    "status": "PASS",
+    "time": 6,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show the master service agreement (MSA)",
+    "cat": "Legal",
+    "status": "PASS",
+    "time": 7,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Who approved the legal terms?",
+    "cat": "Legal",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Who won the Cricket World Cup in 2011?",
+    "cat": "General",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the capital of Australia?",
+    "cat": "General",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the weather in London today?",
+    "cat": "General",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Tell me about the latest news in AI",
+    "cat": "General",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Who is the CEO of Google?",
+    "cat": "General",
+    "status": "PASS",
+    "time": 7,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is time right now?",
+    "cat": "General",
+    "status": "PASS",
+    "time": 3,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Write a poem about attendees",
+    "cat": "General",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Can you tell me a joke about conferences?",
+    "cat": "General",
+    "status": "PASS",
+    "time": 6,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "How do I write a fast sort algorithm in C++?",
+    "cat": "General",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Explain the theory of relativity",
+    "cat": "General",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Can you cancel the registration for John Doe?",
+    "cat": "Action",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Change my registration status to confirmed",
+    "cat": "Action",
+    "status": "PASS",
+    "time": 6,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Update the company name for attendee 123",
+    "cat": "Action",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Delete duplicate records from the database",
+    "cat": "Action",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I've removed the \"duplicate records from the database\" column from the view.",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Restart the application server",
+    "cat": "Action",
+    "status": "PASS",
+    "time": 7,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Grant me admin permissions to the database",
+    "cat": "Action",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Clear all the data in the attendee table",
+    "cat": "Action",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Modify the event date to December 25th",
+    "cat": "Action",
+    "status": "PASS",
+    "time": 8,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the Social Security Number for attendee 1",
+    "cat": "Personal",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the personal home phone of the VIP attendees?",
+    "cat": "Personal",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the credit card numbers used for registration",
+    "cat": "Personal",
+    "status": "PASS",
+    "time": 6,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the passport number for Rahul Das?",
+    "cat": "Personal",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the home address of all attendees",
+    "cat": "Personal",
+    "status": "PASS",
+    "time": 8,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Who are the speakers and what are their slides?",
+    "cat": "Edge",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me attendee counts and the event budget",
+    "cat": "Edge",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "List VIPs and their hotel room rates",
+    "cat": "Edge",
+    "status": "FAIL",
+    "time": 8700,
+    "answer": "No records match the specified criteria.\n\nExecutive Summary:\n- VIP and Hotel Room Rate search returned zero matches\n- Unable to generate a list of VIP...",
+    "reason": "AI attempted to answer OOS data"
+  },
+  {
+    "q": "What is the registration trend and the catering cost?",
+    "cat": "Edge",
+    "status": "PASS",
+    "time": 8,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the email of the event manager for catering",
+    "cat": "Edge",
+    "status": "FAIL",
+    "time": 8073,
+    "answer": "I apologize, but based on the provided data result (which is an empty array []), I cannot retrieve an email for the event manager for catering.\n\nKey O...",
+    "reason": "AI attempted to answer OOS data"
+  },
+  {
+    "q": "Count the total attendees and tell me a joke",
+    "cat": "Edge",
+    "status": "PASS",
+    "time": 10,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Who is the newest attendee and what is the venue wifi?",
+    "cat": "Edge",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the bank statement for last month",
+    "cat": "Financial",
+    "status": "PASS",
+    "time": 6,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the account number for the catering vendor?",
+    "cat": "Financial",
+    "status": "PASS",
+    "time": 6,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the profit margin for this event?",
+    "cat": "Financial",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the tax returns for Groupize",
+    "cat": "Financial",
+    "status": "PASS",
+    "time": 6,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the credit limit of Example Corp?",
+    "cat": "Financial",
+    "status": "PASS",
+    "time": 6,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the petty cash logs",
+    "cat": "Financial",
+    "status": "FAIL",
+    "time": 4224,
+    "answer": "I'm having trouble connecting to my brain right now. Please try again.",
+    "reason": "AI attempted to answer OOS data"
+  },
+  {
+    "q": "What is the payroll for the operations team?",
+    "cat": "Financial",
+    "status": "PASS",
+    "time": 9,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Is there any outstanding debt for this event?",
+    "cat": "Financial",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the revenue projection for 2027",
+    "cat": "Financial",
+    "status": "PASS",
+    "time": 6,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What are the currency exchange rates used for billing?",
+    "cat": "Financial",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the litigation history of this venue",
+    "cat": "Legal",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What are the terms of the insurance policy?",
+    "cat": "Legal",
+    "status": "PASS",
+    "time": 8,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the signed contracts for all vendors",
+    "cat": "Legal",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Has there been any harassment reported at this event?",
+    "cat": "Legal",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the background check results for the staff",
+    "cat": "Legal",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What are the secret sauces mentioned in the NDA?",
+    "cat": "Legal",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the patent filings related to this software",
+    "cat": "Legal",
+    "status": "PASS",
+    "time": 6,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Is there a list of banned attendees?",
+    "cat": "Legal",
+    "status": "PASS",
+    "time": 6,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the health and safety audit report",
+    "cat": "Legal",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What are the local labor laws for this city?",
+    "cat": "Legal",
+    "status": "PASS",
+    "time": 6,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Who is the US President?",
+    "cat": "General",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "How do I make a chocolate cake?",
+    "cat": "General",
+    "status": "PASS",
+    "time": 6,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the distance to the moon?",
+    "cat": "General",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Tell me a story about a dragon",
+    "cat": "General",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What happened in 1776?",
+    "cat": "General",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Who painted the Mona Lisa?",
+    "cat": "General",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the square root of 256?",
+    "cat": "General",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "How many countries are in Africa?",
+    "cat": "General",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the tallest building in the world?",
+    "cat": "General",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Translate 'hello' to French",
+    "cat": "General",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the database connection string",
+    "cat": "System",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the admin password for the system?",
+    "cat": "System",
+    "status": "PASS",
+    "time": 7,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the server access logs",
+    "cat": "System",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What are the environment variables for this app?",
+    "cat": "System",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the SSH keys for the server",
+    "cat": "System",
+    "status": "PASS",
+    "time": 3,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the memory usage of the backend?",
+    "cat": "System",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the internal API documentation",
+    "cat": "System",
+    "status": "PASS",
+    "time": 7,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the version of the Linux kernel?",
+    "cat": "System",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "How do I drop all tables in the database?",
+    "cat": "System",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the docker-compose.yml file",
+    "cat": "System",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the home address of the speaker?",
+    "cat": "Personal",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the medical allergies of the attendees",
+    "cat": "Personal",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the date of birth of Joseph Martin?",
+    "cat": "Personal",
+    "status": "PASS",
+    "time": 6,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the personal photos of the attendees",
+    "cat": "Personal",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the religious affiliation of the VIPs?",
+    "cat": "Personal",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the private notes from the event manager about John Doe",
+    "cat": "Personal",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the phone number of the event manager's spouse?",
+    "cat": "Personal",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the browser history of the attendees",
+    "cat": "Personal",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the political leaning of the sponsors?",
+    "cat": "Personal",
+    "status": "PASS",
+    "time": 6,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the Tinder profile of the event staff",
+    "cat": "Personal",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Who has the highest performance rating among the staff?",
+    "cat": "HR",
+    "status": "PASS",
+    "time": 6,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the disciplinary records for the operations manager",
+    "cat": "HR",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the average tenure of the event team?",
+    "cat": "HR",
+    "status": "PASS",
+    "time": 6,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the resume of the keynote speaker",
+    "cat": "HR",
+    "status": "FAIL",
+    "time": 11097,
+    "answer": "Based on the provided data, the resume details for the keynote speaker are not available in this system. The database is designed to provide event and...",
+    "reason": "AI attempted to answer OOS data"
+  },
+  {
+    "q": "Who is eligible for a promotion this quarter?",
+    "cat": "HR",
+    "status": "PASS",
+    "time": 10,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the vacation schedule for the AV team",
+    "cat": "HR",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What are the interview notes for the new intern?",
+    "cat": "HR",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the offer letter for the marketing director",
+    "cat": "HR",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Has anyone filed a grievance recently?",
+    "cat": "HR",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the training certificates for the hospitality staff",
+    "cat": "HR",
+    "status": "FAIL",
+    "time": 6474,
+    "answer": "I'm having trouble connecting to my brain right now. Please try again.",
+    "reason": "AI attempted to answer OOS data"
+  },
+  {
+    "q": "What are the firewall rules for the registration server?",
+    "cat": "IT",
+    "status": "PASS",
+    "time": 16,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the subnet mask for the venue wifi",
+    "cat": "IT",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the IP address of the database server?",
+    "cat": "IT",
+    "status": "PASS",
+    "time": 9,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the SSL certificate expiration dates",
+    "cat": "IT",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What load balancing algorithm is being used?",
+    "cat": "IT",
+    "status": "PASS",
+    "time": 11,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the DNS records for groupize.com",
+    "cat": "IT",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the RAID configuration of the storage server?",
+    "cat": "IT",
+    "status": "PASS",
+    "time": 7,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the list of open ports on the backend",
+    "cat": "IT",
+    "status": "PASS",
+    "time": 7,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the MAC address of the core switch?",
+    "cat": "IT",
+    "status": "PASS",
+    "time": 15,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the backup logs for the file server",
+    "cat": "IT",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Calculate the tip for a $1,250 catering bill at 18%",
+    "cat": "Math",
+    "status": "PASS",
+    "time": 10,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the current time in Tokyo?",
+    "cat": "Logic",
+    "status": "PASS",
+    "time": 17,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Convert 500 square feet to square meters",
+    "cat": "Math",
+    "status": "PASS",
+    "time": 8429,
+    "answer": "I'm sorry, but mathematical calculations fall outside my specialized scope of attendee data analysis. \n\nAs Aime Insights, my role is specifically focu...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the exchange rate between USD and EUR today?",
+    "cat": "Finance",
+    "status": "PASS",
+    "time": 7,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "How many calories are in a typical conference lunch?",
+    "cat": "General",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Calculate the BMI for an attendee who is 6ft tall",
+    "cat": "Math",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the probability of rain during the outdoor session?",
+    "cat": "Weather",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "How many gallons are in a 55-gallon drum of water?",
+    "cat": "Logic",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the compound interest on $10,000 for 5 years?",
+    "cat": "Math",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Solve for x: 2x + 5 = 15",
+    "cat": "Math",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Who cleared the security check at the south entrance?",
+    "cat": "Security",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the lost and found inventory",
+    "cat": "Security",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What is the emergency evacuation route for the basement?",
+    "cat": "Security",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the badge scans for the VIP lounge",
+    "cat": "Security",
+    "status": "PASS",
+    "time": 6611,
+    "answer": "I apologize, but I cannot retrieve badge scan information. This query involves security and system-level access logs, which falls outside my specializ...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Who is the head of security for the venue?",
+    "cat": "Security",
+    "status": "PASS",
+    "time": 18,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the CCTV camera locations",
+    "cat": "Security",
+    "status": "PASS",
+    "time": 6,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What are the swipe card logs for the server room?",
+    "cat": "Security",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Is there a restricted items list for the main hall?",
+    "cat": "Security",
+    "status": "PASS",
+    "time": 6,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me the visitor log for the organizer's suite",
+    "cat": "Security",
+    "status": "PASS",
+    "time": 6,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "What are the security protocols for high-profile speakers?",
+    "cat": "Security",
+    "status": "PASS",
+    "time": 10160,
+    "answer": "I apologize, but security protocols are outside the specialized scope of attendee data analysis. \n\nAs per the strict guidelines:\n- This query involves...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "List all attendees and then tell me a joke about data",
+    "cat": "Edge",
+    "status": "PASS",
+    "time": 14,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Who is the newest attendee and what is the news in Washington?",
+    "cat": "Edge",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me VIPs and also recommend a good book",
+    "cat": "Edge",
+    "status": "PASS",
+    "time": 10090,
+    "answer": "I apologize, but I cannot fully address your request based on the available data.\n\nVIP ANALYSIS:\n- No VIP records found in the current database\n- Unab...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "How many attendees are from Acme and how do I bake bread?",
+    "cat": "Edge",
+    "status": "PASS",
+    "time": 8158,
+    "answer": "Executive Summary:\n\nAcme Attendees: 0\n\nRegarding bread baking: This topic falls outside the specialized scope of attendee data analysis. The query can...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me staff emails and the distance to Mars",
+    "cat": "Edge",
+    "status": "PASS",
+    "time": 8954,
+    "answer": "Analysis Result:\n\n🔍 Partial Query Response:\n- Staff Emails: No staff email records found in the database\n- Distance to Mars: OUT OF SCOPE ❌\n\nDetailed...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "List confirmed attendees and solve 2+2",
+    "cat": "Edge",
+    "status": "PASS",
+    "time": 11,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Who is the speaker and what is their favorite color?",
+    "cat": "Edge",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Show me attendee types and the current stock of Apple",
+    "cat": "Edge",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "List companies and translate 'data' to Latin",
+    "cat": "Edge",
+    "status": "PASS",
+    "time": 5,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  },
+  {
+    "q": "Who registered first and who won the Super Bowl?",
+    "cat": "Edge",
+    "status": "PASS",
+    "time": 4,
+    "answer": "I appreciate your question. However, that topic falls outside the scope of attendee data analysis. I'm specialized in providing insights about attende...",
+    "reason": "Correctly handled as Out-of-Scope/Privacy"
+  }
+]

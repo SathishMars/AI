@@ -7,7 +7,7 @@
     "dev:insights": "cross-env NODE_OPTIONS=--max-old-space-size=8192 PORT=3000 next dev",
     "dev:local-rails": "cross-env PORT=3001 next dev",
     "build": "next build",
-    "start": "cross-env PORT=3001 next start",
+    "start": "PORT=3001 next start",
     "lint": "eslint",
     "test": "jest",
     "test:watch": "jest --watch",

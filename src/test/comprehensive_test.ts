@@ -28,7 +28,8 @@ function containsOosKeyword(question: string): boolean {
     return oosKeywords.some(keyword => q.includes(keyword));
 }
 
-const GRAPHQL_URL = 'http://localhost:3000/aime/api/graphql';
+// Use Docker endpoint (port 4000) for standalone GraphQL server
+const GRAPHQL_URL = process.env.GRAPHQL_URL || 'http://localhost:4000/graphql';
 
 // ============================================================================
 // IN-SCOPE TEST CASES (25)
@@ -375,8 +376,10 @@ async function runTest(question: string, category: string, expectedScope: 'in_sc
 }
 
 async function runComprehensiveTests() {
+    const modelName = process.env.TEST_MODEL || "openai-gpt-4o";
     console.log("=".repeat(80));
     console.log("AIME INSIGHTS COMPREHENSIVE SCOPE TEST SUITE");
+    console.log(`Model: ${modelName.toUpperCase()}`);
     console.log("=".repeat(80));
     console.log(`Total Test Cases: ${IN_SCOPE_TESTS.length + QA_SPECIFIC_TESTS.length + OUT_OF_SCOPE_TESTS.length}`);
     console.log(`- In-Scope: ${IN_SCOPE_TESTS.length}`);
@@ -423,6 +426,13 @@ async function runComprehensiveTests() {
     console.log("\nRESULTS_JSON_START");
     console.log(JSON.stringify(allResults, null, 2));
     console.log("RESULTS_JSON_END");
+
+    // Save results to file with model identifier
+    const fs = require('fs');
+    const path = require('path');
+    const resultsPath = path.join(__dirname, `results_comprehensive_${modelName.replace(/\s+/g, '-').toLowerCase()}.json`);
+    fs.writeFileSync(resultsPath, JSON.stringify(allResults, null, 2));
+    console.log(`\nResults saved to: ${resultsPath}`);
 
     return allResults;
 }
