@@ -1,11 +1,11 @@
 // INSIGHTS-SPECIFIC: Arrivals page component
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import InsightsArrivalsTable from "./ArrivalsTable";
 import { InsightsPickColumnsPanel } from "./PickColumnsPanel";
 import { useInsightsUI } from "@/app/lib/insights/ui-store";
-import { Upload, Search, ChevronLeft, Columns3, ChevronDown, User } from "lucide-react";
+import { Upload, Search, ChevronLeft, Columns3, ChevronDown, User, FileDown } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/app/utils/api";
 
@@ -34,11 +34,28 @@ export default function InsightsArrivalsPage() {
   const [exportStatus, setExportStatus] = useState<"idle" | "exporting" | "error">("idle");
   const [exportProgress, setExportProgress] = useState(0);
   const [exportMessage, setExportMessage] = useState("");
+  const [visibleRowCount, setVisibleRowCount] = useState<number>(0);
+  const [commandError, setCommandError] = useState<string | null>(null);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
   const { setPickColumnsOpen, setAimeOpen, setPickColumnsData, aimeAction, setAimeAction, eventId, setEventId } = useInsightsUI();
+
+  // Helper function to validate column exists
+  const validateColumn = (columnName: string, availableColumns: string[]): boolean => {
+    return availableColumns.includes(columnName);
+  };
+
+  // Helper function to get available columns (selected or all)
+  const getAvailableColumns = (): string[] => {
+    return selectedColumns.length > 0 ? selectedColumns : columns;
+  };
 
   // Handle AIME actions
   useEffect(() => {
     if (!aimeAction) return;
+
+    // Clear any previous errors
+    setCommandError(null);
 
     switch (aimeAction.type) {
       case "reorder_column": {
@@ -96,6 +113,15 @@ export default function InsightsArrivalsPage() {
         break;
       }
       case "sort": {
+        const availableCols = getAvailableColumns();
+        if (!validateColumn(aimeAction.column, availableCols)) {
+          setCommandError(
+            `Column "${aimeAction.column.replace(/_/g, " ")}" is not available. Available columns: ${availableCols.slice(0, 5).map(c => c.replace(/_/g, " ")).join(", ")}${availableCols.length > 5 ? "..." : ""}`
+          );
+          // Clear the action to prevent retry
+          setAimeAction(null);
+          return;
+        }
         setSortColumn(aimeAction.column);
         setSortDirection(aimeAction.direction);
         break;
@@ -121,6 +147,20 @@ export default function InsightsArrivalsPage() {
     // Clear the action after processing
     setAimeAction(null);
   }, [aimeAction, setAimeAction]);
+
+  // Close export menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        setExportMenuOpen(false);
+      }
+    };
+
+    if (exportMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [exportMenuOpen]);
 
   // Apply filters and sorting to rows
   const processedRows = useMemo(() => {
@@ -162,7 +202,8 @@ export default function InsightsArrivalsPage() {
     return result;
   }, [rows, filters, sortColumn, sortDirection]);
 
-  const displayedRows = showAll ? processedRows : processedRows.slice(0, 10);
+  // Pass all processed rows to table - it will handle viewport height limiting
+  const displayedRows = processedRows;
   const displayedColumns = selectedColumns.length > 0 ? selectedColumns : columns;
 
   // Auto-load data on component mount or eventId change (debounced)
@@ -292,10 +333,12 @@ export default function InsightsArrivalsPage() {
 
       // Ensure we have all data if there's more on the server than in memory
       if (direct || needsFullFetch || dataToExport.length === 0) {
+        setExportProgress(10);
         setExportMessage("Fetching complete dataset for export...");
         try {
           // Fetch data with a limit equal to the total count (up to backend cap)
           const fetched = await fetchArrivals(q, eventId, total || 50000);
+          setExportProgress(40);
 
           if (direct || needsFullFetch) {
             // Re-apply local filters if they exist to the newly fetched data
@@ -309,9 +352,12 @@ export default function InsightsArrivalsPage() {
             });
             dataToExport = filtered;
           }
+          setExportProgress(50);
         } catch (fetchErr: any) {
           throw fetchErr;
         }
+      } else {
+        setExportProgress(30);
       }
 
       if (dataToExport.length === 0) {
@@ -324,10 +370,16 @@ export default function InsightsArrivalsPage() {
         return;
       }
 
+      setExportProgress(60);
+      setExportMessage("Preparing columns...");
+
       const columnsToExport = displayedColumns.map(col => ({
         header: col,
         key: col,
       }));
+
+      setExportProgress(70);
+      setExportMessage("Generating Excel file...");
 
       const XLSX = await import("xlsx");
 
@@ -398,13 +450,28 @@ export default function InsightsArrivalsPage() {
         e: { r: range.e.r + 5, c: range.e.c }
       });
 
+      setExportProgress(85);
+      setExportMessage("Finalizing export...");
+
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Arrivals");
+      
+      setExportProgress(95);
+      setExportMessage("Saving file...");
+      
       XLSX.writeFile(wb, `Arrivals_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
 
+      setExportProgress(100);
+      setExportMessage("Export complete!");
+      
       console.log("Export complete!");
-      setExportStatus("idle");
-      setExportMessage("");
+      
+      // Reset after brief success message
+      setTimeout(() => {
+        setExportStatus("idle");
+        setExportMessage("");
+        setExportProgress(0);
+      }, 1500);
     } catch (err: any) {
       console.error("Export Error Caught:", err);
 
@@ -455,13 +522,47 @@ export default function InsightsArrivalsPage() {
               <button className="rounded-md border border-[#e5e7eb] bg-white px-3 py-1.5 text-[12px] font-medium text-[#374151] hover:bg-[#f9fafb]">
                 Save to My Reports
               </button>
-              <button
-                onClick={() => handleExport(false)}
-                className="flex items-center gap-2 rounded-md bg-[#a855f7] px-3 py-1.5 text-[12px] font-medium text-white hover:bg-[#9333ea] transition-all shadow-sm active:scale-95"
-              >
-                <ChevronDown className="h-3 w-3" />
-                Export
-              </button>
+              <div className="relative" ref={exportMenuRef}>
+                <button
+                  onClick={() => setExportMenuOpen(!exportMenuOpen)}
+                  className="flex items-center gap-2 rounded-md bg-[#a855f7] px-3 py-1.5 text-[12px] font-medium text-white hover:bg-[#9333ea] transition-all shadow-sm active:scale-95"
+                >
+                  <FileDown className="h-3 w-3" />
+                  Export
+                  <ChevronDown className={`h-3 w-3 transition-transform ${exportMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {exportMenuOpen && (
+                  <div className="absolute right-0 mt-1 w-48 rounded-md border border-[#e5e7eb] bg-white shadow-lg z-50">
+                    <button
+                      onClick={() => {
+                        handleExport(false);
+                        setExportMenuOpen(false);
+                      }}
+                      className="w-full px-4 py-2 text-left text-[12px] text-[#374151] hover:bg-[#f9fafb] transition-colors flex items-center gap-2"
+                    >
+                      <FileDown className="h-3 w-3" />
+                      <div className="flex flex-col">
+                        <span className="font-medium">Export Preview</span>
+                        <span className="text-[10px] text-[#6b7280]">Export currently visible data</span>
+                      </div>
+                    </button>
+                    <div className="border-t border-[#e5e7eb]"></div>
+                    <button
+                      onClick={() => {
+                        handleExport(true);
+                        setExportMenuOpen(false);
+                      }}
+                      className="w-full px-4 py-2 text-left text-[12px] text-[#374151] hover:bg-[#f9fafb] transition-colors flex items-center gap-2"
+                    >
+                      <FileDown className="h-3 w-3" />
+                      <div className="flex flex-col">
+                        <span className="font-medium">Export All Data</span>
+                        <span className="text-[10px] text-[#6b7280]">Export complete dataset without preview</span>
+                      </div>
+                    </button>
+                  </div>
+                )}
+              </div>
             </>
           )}
         </div>
@@ -523,17 +624,35 @@ export default function InsightsArrivalsPage() {
         </div>
       </div>
 
+      {/* Command Error Display */}
+      {commandError && (
+        <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded-md flex items-center justify-between">
+          <div className="flex items-center gap-2 text-[12px] text-red-700">
+            <span className="font-medium">Command Error:</span>
+            <span>{commandError}</span>
+          </div>
+          <button
+            onClick={() => setCommandError(null)}
+            className="text-red-500 hover:text-red-700 text-[12px] font-medium"
+            aria-label="Dismiss error"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       {/* Row 5: Status Summary */}
       <div className="pb-1 flex items-center gap-3 text-[11px] text-[#6b7280] flex-shrink-0">
         <span>
-          {fetchMessage || (rows.length > 0 ? `Showing ${displayedRows.length} of ${total}` : "")}
+          {fetchMessage || (rows.length > 0 ? `Showing ${visibleRowCount > 0 ? visibleRowCount : displayedRows.length} of ${total}${!showAll && visibleRowCount > 0 && visibleRowCount < processedRows.length ? ` (${processedRows.length - visibleRowCount} more rows available)` : ""}` : "")}
         </span>
-        {rows.length > 10 && (
+        {processedRows.length > (visibleRowCount > 0 ? visibleRowCount : displayedRows.length) && (
           <button
             onClick={() => setShowAll(!showAll)}
-            className="text-[#9333ea] font-semibold hover:underline bg-[#f3e8ff] px-2 py-0.5 rounded-full"
+            className="text-[#9333ea] font-semibold hover:underline bg-[#f3e8ff] px-2 py-0.5 rounded-full transition-all hover:bg-[#e9d5ff]"
+            title={showAll ? "Limit rows to viewport height" : `Show all ${processedRows.length} rows`}
           >
-            {showAll ? "Show Less" : "Show More"}
+            {showAll ? "Show Less" : `Show All (${processedRows.length})`}
           </button>
         )}
       </div>
@@ -548,8 +667,33 @@ export default function InsightsArrivalsPage() {
             </div>
           </div>
         ) : fetchStatus === "error" ? (
-          <div className="p-4 text-center text-red-500">
-            {fetchMessage || "Error loading data. Please check the console for details."}
+          <div className="p-4 flex flex-col items-center justify-center gap-3 min-h-[200px]">
+            <div className="flex flex-col items-center gap-2 text-red-500">
+              <div className="text-[14px] font-medium">Failed to load data</div>
+              <div className="text-[12px] text-red-400 max-w-md text-center">
+                {fetchMessage || "An error occurred while loading data. Please try again."}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setFetchStatus("idle");
+                  fetchArrivals(q, eventId);
+                }}
+                className="flex items-center gap-2 rounded-md bg-[#a855f7] px-4 py-2 text-[12px] font-medium text-white hover:bg-[#9333ea] transition-all shadow-sm active:scale-95"
+              >
+                <span>Retry</span>
+              </button>
+              <button
+                onClick={() => {
+                  setFetchStatus("idle");
+                  setFetchMessage("");
+                }}
+                className="flex items-center gap-2 rounded-md border border-[#e5e7eb] bg-white px-4 py-2 text-[12px] font-medium text-[#374151] hover:bg-[#f9fafb] transition-all"
+              >
+                Dismiss
+              </button>
+            </div>
           </div>
         ) : rows.length > 0 ? (
           <div className={`h-full ${showAll ? 'overflow-auto' : 'overflow-hidden'}`}>
@@ -565,6 +709,12 @@ export default function InsightsArrivalsPage() {
               onSortChange={(col, dir) => {
                 setSortColumn(col);
                 setSortDirection(dir);
+              }}
+              onColumnOrderChange={(newOrder) => {
+                setSelectedColumns(newOrder);
+              }}
+              onVisibleRowsChange={(visibleCount, totalCount) => {
+                setVisibleRowCount(visibleCount);
               }}
             />
           </div>

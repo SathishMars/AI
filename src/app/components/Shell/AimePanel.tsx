@@ -11,8 +11,9 @@ import { ERROR_MESSAGES } from "@/app/lib/insights/messages";
 import { Sparkles, Send } from "lucide-react";
 import Image from "next/image";
 import { env } from "@/app/lib/env";
+import { CommandHistory } from "./CommandHistory";
 
-type Msg = { id: string; role: "assistant" | "user"; text: string; ts: string; sql?: string; data?: any[] };
+type Msg = { id: string; role: "assistant" | "user"; text: string; ts: string; sql?: string; data?: any[]; meta?: any };
 
 function nowTime() {
   const d = new Date();
@@ -30,8 +31,8 @@ export function InsightsAimePanel() {
 
   const canSend = useMemo(() => input.trim().length >= 3 && input.trim().length <= 200, [input]);
 
-  function push(role: Msg["role"], text: string, sql?: string, data?: any[]) {
-    setMessages((prev) => [...prev, { id: crypto.randomUUID(), role, text, ts: nowTime(), sql, data }]);
+  function push(role: Msg["role"], text: string, sql?: string, data?: any[], meta?: any) {
+    setMessages((prev) => [...prev, { id: crypto.randomUUID(), role, text, ts: nowTime(), sql, data, meta }]);
     setTimeout(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
   }
 
@@ -172,7 +173,8 @@ export function InsightsAimePanel() {
       const data = resJson.data?.chat;
 
       if (data && data.ok) {
-        push("assistant", data.answer, data.sql, data.rows);
+        // Store message with meta information (including action)
+        push("assistant", data.answer, data.sql, data.rows, data.meta);
 
         // Handle UI actions from AIME (actions are nested in meta)
         if (data.meta?.action) {
@@ -222,13 +224,22 @@ export function InsightsAimePanel() {
           />
           <span className="text-[13px]">aime</span>
         </div>
-        <button
-          onClick={() => setAimeOpen(false)}
-          className="flex h-8 w-8 items-center justify-center rounded-full border border-[#e5e7eb] bg-white text-[#9ca3af] hover:bg-[#f9fafb] transition-colors"
-          title="Collapse"
-        >
-          –
-        </button>
+        <div className="flex items-center gap-2">
+          <CommandHistory 
+            messages={messages} 
+            onRepeatCommand={(command) => {
+              // Command will be executed via setAimeAction
+              console.log("Repeating command:", command);
+            }}
+          />
+          <button
+            onClick={() => setAimeOpen(false)}
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-[#e5e7eb] bg-white text-[#9ca3af] hover:bg-[#f9fafb] transition-colors"
+            title="Collapse"
+          >
+            –
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-1 flex-col overflow-hidden">

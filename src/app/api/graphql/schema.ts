@@ -479,8 +479,8 @@ export const resolvers = {
 
       // SELECT MODEL (Uncomment the one you want to use)
       //const model = anthropic("claude-3-5-haiku-latest"); // Default: Anthropic
-     // const model = openai("gpt-4o");                   // Option: OpenAI
-       const model = groq("llama-3.3-70b-versatile");    // Option: Groq
+     const model = openai("gpt-4o");                   // Option: OpenAI
+     //  const model = groq("llama-3.3-70b-versatile");    // Option: Groq
 
       console.log(`[GraphQL Chat] Q: ${question} (Event: ${eventId})`);
 

@@ -1,6 +1,7 @@
 // INSIGHTS-SPECIFIC: Arrivals table component
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { insightsAttendeeColumns } from "@/app/lib/insights/data";
-import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, GripVertical } from "lucide-react";
 
 type ArrivalsTableProps = {
   rows: Record<string, any>[];
@@ -12,6 +13,8 @@ type ArrivalsTableProps = {
   sortColumn?: string | null;
   sortDirection?: "asc" | "desc";
   onSortChange?: (column: string | null, direction: "asc" | "desc") => void;
+  onColumnOrderChange?: (newOrder: string[]) => void;
+  onVisibleRowsChange?: (visibleCount: number, totalCount: number) => void;
 };
 
 // Helper function to detect data type of a column
@@ -70,7 +73,177 @@ export default function InsightsArrivalsTable({
   sortColumn,
   sortDirection = "asc",
   onSortChange,
+  onColumnOrderChange,
+  onVisibleRowsChange,
 }: ArrivalsTableProps) {
+  const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
+  const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
+  const [localColumnOrder, setLocalColumnOrder] = useState<string[]>(columnOrder);
+  const [viewportHeight, setViewportHeight] = useState<number>(0);
+  const [rowHeight, setRowHeight] = useState<number>(0);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLTableSectionElement>(null);
+  const firstRowRef = useRef<HTMLTableRowElement>(null);
+
+  // Sync local order when prop changes
+  useEffect(() => {
+    setLocalColumnOrder(columnOrder);
+  }, [columnOrder]);
+
+  // Calculate viewport height and row height
+  useEffect(() => {
+    const calculateDimensions = () => {
+      if (!tableContainerRef.current) return;
+
+      const container = tableContainerRef.current;
+      const containerRect = container.getBoundingClientRect();
+      const availableHeight = containerRect.height;
+
+      // Measure header height
+      let headerHeight = 0;
+      if (headerRef.current) {
+        headerHeight = headerRef.current.getBoundingClientRect().height;
+      }
+
+      // Measure row height (use first row if available)
+      let measuredRowHeight = 0;
+      if (firstRowRef.current) {
+        measuredRowHeight = firstRowRef.current.getBoundingClientRect().height;
+      } else {
+        // Default row height estimate (including border)
+        measuredRowHeight = 40; // Approximate height for a row with padding
+      }
+
+      setViewportHeight(availableHeight);
+      setRowHeight(measuredRowHeight);
+    };
+
+    // Calculate on mount and when showAll changes
+    calculateDimensions();
+
+    // Recalculate on window resize
+    const handleResize = () => {
+      calculateDimensions();
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [showAll, rows.length]);
+
+  // Calculate how many rows fit in viewport
+  const maxVisibleRows = useMemo(() => {
+    if (showAll || viewportHeight === 0 || rowHeight === 0) {
+      return rows.length; // Show all rows if showAll is true or dimensions not calculated
+    }
+
+    // Account for header height
+    const headerHeight = headerRef.current?.getBoundingClientRect().height || 60;
+    const availableHeight = viewportHeight - headerHeight;
+    const calculatedRows = Math.floor(availableHeight / rowHeight);
+
+    // Ensure at least 1 row is shown, and add buffer for smooth scrolling
+    return Math.max(1, calculatedRows + 2); // +2 for buffer
+  }, [showAll, viewportHeight, rowHeight, rows.length]);
+
+  // Limit displayed rows based on viewport height
+  const visibleRows = useMemo(() => {
+    if (showAll) {
+      return rows;
+    }
+    return rows.slice(0, maxVisibleRows);
+  }, [rows, showAll, maxVisibleRows]);
+
+  // Notify parent of visible row count
+  useEffect(() => {
+    if (onVisibleRowsChange) {
+      onVisibleRowsChange(visibleRows.length, rows.length);
+    }
+  }, [visibleRows.length, rows.length, onVisibleRowsChange]);
+
+  // Handle drag start
+  const handleDragStart = (e: React.DragEvent, column: string) => {
+    setDraggedColumn(column);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", column);
+    // Add visual feedback
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = "0.5";
+    }
+  };
+
+  // Handle drag over
+  const handleDragOver = (e: React.DragEvent, targetColumn: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "move";
+
+    if (!draggedColumn || draggedColumn === targetColumn) {
+      setDragOverColumn(null);
+      return;
+    }
+
+    setDragOverColumn(targetColumn);
+
+    // Reorder columns
+    const draggedIndex = localColumnOrder.indexOf(draggedColumn);
+    const targetIndex = localColumnOrder.indexOf(targetColumn);
+
+    if (draggedIndex === -1 || targetIndex === -1) return;
+    if (draggedIndex === targetIndex) return;
+
+    const newOrder = [...localColumnOrder];
+    newOrder.splice(draggedIndex, 1);
+    newOrder.splice(targetIndex, 0, draggedColumn);
+    setLocalColumnOrder(newOrder);
+    
+    // Notify parent immediately for real-time updates
+    if (onColumnOrderChange) {
+      onColumnOrderChange(newOrder);
+    }
+  };
+
+  // Handle drag leave
+  const handleDragLeave = (e: React.DragEvent) => {
+    // Only clear dragOver if we're leaving the table area
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setDragOverColumn(null);
+    }
+  };
+
+  // Handle drag end
+  const handleDragEnd = (e: React.DragEvent) => {
+    // Restore opacity
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = "1";
+    }
+    setDraggedColumn(null);
+    setDragOverColumn(null);
+    
+    // Final update to parent
+    if (onColumnOrderChange && draggedColumn) {
+      onColumnOrderChange(localColumnOrder);
+    }
+  };
+
+  // Handle drop
+  const handleDrop = (e: React.DragEvent, targetColumn: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!draggedColumn || draggedColumn === targetColumn) {
+      setDragOverColumn(null);
+      return;
+    }
+
+    // Final update
+    if (onColumnOrderChange) {
+      onColumnOrderChange(localColumnOrder);
+    }
+    
+    setDraggedColumn(null);
+    setDragOverColumn(null);
+  };
+
   if (loading) {
     return <div className="p-4 text-sm text-gray-500">Loading table data...</div>;
   }
@@ -83,40 +256,67 @@ export default function InsightsArrivalsTable({
     );
   }
 
-  // Use columnOrder if available, fall back to row keys or insightsAttendeeColumns
-  const allHeaders = columnOrder.length > 0
-    ? columnOrder
-    : rows.length > 0
-      ? Object.keys(rows[0])
-      : insightsAttendeeColumns;
+  // Use localColumnOrder if available, fall back to prop or row keys
+  const allHeaders = localColumnOrder.length > 0
+    ? localColumnOrder
+    : columnOrder.length > 0
+      ? columnOrder
+      : rows.length > 0
+        ? Object.keys(rows[0])
+        : insightsAttendeeColumns;
 
   const displayedHeaders = allHeaders;
-  const displayedRows = rows;
+  const displayedRows = visibleRows;
 
   console.log("ArrivalsTable rendering:", {
     rowsCount: rows.length,
+    visibleRowsCount: visibleRows.length,
+    maxVisibleRows,
+    viewportHeight,
+    rowHeight,
     headersCount: displayedHeaders.length,
     firstRow: rows[0]
   });
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" ref={tableContainerRef}>
       <div className="overflow-hidden rounded-2xl border border-[#e5e7eb] bg-white h-full flex flex-col">
         <div className={`w-full h-full overflow-x-auto flex flex-col ${showAll ? 'overflow-y-auto' : 'overflow-y-hidden'}`}>
           <table className="w-full border-collapse">
-            <thead className="bg-[#f3f4f6] sticky top-0 z-10">
+            <thead ref={headerRef} className="bg-[#f3f4f6] sticky top-0 z-10">
               <tr className="text-left text-[12px] text-[#111827]">
                 {displayedHeaders.map((col) => {
                   const dataType = getColumnDataType(rows, col);
                   const isSorted = sortColumn === col;
+                  const isDragging = draggedColumn === col;
+                  const isDragOver = dragOverColumn === col;
                   return (
-                    <th key={col} className="px-4 py-1.5 font-medium whitespace-nowrap">
+                    <th
+                      key={col}
+                      draggable={onColumnOrderChange !== undefined}
+                      onDragStart={(e) => handleDragStart(e, col)}
+                      onDragOver={(e) => handleDragOver(e, col)}
+                      onDragLeave={handleDragLeave}
+                      onDragEnd={handleDragEnd}
+                      onDrop={(e) => handleDrop(e, col)}
+                      className={`px-4 py-1.5 font-medium whitespace-nowrap transition-all ${
+                        isDragging ? "opacity-50" : ""
+                      } ${
+                        isDragOver ? "bg-[#e5e7eb] border-l-2 border-l-[#7c3aed]" : ""
+                      } ${
+                        onColumnOrderChange ? "cursor-move hover:bg-[#e5e7eb]" : ""
+                      }`}
+                    >
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-1">
+                          {onColumnOrderChange && (
+                            <GripVertical className="h-3 w-3 text-[#9ca3af] cursor-grab active:cursor-grabbing flex-shrink-0" />
+                          )}
                           <span className="capitalize">{col.replace(/_/g, " ")}</span>
                           {onSortChange && (
                             <button
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 if (isSorted) {
                                   // Toggle direction or remove sort
                                   if (sortDirection === "asc") {
@@ -130,6 +330,7 @@ export default function InsightsArrivalsTable({
                               }}
                               className="ml-1 flex items-center text-[#6b7280] hover:text-[#111827] transition-colors"
                               title={`Sort by ${col.replace(/_/g, " ")}`}
+                              onMouseDown={(e) => e.stopPropagation()}
                             >
                               {isSorted ? (
                                 sortDirection === "asc" ? (
@@ -172,6 +373,7 @@ export default function InsightsArrivalsTable({
                 displayedRows.map((row, idx) => (
                   <tr
                     key={row.id || row.email || idx}
+                    ref={idx === 0 ? firstRowRef : null}
                     className="border-t border-[#e5e7eb] text-[12px] text-[#111827] hover:bg-gray-50 transition-colors"
                   >
                     {displayedHeaders.map((col) => (

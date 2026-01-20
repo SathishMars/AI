@@ -13,9 +13,6 @@ function InsightsShellInner({ children }: { children: React.ReactNode }) {
   // Calculate right panel width based on which panels are open
   // If both are open, show Pick Columns (it overlays or replaces AIME temporarily)
   // Otherwise show whichever is open
-  // Calculate right panel width based on state:
-  // - 360px if either AIME or Pick Columns is full-open
-  // - 48px if AIME is minimized (aimeOpen is false)
   const rightPanelWidth = (aimeOpen || pickColumnsOpen) ? 360 : 0;
 
   // Exact 3-column behavior like PNG:

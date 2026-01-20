@@ -1,9 +1,10 @@
 // INSIGHTS-SPECIFIC: Pick Columns panel component
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useInsightsUI } from "@/app/lib/insights/ui-store";
-import { Search, ChevronDown, GripVertical, X } from "lucide-react";
+import { Search, ChevronDown, GripVertical, X, Loader2 } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 type PickColumnsPanelProps = {
   allColumns: string[];
@@ -23,6 +24,10 @@ export function InsightsPickColumnsPanel({
   const [categoryExpanded, setCategoryExpanded] = useState(true);
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const columnRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   // Initialize local state when panel opens
   useEffect(() => {
@@ -35,8 +40,21 @@ export function InsightsPickColumnsPanel({
       setColumnOrder([...selectedColumns, ...unselected]);
 
       setSearchQuery("");
+      setIsLoading(false);
+      
+      // Focus search input when panel opens
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 100);
     }
   }, [pickColumnsOpen, selectedColumns, allColumns]);
+
+  // Handle cancel - close panel without applying changes
+  const handleCancel = () => {
+    // Reset local state to original selected columns
+    setLocalSelectedColumns(selectedColumns);
+    setPickColumnsOpen(false);
+  };
 
   // Filter columns based on search, but maintain custom order
   const filteredColumns = useMemo(() => {
@@ -114,149 +132,240 @@ export function InsightsPickColumnsPanel({
     }
   };
 
-  // Handle save changes - maintain order of selected columns based on columnOrder
-  const handleSaveChanges = () => {
-    // Order selected columns according to columnOrder
-    const orderedSelectedColumns = columnOrder.filter(col => localSelectedColumns.includes(col));
-    onApply(orderedSelectedColumns);
-    setPickColumnsOpen(false);
+  // Get data source info for a column
+  const getColumnDataSource = (column: string): string => {
+    // Determine data source based on column name patterns
+    if (column.includes('room') || column.includes('air') || column.includes('travel')) {
+      return "Source: Travel & Logistics";
+    }
+    if (column.includes('registration') || column.includes('status')) {
+      return "Source: Registration System";
+    }
+    if (column.includes('companion')) {
+      return "Source: Attendee Relationships";
+    }
+    // Default to main attendee table
+    return "Source: public.attendee table";
   };
 
-  // Handle cancel - close panel without applying changes
-  const handleCancel = () => {
-    // Reset local state to original selected columns
-    setLocalSelectedColumns(selectedColumns);
+  // Check if newly selected columns need backend data fetch
+  const needsBackendFetch = (newSelected: string[]): boolean => {
+    // Check if any newly selected columns were previously hidden
+    const previouslyHidden = newSelected.filter(col => !selectedColumns.includes(col));
+    // For now, assume all columns are available - can be enhanced later
+    // This would check if columns require additional data fetching
+    return false; // Placeholder - implement based on actual requirements
+  };
+
+  // Handle save changes - maintain order of selected columns based on columnOrder
+  const handleSaveChanges = async () => {
+    // Order selected columns according to columnOrder
+    const orderedSelectedColumns = columnOrder.filter(col => localSelectedColumns.includes(col));
+    
+    // Check if backend fetch is needed
+    if (needsBackendFetch(orderedSelectedColumns)) {
+      setIsLoading(true);
+      try {
+        // Simulate backend fetch - replace with actual implementation
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    
+    onApply(orderedSelectedColumns);
     setPickColumnsOpen(false);
   };
 
   if (!pickColumnsOpen) return null;
 
   return (
-    <aside className="flex h-full flex-col border-l border-[#e5e7eb] bg-white">
+    <aside className="flex h-full w-full flex-col border-l border-[#e5e7eb] bg-white px-3 py-3 shadow-[-4px_0_12px_-4px_rgba(0,0,0,0.05)] animate-in slide-in-from-right duration-300" ref={panelRef}>
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-[#e5e7eb] px-6 py-4">
-        <h2 className="text-[16px] font-semibold text-[#111827]">Pick Columns</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-[13px] font-semibold text-[#111827]">Pick Columns</h2>
         <button
           onClick={handleCancel}
           className="flex h-8 w-8 items-center justify-center rounded-full border border-[#e5e7eb] bg-white text-[#9ca3af] hover:bg-[#f9fafb] transition-colors"
           title="Close"
+          aria-label="Close column picker"
         >
-          <X className="h-4 w-4" strokeWidth={2} />
+          –
         </button>
       </div>
 
       {/* Instructions */}
-      <div className="px-6 pt-4 pb-2">
-        <p className="text-[12px] text-[#6b7280]">
-          Select which columns to display in the data grid. Pinned columns cannot be hidden.
+      <div className="mt-2">
+        <p className="text-[11px] text-[#6b7280] leading-relaxed">
+          Select which columns to display in the data grid.
+        </p>
+        <p className="text-[11px] text-[#6b7280] leading-relaxed">
+          Pinned columns cannot be hidden.
         </p>
       </div>
 
-      {/* Search Bar */}
-      <div className="px-6 pb-4">
-        <div className="flex items-center rounded-lg border border-[#e5e7eb] bg-white px-3 py-2">
-          <Search className="mr-2 h-4 w-4 text-[#9ca3af]" />
-          <input
-            type="text"
-            placeholder="Find Page or Column"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 border-none bg-transparent text-[12px] outline-none placeholder:text-[#9ca3af]"
-          />
+      {/* Content Area */}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Search Bar */}
+        <div className="mt-2">
+          <div className="flex items-center rounded-xl border border-[#e5e7eb] bg-[#f9fafb] px-3 py-2">
+            <Search className="mr-2 h-3.5 w-3.5 text-[#9ca3af]" aria-hidden="true" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Find Page or Column"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-1 border-none bg-transparent text-[11px] outline-none placeholder:text-[#9ca3af]"
+              aria-label="Search columns"
+            />
+          </div>
         </div>
-      </div>
 
-      {/* Column List */}
-      <div className="flex-1 overflow-y-auto px-6 pb-4">
+        {/* Column List */}
+        <div className="flex-1 overflow-y-auto mt-4">
         {/* Category Header */}
         <button
           onClick={() => setCategoryExpanded(!categoryExpanded)}
           className="flex w-full items-center justify-between py-2 text-left"
+          aria-expanded={categoryExpanded}
+          aria-controls="column-list"
+          aria-label={`${categoryExpanded ? 'Collapse' : 'Expand'} Attendees category`}
         >
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <input
-                type="checkbox"
-                checked={selectedCount === totalCount && totalCount > 0}
-                onChange={toggleAllColumns}
-                className="h-4 w-4 rounded border-[#d1d5db] text-[#7c3aed] focus:ring-[#7c3aed]"
-                style={{ accentColor: '#7c3aed' }}
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={selectedCount === totalCount && totalCount > 0}
+                    onChange={toggleAllColumns}
+                    className="h-4 w-4 rounded border-[#d1d5db] text-[#7c3aed] focus:ring-2 focus:ring-[#7c3aed]"
+                    style={{ accentColor: '#7c3aed' }}
+                    aria-label={`${selectedCount === totalCount ? 'Deselect' : 'Select'} all ${totalCount} columns`}
+                  />
+                </div>
+                <span className="text-[13px] font-medium text-[#111827]">Attendees</span>
+                <span className="text-[12px] text-[#6b7280]" aria-live="polite" aria-atomic="true">
+                  {selectedCount}/{totalCount}
+                </span>
+              </div>
+              <ChevronDown
+                className={`h-4 w-4 text-[#6b7280] transition-transform ${categoryExpanded ? "" : "-rotate-90"
+                  }`}
+                strokeWidth={2}
+                aria-hidden="true"
               />
-            </div>
-            <span className="text-[13px] font-medium text-[#111827]">Attendees</span>
-            <span className="text-[12px] text-[#6b7280]">
-              {selectedCount}/{totalCount}
-            </span>
-          </div>
-          <ChevronDown
-            className={`h-4 w-4 text-[#6b7280] transition-transform ${categoryExpanded ? "" : "-rotate-90"
-              }`}
-            strokeWidth={2}
-          />
-        </button>
+            </button>
 
         {/* Column Items */}
         {categoryExpanded && (
-          <div className="space-y-1">
-            {filteredColumns.map((column) => {
+          <div id="column-list" className="space-y-1 mt-1" role="group" aria-label="Column list">
+            {filteredColumns.map((column, index) => {
               const isSelected = localSelectedColumns.includes(column);
               const isDragging = draggedColumn === column;
               const isDragOver = dragOverColumn === column && !isDragging;
+              const columnDisplayName = column.replace(/_/g, " ");
+              const dataSource = getColumnDataSource(column);
 
               return (
                 <div
                   key={column}
+                  ref={(el) => { columnRefs.current[index] = el; }}
                   draggable={true}
                   onDragStart={() => handleDragStart(column)}
                   onDragOver={(e) => handleDragOver(e, column)}
                   onDragLeave={handleDragLeave}
                   onDragEnd={handleDragEnd}
-                  className={`flex items-center gap-3 py-1.5 rounded px-2 transition-all ${isDragging
+                  className={`flex items-center gap-2 py-1.5 rounded-xl px-3 border border-[#e5e7eb] bg-[#f9fafb] transition-all ${isDragging
                       ? 'opacity-50 cursor-grabbing'
                       : isDragOver
-                        ? 'bg-[#ede9fe] border-t-2 border-[#7c3aed]'
-                        : 'hover:bg-[#f9fafb] cursor-move'
+                        ? 'bg-[#ede9fe] border-[#7c3aed]'
+                        : 'hover:bg-[#f3f4f6] cursor-move'
                     }`}
+                  role="listitem"
                 >
                   {/* Drag Handle */}
-                  <div className="text-[#9ca3af] cursor-move">
+                  <div className="text-[#9ca3af] cursor-move" aria-hidden="true">
                     <GripVertical className="h-4 w-4" strokeWidth={2} />
                   </div>
 
                   {/* Checkbox */}
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => toggleColumn(column)}
-                    className="h-4 w-4 rounded border-[#d1d5db] text-[#7c3aed] focus:ring-[#7c3aed]"
-                    style={{ accentColor: '#7c3aed' }}
-                  />
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleColumn(column)}
+                        className="h-4 w-4 rounded border-[#d1d5db] text-[#7c3aed] focus:ring-2 focus:ring-[#7c3aed]"
+                        style={{ accentColor: '#7c3aed' }}
+                        aria-label={`${isSelected ? 'Hide' : 'Show'} ${columnDisplayName} column`}
+                        aria-describedby={`column-${index}-description`}
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="max-w-xs">
+                      <div className="text-xs">
+                        <div className="font-semibold mb-1">{columnDisplayName}</div>
+                        <div className="text-[#6b7280]">{dataSource}</div>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
 
-                  {/* Column Name */}
-                  <span className="flex-1 text-[12px] text-[#111827]">
-                    {column.replace(/_/g, " ")}
-                  </span>
+                  {/* Column Name with Tooltip */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span 
+                        className="flex-1 text-[11px] text-[#374151] cursor-pointer"
+                        onClick={() => toggleColumn(column)}
+                        id={`column-${index}-description`}
+                      >
+                        {columnDisplayName}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="max-w-xs">
+                      <div className="text-xs">
+                        <div className="font-semibold mb-1">{columnDisplayName}</div>
+                        <div className="text-[#6b7280]">{dataSource}</div>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
               );
             })}
           </div>
         )}
-      </div>
+        </div>
 
-      {/* Footer */}
-      <div className="flex items-center justify-end gap-2 border-t border-[#e5e7eb] px-6 py-4">
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2 border-t border-[#e5e7eb] mt-2 pt-2 flex-shrink-0">
+        {isLoading && (
+          <div className="flex items-center gap-2 text-[12px] text-[#6b7280] mr-auto" role="status" aria-live="polite">
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            <span>Loading column data...</span>
+          </div>
+        )}
         <button
           onClick={handleCancel}
-          className="rounded-lg border border-[#e5e7eb] bg-white px-4 py-1.5 text-[12px] font-medium text-[#374151] hover:bg-[#f9fafb] transition-colors"
+          className="rounded-lg border border-[#e5e7eb] bg-white px-3 py-1.5 text-[11px] font-medium text-[#374151] hover:bg-[#f9fafb] transition-colors"
+          aria-label="Cancel and close column picker"
+          disabled={isLoading}
         >
           Cancel
         </button>
         <button
           onClick={handleSaveChanges}
-          className="rounded-lg bg-[#7c3aed] px-4 py-1.5 text-[12px] font-medium text-white hover:bg-[#6d28d9] transition-colors"
+          className="rounded-lg bg-[#7c3aed] px-3 py-1.5 text-[11px] font-medium text-white hover:bg-[#6d28d9] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          aria-label="Save column selection changes"
+          disabled={isLoading}
         >
-          Save Changes
+          {isLoading ? (
+            <>
+              <Loader2 className="h-3 w-3 animate-spin inline mr-2" aria-hidden="true" />
+              Saving...
+            </>
+          ) : (
+            'Save Changes'
+          )}
         </button>
+        </div>
       </div>
     </aside>
   );
