@@ -1,0 +1,1658 @@
+[
+  {
+    "q": "How many total attendees are registered?",
+    "cat": "Statistics",
+    "status": "PASS",
+    "time": 34763,
+    "answer": "- Total registered attendees: 1",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "What are the top 5 companies?",
+    "cat": "Statistics",
+    "status": "PASS",
+    "time": 30052,
+    "answer": "Top companies by number of primary attendees:\n1) Example Corp. — 1",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "How many unique companies are represented?",
+    "cat": "Statistics",
+    "status": "PASS",
+    "time": 28780,
+    "answer": "1",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "How many attendees have confirmed registration?",
+    "cat": "Registration",
+    "status": "PASS",
+    "time": 22374,
+    "answer": "1 attendee has confirmed registration.",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "Show me attendees with incomplete registration",
+    "cat": "Registration",
+    "status": "PASS",
+    "time": 27614,
+    "answer": "No records match the specified criteria.",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "List attendees who were invited but haven't registered",
+    "cat": "Registration",
+    "status": "PASS",
+    "time": 44863,
+    "answer": "Executive summary:\n- Intended filter: Attendees invited but not registered (event 5281).\n- Outcome: No records match the specified criteria.\n- Total m...",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "How many attendees requested rooms?",
+    "cat": "Travel",
+    "status": "PASS",
+    "time": 25290,
+    "answer": "Attendees who requested rooms: 0",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "Who has confirmed air travel?",
+    "cat": "Travel",
+    "status": "PASS",
+    "time": 26408,
+    "answer": "No records match the specified criteria.",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "Which attendees have both room and air travel requests?",
+    "cat": "Travel",
+    "status": "PASS",
+    "time": 25169,
+    "answer": "No records match the specified criteria.",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "List all speakers",
+    "cat": "Profiles",
+    "status": "PASS",
+    "time": 29296,
+    "answer": "No records match the specified criteria.",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "Who are the VIPs and sponsors?",
+    "cat": "Profiles",
+    "status": "PASS",
+    "time": 30846,
+    "answer": "No records match the specified criteria.",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "Show details for healthcare practitioners",
+    "cat": "Profiles",
+    "status": "PASS",
+    "time": 34781,
+    "answer": "No records match the specified criteria.",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "Which attendees are from Groupize?",
+    "cat": "Profiles",
+    "status": "PASS",
+    "time": 33120,
+    "answer": "No records match the specified criteria.",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "How many registered in the last 7 days?",
+    "cat": "Temporal",
+    "status": "PASS",
+    "time": 23601,
+    "answer": "Registrations in the last 7 days: 0\n\n(Intent: Count of attendees with Registered/Confirmed status created in the last 7 days for event 5281)",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "What date had the highest registrations?",
+    "cat": "Temporal",
+    "status": "PASS",
+    "time": 31688,
+    "answer": "April 30, 2024 — 991 registrations.",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "Who was most recently updated?",
+    "cat": "Temporal",
+    "status": "PASS",
+    "time": 39517,
+    "answer": "Joseph Martin (updated at 2024-04-30 15:14)",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "How many attendees are missing phone numbers?",
+    "cat": "Data Quality",
+    "status": "PASS",
+    "time": 37149,
+    "answer": "990 attendees are missing phone numbers. (Primary records only for event 5281; no phone or mobile provided.)",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "List email addresses of all staff",
+    "cat": "Data Quality",
+    "status": "PASS",
+    "time": 38642,
+    "answer": "No records match the specified criteria.",
+    "reason": "Correctly handled as in-scope"
+  },
+  {
+    "q": "Are there duplicate emails?",
+    "cat": "Data Quality",
+    "status": "FAIL",
+    "time": 36894,
+    "answer": "I appreciate the request, but I am a read-only data analysis tool. I cannot cancel, update, or modify any records in the database. Is there any attend...",
+    "reason": "Incorrectly identified as out_of_scope"
+  },
+  {
+    "q": "Which attendees have missing company info?",
+    "cat": "Data Quality",
+    "status": "FAIL",
+    "time": 14986,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "what is the arrival time of the attendee Joseph Martin",
+    "cat": "Travel",
+    "status": "FAIL",
+    "time": 47,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "show me 100th attendee name",
+    "cat": "Statistics",
+    "status": "FAIL",
+    "time": 37,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "who is next attendee to be registered",
+    "cat": "Temporal",
+    "status": "FAIL",
+    "time": 21,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show phone numbers of attendees.",
+    "cat": "Data Quality",
+    "status": "FAIL",
+    "time": 16,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show email addresses of all attendees.",
+    "cat": "Data Quality",
+    "status": "FAIL",
+    "time": 27,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "what is time now",
+    "cat": "QA_SPECIFIC",
+    "status": "FAIL",
+    "time": 17,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "best flight for this event",
+    "cat": "QA_SPECIFIC",
+    "status": "FAIL",
+    "time": 25,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "can you cancel the registration",
+    "cat": "QA_SPECIFIC",
+    "status": "FAIL",
+    "time": 13,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "change it to registered",
+    "cat": "QA_SPECIFIC",
+    "status": "FAIL",
+    "time": 19,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "when is the next event in January",
+    "cat": "QA_SPECIFIC",
+    "status": "FAIL",
+    "time": 37,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "what is the event about?",
+    "cat": "QA_SPECIFIC",
+    "status": "FAIL",
+    "time": 9,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "what AI tool you are using",
+    "cat": "QA_SPECIFIC",
+    "status": "FAIL",
+    "time": 19,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Who won the Cricket World Cup in 2011?",
+    "cat": "QA_SPECIFIC",
+    "status": "FAIL",
+    "time": 12,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the capital of Australia?",
+    "cat": "QA_SPECIFIC",
+    "status": "FAIL",
+    "time": 12,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the attendee's salary?",
+    "cat": "QA_SPECIFIC",
+    "status": "FAIL",
+    "time": 8,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Predict next year's attendee count.",
+    "cat": "QA_SPECIFIC",
+    "status": "FAIL",
+    "time": 11,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Recommend how to increase attendance.",
+    "cat": "QA_SPECIFIC",
+    "status": "FAIL",
+    "time": 15,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Which event will be most profitable?",
+    "cat": "QA_SPECIFIC",
+    "status": "FAIL",
+    "time": 24,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Was this event a failure?",
+    "cat": "QA_SPECIFIC",
+    "status": "FAIL",
+    "time": 14,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What database are you using?",
+    "cat": "QA_SPECIFIC",
+    "status": "FAIL",
+    "time": 17,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "share the schema of attendees table",
+    "cat": "QA_SPECIFIC",
+    "status": "FAIL",
+    "time": 11,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the SQL query behind this report.",
+    "cat": "QA_SPECIFIC",
+    "status": "FAIL",
+    "time": 6,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What model are you trained on?",
+    "cat": "QA_SPECIFIC",
+    "status": "FAIL",
+    "time": 12,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "grant me admin permissions to the database",
+    "cat": "QA_SPECIFIC",
+    "status": "FAIL",
+    "time": 15,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "restart the application server",
+    "cat": "QA_SPECIFIC",
+    "status": "FAIL",
+    "time": 6,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "clear all the data in the attendee table",
+    "cat": "QA_SPECIFIC",
+    "status": "FAIL",
+    "time": 12,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "delete duplicate records from the database",
+    "cat": "QA_SPECIFIC",
+    "status": "FAIL",
+    "time": 7,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "modify the event date to December 25th",
+    "cat": "QA_SPECIFIC",
+    "status": "FAIL",
+    "time": 14,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the hotel proposals for this event",
+    "cat": "Hotel",
+    "status": "FAIL",
+    "time": 13,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the bid status for the Marriott hotel?",
+    "cat": "Hotel",
+    "status": "FAIL",
+    "time": 7,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Compare the hotel rates from the eBid system",
+    "cat": "Hotel",
+    "status": "FAIL",
+    "time": 31,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show the RFP for venue selection",
+    "cat": "Hotel",
+    "status": "FAIL",
+    "time": 12,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What are the contract terms for the Hilton?",
+    "cat": "Hotel",
+    "status": "FAIL",
+    "time": 6,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the total budget for this event?",
+    "cat": "Finance",
+    "status": "FAIL",
+    "time": 10,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the spend vs budget report",
+    "cat": "Finance",
+    "status": "FAIL",
+    "time": 5,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "How many invoices are pending payment?",
+    "cat": "Finance",
+    "status": "FAIL",
+    "time": 12,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the tax rate for this location?",
+    "cat": "Finance",
+    "status": "FAIL",
+    "time": 10,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the purchase orders for AV equipment",
+    "cat": "Finance",
+    "status": "FAIL",
+    "time": 7,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the annual salary of the event manager?",
+    "cat": "Finance",
+    "status": "FAIL",
+    "time": 11,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the bank details for hotel wire transfers",
+    "cat": "Finance",
+    "status": "FAIL",
+    "time": 7,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the menu for the gala dinner?",
+    "cat": "Logistics",
+    "status": "FAIL",
+    "time": 11,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the floor plan for the main hall",
+    "cat": "Logistics",
+    "status": "FAIL",
+    "time": 18,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "When is the AV setup scheduled?",
+    "cat": "Logistics",
+    "status": "FAIL",
+    "time": 11,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What are the catering options for vegetarians?",
+    "cat": "Logistics",
+    "status": "FAIL",
+    "time": 10,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the agenda/sessions for Day 2",
+    "cat": "Logistics",
+    "status": "FAIL",
+    "time": 12,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Where can I collect the keys for the booth?",
+    "cat": "Logistics",
+    "status": "FAIL",
+    "time": 7,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the seating chart for Workshop A",
+    "cat": "Logistics",
+    "status": "FAIL",
+    "time": 14,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the wifi password for the venue?",
+    "cat": "Logistics",
+    "status": "FAIL",
+    "time": 10,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What are the sponsorship packages available?",
+    "cat": "Marketing",
+    "status": "FAIL",
+    "time": 4,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the exhibitor booth assignments",
+    "cat": "Marketing",
+    "status": "FAIL",
+    "time": 10,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "How many email blasts were sent last week?",
+    "cat": "Marketing",
+    "status": "FAIL",
+    "time": 5,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the social media engagement for this event?",
+    "cat": "Marketing",
+    "status": "FAIL",
+    "time": 8,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show the marketing campaign performance",
+    "cat": "Marketing",
+    "status": "FAIL",
+    "time": 6,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the signed NDA for Example Corp",
+    "cat": "Legal",
+    "status": "FAIL",
+    "time": 12,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What are the GDPR compliance requirements?",
+    "cat": "Legal",
+    "status": "FAIL",
+    "time": 7,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show the master service agreement (MSA)",
+    "cat": "Legal",
+    "status": "FAIL",
+    "time": 11,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Who approved the legal terms?",
+    "cat": "Legal",
+    "status": "FAIL",
+    "time": 6,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Who won the Cricket World Cup in 2011?",
+    "cat": "General",
+    "status": "FAIL",
+    "time": 11,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the capital of Australia?",
+    "cat": "General",
+    "status": "FAIL",
+    "time": 5,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the weather in London today?",
+    "cat": "General",
+    "status": "FAIL",
+    "time": 11,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Tell me about the latest news in AI",
+    "cat": "General",
+    "status": "FAIL",
+    "time": 5,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Who is the CEO of Google?",
+    "cat": "General",
+    "status": "FAIL",
+    "time": 10,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is time right now?",
+    "cat": "General",
+    "status": "FAIL",
+    "time": 8,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Write a poem about attendees",
+    "cat": "General",
+    "status": "FAIL",
+    "time": 11,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Can you tell me a joke about conferences?",
+    "cat": "General",
+    "status": "FAIL",
+    "time": 13,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "How do I write a fast sort algorithm in C++?",
+    "cat": "General",
+    "status": "FAIL",
+    "time": 5,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Explain the theory of relativity",
+    "cat": "General",
+    "status": "FAIL",
+    "time": 10,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Can you cancel the registration for John Doe?",
+    "cat": "Action",
+    "status": "FAIL",
+    "time": 7,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Change my registration status to confirmed",
+    "cat": "Action",
+    "status": "FAIL",
+    "time": 9,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Update the company name for attendee 123",
+    "cat": "Action",
+    "status": "FAIL",
+    "time": 8,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Delete duplicate records from the database",
+    "cat": "Action",
+    "status": "FAIL",
+    "time": 9,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Restart the application server",
+    "cat": "Action",
+    "status": "FAIL",
+    "time": 8,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Grant me admin permissions to the database",
+    "cat": "Action",
+    "status": "FAIL",
+    "time": 11,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Clear all the data in the attendee table",
+    "cat": "Action",
+    "status": "FAIL",
+    "time": 14,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Modify the event date to December 25th",
+    "cat": "Action",
+    "status": "FAIL",
+    "time": 7,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the Social Security Number for attendee 1",
+    "cat": "Personal",
+    "status": "FAIL",
+    "time": 12,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the personal home phone of the VIP attendees?",
+    "cat": "Personal",
+    "status": "FAIL",
+    "time": 6,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the credit card numbers used for registration",
+    "cat": "Personal",
+    "status": "FAIL",
+    "time": 12,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the passport number for Rahul Das?",
+    "cat": "Personal",
+    "status": "FAIL",
+    "time": 5,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the home address of all attendees",
+    "cat": "Personal",
+    "status": "FAIL",
+    "time": 11,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Who are the speakers and what are their slides?",
+    "cat": "Edge",
+    "status": "FAIL",
+    "time": 3116,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me attendee counts and the event budget",
+    "cat": "Edge",
+    "status": "FAIL",
+    "time": 69,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "List VIPs and their hotel room rates",
+    "cat": "Edge",
+    "status": "FAIL",
+    "time": 13,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the registration trend and the catering cost?",
+    "cat": "Edge",
+    "status": "FAIL",
+    "time": 10,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the email of the event manager for catering",
+    "cat": "Edge",
+    "status": "FAIL",
+    "time": 7,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Count the total attendees and tell me a joke",
+    "cat": "Edge",
+    "status": "FAIL",
+    "time": 11,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Who is the newest attendee and what is the venue wifi?",
+    "cat": "Edge",
+    "status": "FAIL",
+    "time": 6,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the bank statement for last month",
+    "cat": "Financial",
+    "status": "FAIL",
+    "time": 13,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the account number for the catering vendor?",
+    "cat": "Financial",
+    "status": "FAIL",
+    "time": 6,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the profit margin for this event?",
+    "cat": "Financial",
+    "status": "FAIL",
+    "time": 12,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the tax returns for Groupize",
+    "cat": "Financial",
+    "status": "FAIL",
+    "time": 12,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the credit limit of Example Corp?",
+    "cat": "Financial",
+    "status": "FAIL",
+    "time": 7,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the petty cash logs",
+    "cat": "Financial",
+    "status": "FAIL",
+    "time": 31,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the payroll for the operations team?",
+    "cat": "Financial",
+    "status": "FAIL",
+    "time": 29,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Is there any outstanding debt for this event?",
+    "cat": "Financial",
+    "status": "FAIL",
+    "time": 21,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the revenue projection for 2027",
+    "cat": "Financial",
+    "status": "FAIL",
+    "time": 16,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What are the currency exchange rates used for billing?",
+    "cat": "Financial",
+    "status": "FAIL",
+    "time": 15,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the litigation history of this venue",
+    "cat": "Legal",
+    "status": "FAIL",
+    "time": 10,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What are the terms of the insurance policy?",
+    "cat": "Legal",
+    "status": "FAIL",
+    "time": 18,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the signed contracts for all vendors",
+    "cat": "Legal",
+    "status": "FAIL",
+    "time": 17,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Has there been any harassment reported at this event?",
+    "cat": "Legal",
+    "status": "FAIL",
+    "time": 7,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the background check results for the staff",
+    "cat": "Legal",
+    "status": "FAIL",
+    "time": 30,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What are the secret sauces mentioned in the NDA?",
+    "cat": "Legal",
+    "status": "FAIL",
+    "time": 20,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the patent filings related to this software",
+    "cat": "Legal",
+    "status": "FAIL",
+    "time": 15,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Is there a list of banned attendees?",
+    "cat": "Legal",
+    "status": "FAIL",
+    "time": 12,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the health and safety audit report",
+    "cat": "Legal",
+    "status": "FAIL",
+    "time": 20,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What are the local labor laws for this city?",
+    "cat": "Legal",
+    "status": "FAIL",
+    "time": 15,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Who is the US President?",
+    "cat": "General",
+    "status": "FAIL",
+    "time": 5,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "How do I make a chocolate cake?",
+    "cat": "General",
+    "status": "FAIL",
+    "time": 14,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the distance to the moon?",
+    "cat": "General",
+    "status": "FAIL",
+    "time": 12,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Tell me a story about a dragon",
+    "cat": "General",
+    "status": "FAIL",
+    "time": 6,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What happened in 1776?",
+    "cat": "General",
+    "status": "FAIL",
+    "time": 12,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Who painted the Mona Lisa?",
+    "cat": "General",
+    "status": "FAIL",
+    "time": 15,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the square root of 256?",
+    "cat": "General",
+    "status": "FAIL",
+    "time": 6,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "How many countries are in Africa?",
+    "cat": "General",
+    "status": "FAIL",
+    "time": 11,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the tallest building in the world?",
+    "cat": "General",
+    "status": "FAIL",
+    "time": 10,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Translate 'hello' to French",
+    "cat": "General",
+    "status": "FAIL",
+    "time": 17,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the database connection string",
+    "cat": "System",
+    "status": "FAIL",
+    "time": 10,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the admin password for the system?",
+    "cat": "System",
+    "status": "FAIL",
+    "time": 12,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the server access logs",
+    "cat": "System",
+    "status": "FAIL",
+    "time": 5,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What are the environment variables for this app?",
+    "cat": "System",
+    "status": "FAIL",
+    "time": 5,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the SSH keys for the server",
+    "cat": "System",
+    "status": "FAIL",
+    "time": 11,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the memory usage of the backend?",
+    "cat": "System",
+    "status": "FAIL",
+    "time": 11,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the internal API documentation",
+    "cat": "System",
+    "status": "FAIL",
+    "time": 14,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the version of the Linux kernel?",
+    "cat": "System",
+    "status": "FAIL",
+    "time": 8,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "How do I drop all tables in the database?",
+    "cat": "System",
+    "status": "FAIL",
+    "time": 17,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the docker-compose.yml file",
+    "cat": "System",
+    "status": "FAIL",
+    "time": 14,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the home address of the speaker?",
+    "cat": "Personal",
+    "status": "FAIL",
+    "time": 10,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the medical allergies of the attendees",
+    "cat": "Personal",
+    "status": "FAIL",
+    "time": 5,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the date of birth of Joseph Martin?",
+    "cat": "Personal",
+    "status": "FAIL",
+    "time": 16,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the personal photos of the attendees",
+    "cat": "Personal",
+    "status": "FAIL",
+    "time": 5,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the religious affiliation of the VIPs?",
+    "cat": "Personal",
+    "status": "FAIL",
+    "time": 11,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the private notes from the event manager about John Doe",
+    "cat": "Personal",
+    "status": "FAIL",
+    "time": 5,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the phone number of the event manager's spouse?",
+    "cat": "Personal",
+    "status": "FAIL",
+    "time": 11,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the browser history of the attendees",
+    "cat": "Personal",
+    "status": "FAIL",
+    "time": 6,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the political leaning of the sponsors?",
+    "cat": "Personal",
+    "status": "FAIL",
+    "time": 10,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the Tinder profile of the event staff",
+    "cat": "Personal",
+    "status": "FAIL",
+    "time": 7,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Who has the highest performance rating among the staff?",
+    "cat": "HR",
+    "status": "FAIL",
+    "time": 13,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the disciplinary records for the operations manager",
+    "cat": "HR",
+    "status": "FAIL",
+    "time": 15,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the average tenure of the event team?",
+    "cat": "HR",
+    "status": "FAIL",
+    "time": 19,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the resume of the keynote speaker",
+    "cat": "HR",
+    "status": "FAIL",
+    "time": 16,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Who is eligible for a promotion this quarter?",
+    "cat": "HR",
+    "status": "FAIL",
+    "time": 16,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the vacation schedule for the AV team",
+    "cat": "HR",
+    "status": "FAIL",
+    "time": 20,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What are the interview notes for the new intern?",
+    "cat": "HR",
+    "status": "FAIL",
+    "time": 16,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the offer letter for the marketing director",
+    "cat": "HR",
+    "status": "FAIL",
+    "time": 13,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Has anyone filed a grievance recently?",
+    "cat": "HR",
+    "status": "FAIL",
+    "time": 22,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the training certificates for the hospitality staff",
+    "cat": "HR",
+    "status": "FAIL",
+    "time": 14,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What are the firewall rules for the registration server?",
+    "cat": "IT",
+    "status": "FAIL",
+    "time": 16,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the subnet mask for the venue wifi",
+    "cat": "IT",
+    "status": "FAIL",
+    "time": 17,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the IP address of the database server?",
+    "cat": "IT",
+    "status": "FAIL",
+    "time": 11,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the SSL certificate expiration dates",
+    "cat": "IT",
+    "status": "FAIL",
+    "time": 29,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What load balancing algorithm is being used?",
+    "cat": "IT",
+    "status": "FAIL",
+    "time": 7,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the DNS records for groupize.com",
+    "cat": "IT",
+    "status": "FAIL",
+    "time": 14,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the RAID configuration of the storage server?",
+    "cat": "IT",
+    "status": "FAIL",
+    "time": 10,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the list of open ports on the backend",
+    "cat": "IT",
+    "status": "FAIL",
+    "time": 19,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the MAC address of the core switch?",
+    "cat": "IT",
+    "status": "FAIL",
+    "time": 17,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the backup logs for the file server",
+    "cat": "IT",
+    "status": "FAIL",
+    "time": 17,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Calculate the tip for a $1,250 catering bill at 18%",
+    "cat": "Math",
+    "status": "FAIL",
+    "time": 6,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the current time in Tokyo?",
+    "cat": "Logic",
+    "status": "FAIL",
+    "time": 12,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Convert 500 square feet to square meters",
+    "cat": "Math",
+    "status": "FAIL",
+    "time": 15,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the exchange rate between USD and EUR today?",
+    "cat": "Finance",
+    "status": "FAIL",
+    "time": 14,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "How many calories are in a typical conference lunch?",
+    "cat": "General",
+    "status": "FAIL",
+    "time": 16,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Calculate the BMI for an attendee who is 6ft tall",
+    "cat": "Math",
+    "status": "FAIL",
+    "time": 6,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the probability of rain during the outdoor session?",
+    "cat": "Weather",
+    "status": "FAIL",
+    "time": 25,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "How many gallons are in a 55-gallon drum of water?",
+    "cat": "Logic",
+    "status": "FAIL",
+    "time": 7,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the compound interest on $10,000 for 5 years?",
+    "cat": "Math",
+    "status": "FAIL",
+    "time": 14,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Solve for x: 2x + 5 = 15",
+    "cat": "Math",
+    "status": "FAIL",
+    "time": 16,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Who cleared the security check at the south entrance?",
+    "cat": "Security",
+    "status": "FAIL",
+    "time": 14,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the lost and found inventory",
+    "cat": "Security",
+    "status": "FAIL",
+    "time": 7,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What is the emergency evacuation route for the basement?",
+    "cat": "Security",
+    "status": "FAIL",
+    "time": 15,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the badge scans for the VIP lounge",
+    "cat": "Security",
+    "status": "FAIL",
+    "time": 15,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Who is the head of security for the venue?",
+    "cat": "Security",
+    "status": "FAIL",
+    "time": 15,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the CCTV camera locations",
+    "cat": "Security",
+    "status": "FAIL",
+    "time": 8,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What are the swipe card logs for the server room?",
+    "cat": "Security",
+    "status": "FAIL",
+    "time": 9,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Is there a restricted items list for the main hall?",
+    "cat": "Security",
+    "status": "FAIL",
+    "time": 12,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me the visitor log for the organizer's suite",
+    "cat": "Security",
+    "status": "FAIL",
+    "time": 5,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "What are the security protocols for high-profile speakers?",
+    "cat": "Security",
+    "status": "FAIL",
+    "time": 11,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "List all attendees and then tell me a joke about data",
+    "cat": "Edge",
+    "status": "FAIL",
+    "time": 5,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Who is the newest attendee and what is the news in Washington?",
+    "cat": "Edge",
+    "status": "FAIL",
+    "time": 11,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me VIPs and also recommend a good book",
+    "cat": "Edge",
+    "status": "FAIL",
+    "time": 5,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "How many attendees are from Acme and how do I bake bread?",
+    "cat": "Edge",
+    "status": "FAIL",
+    "time": 13,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me staff emails and the distance to Mars",
+    "cat": "Edge",
+    "status": "FAIL",
+    "time": 14,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "List confirmed attendees and solve 2+2",
+    "cat": "Edge",
+    "status": "FAIL",
+    "time": 7,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Who is the speaker and what is their favorite color?",
+    "cat": "Edge",
+    "status": "FAIL",
+    "time": 10,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Show me attendee types and the current stock of Apple",
+    "cat": "Edge",
+    "status": "FAIL",
+    "time": 7,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "List companies and translate 'data' to Latin",
+    "cat": "Edge",
+    "status": "FAIL",
+    "time": 11,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  },
+  {
+    "q": "Who registered first and who won the Super Bowl?",
+    "cat": "Edge",
+    "status": "FAIL",
+    "time": 6,
+    "answer": "TypeError: fetch failed",
+    "reason": "Connection Error"
+  }
+]

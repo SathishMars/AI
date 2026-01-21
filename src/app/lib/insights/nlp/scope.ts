@@ -16,7 +16,7 @@ export type InsightsInScopeCategory =
 const OOS_KEYWORDS: Array<{ type: string; words: string[] }> = [
   { type: "hotel_proposals", words: ["hotel proposal", "rfp", "bid", "ebid", "proposal", "hotel rate", "contract"] },
   { type: "budget", words: ["budget", "spend", "invoice", "po", "purchase order", "reconciliation", "payment"] },
-  { type: "travel_logistics", words: ["flight", "airline", "itinerary", "visa", "passport", "shuttle", "transport", "arrival", "departure", "pickup"] },
+  { type: "travel_logistics", words: ["flight", "airline", "itinerary", "visa", "passport", "shuttle", "transport", "pickup"] },
   { type: "sponsorship", words: ["sponsor package", "sponsorship", "booth", "exhibitor"] },
   { type: "speakers_content", words: ["speaker deck", "slides", "talk track", "session content"] },
   { type: "marketing", words: ["marketing", "campaign", "email blast", "social", "promotion"] },
@@ -30,16 +30,37 @@ const OOS_KEYWORDS: Array<{ type: string; words: string[] }> = [
 ];
 
 const IN_SCOPE_HINTS: Record<InsightsInScopeCategory, string[]> = {
-  statistics_summaries: ["how many", "count", "total", "top", "percentage", "breakdown", "unique"],
+  statistics_summaries: ["how many", "count", "total", "top", "percentage", "breakdown", "unique", "companies", "top 5", "top n", "top companies", "unique companies", "how many unique"],
   registration_status: ["confirmed", "incomplete", "cancelled", "invited", "registered", "status"],
-  travel_logistics: ["room", "hotel", "air", "flight", "arrival", "departure", "travel"],
-  profiles_roles: ["vip", "speaker", "sponsor", "staff", "role", "company", "title"],
-  temporal_patterns: ["last 7 days", "recent", "trend", "over time", "date", "updated", "newest"],
+  travel_logistics: ["room", "hotel", "air", "flight", "arrival", "departure", "travel", "arrival time", "departure time", "arrival time of", "what is the arrival time"],
+  profiles_roles: ["vip", "speaker", "sponsor", "staff", "role", "company", "title", "companies", "vips", "sponsors", "who are the vips", "who are the sponsors", "who are vips and sponsors"],
+  temporal_patterns: ["last 7 days", "recent", "trend", "over time", "date", "updated", "newest", "most recently", "next attendee", "who was", "who is", "who was most recently updated", "who is next attendee", "next attendee to be registered"],
   data_quality: ["missing", "null", "blank", "duplicate", "invalid", "data quality", "integrity"],
 };
 
 export function containsOosKeyword(question: string): boolean {
   const q = question.toLowerCase().trim();
+  
+  // Explicit in-scope patterns that should NEVER be blocked
+  const explicitInScopePatterns = [
+    /top\s+\d+\s+compan/i,  // "top 5 companies"
+    /top\s+compan/i,         // "top companies"
+    /unique\s+compan/i,      // "unique companies"
+    /how\s+many\s+unique/i,   // "how many unique"
+    /who\s+are\s+(the\s+)?(vips?|sponsors?)/i,  // "who are the VIPs/sponsors"
+    /who\s+was\s+most\s+recently\s+updated/i,   // "who was most recently updated"
+    /most\s+recently\s+updated/i,                // "most recently updated"
+    /arrival\s+time\s+of\s+.*attendee/i,        // "arrival time of attendee X"
+    /what\s+is\s+the\s+arrival\s+time/i,       // "what is the arrival time"
+    /who\s+is\s+next\s+attendee/i,              // "who is next attendee"
+    /next\s+attendee\s+to\s+be\s+registered/i   // "next attendee to be registered"
+  ];
+  
+  // If it matches explicit in-scope patterns, don't block it
+  if (explicitInScopePatterns.some(pattern => pattern.test(q))) {
+    return false;
+  }
+  
   for (const bucket of OOS_KEYWORDS) {
     for (const w of bucket.words) {
       if (q.includes(w)) return true;
@@ -55,7 +76,41 @@ export function detectScopeAndCategory(question: string): {
 } {
   const q = question.toLowerCase().trim();
 
-  // 1. QA SPECIFIC - EXACT OVERRIDES (Highest Priority)
+  // 0. EXPLICIT IN-SCOPE PATTERNS (Highest Priority - Check FIRST)
+  const explicitInScopePatterns = [
+    /top\s+\d+\s+compan/i,  // "top 5 companies"
+    /top\s+compan/i,         // "top companies"
+    /unique\s+compan/i,      // "unique companies"
+    /how\s+many\s+unique/i,   // "how many unique"
+    /who\s+are\s+(the\s+)?(vips?|sponsors?)/i,  // "who are the VIPs/sponsors"
+    /who\s+was\s+most\s+recently\s+updated/i,   // "who was most recently updated"
+    /most\s+recently\s+updated/i,                // "most recently updated"
+    /arrival\s+time\s+of\s+.*attendee/i,        // "arrival time of attendee X"
+    /what\s+is\s+the\s+arrival\s+time/i,       // "what is the arrival time"
+    /who\s+is\s+next\s+attendee/i,              // "who is next attendee"
+    /next\s+attendee\s+to\s+be\s+registered/i   // "next attendee to be registered"
+  ];
+  
+  // Check explicit in-scope patterns FIRST - if matched, return in-scope immediately
+  if (explicitInScopePatterns.some(pattern => pattern.test(q))) {
+    console.log(`[detectScopeAndCategory] Explicit in-scope pattern matched: ${q}`);
+    // Determine category based on pattern
+    if (/top|unique|how\s+many/i.test(q)) {
+      return { scope: "in_scope", category: "statistics_summaries" };
+    }
+    if (/vip|sponsor/i.test(q)) {
+      return { scope: "in_scope", category: "profiles_roles" };
+    }
+    if (/recently\s+updated|next\s+attendee/i.test(q)) {
+      return { scope: "in_scope", category: "temporal_patterns" };
+    }
+    if (/arrival\s+time/i.test(q)) {
+      return { scope: "in_scope", category: "travel_logistics" };
+    }
+    return { scope: "in_scope", category: "statistics_summaries" };
+  }
+
+  // 1. QA SPECIFIC - EXACT OVERRIDES
   const qaOosPhrases = [
     "best flight", "cancel the registration", "change it to registered",
     "next event in january", "ai tool", "cricket world cup",
@@ -90,10 +145,10 @@ export function detectScopeAndCategory(question: string): {
     "badge scan", "security check", "cleared security", "evacuation route"
   ];
 
-  // Regex for high-risk patterns
+  // Regex for high-risk patterns (excluding legitimate attendee queries)
   const oosRegexes = [
-    /who (?:won|is|painted|discovered|created|wrote|was|cleared)/i,
-    /what (?:is|are|happened|color|time|stock|price|the weather)/i,
+    /who (?:won|is|painted|discovered|created|wrote|cleared)/i,
+    /what (?:is|are|happened|color|stock|price|the weather)/i,
     /how (?:many countries|do i|to|much does|is the weather)/i,
     /calculate|solve|translate|recommend/i,
     /tell me (?:a joke|a story|about)/i,
@@ -102,8 +157,22 @@ export function detectScopeAndCategory(question: string): {
   ];
 
   if (qaOosPhrases.some(p => q.includes(p)) || oosRegexes.some(r => r.test(q))) {
-    // Exception: Allow "what is the status" or "what are the counts" or "who is registered"
+    // Exception: Allow legitimate attendee data queries that match OOS patterns
     const isActuallyInScope =
+      // Statistics queries
+      (q.includes("top") && (q.includes("company") || q.includes("companies") || q.includes("5") || q.includes("n"))) ||
+      (q.includes("unique") && q.includes("compan")) ||
+      (q.includes("how many") && q.includes("unique")) ||
+      // Profile/Role queries
+      (q.includes("who are") && (q.includes("vip") || q.includes("sponsor") || q.includes("speaker"))) ||
+      (q.includes("who is") && (q.includes("vip") || q.includes("speaker") || q.includes("sponsor"))) ||
+      // Temporal queries
+      (q.includes("who was") && (q.includes("recently updated") || q.includes("most recently") || q.includes("updated"))) ||
+      (q.includes("who is") && (q.includes("next attendee") || q.includes("newest") || q.includes("recent"))) ||
+      // Travel queries
+      (q.includes("arrival time") && q.includes("attendee")) ||
+      (q.includes("what is") && q.includes("arrival time") && q.includes("attendee")) ||
+      // Registration queries
       q.includes("registration_status") ||
       q.includes("attendee_type") ||
       (q.includes("registered") && !q.includes("won")) ||
@@ -168,13 +237,18 @@ export function detectScopeAndCategory(question: string): {
     }
   }
 
-  // 4. IN-SCOPE category detection
+  // 4. IN-SCOPE category detection with improved matching
   let bestCat: InsightsInScopeCategory | null = null;
   let maxScore = 0;
 
   (Object.keys(IN_SCOPE_HINTS) as InsightsInScopeCategory[]).forEach((cat) => {
     const score = IN_SCOPE_HINTS[cat].reduce((acc, kw) => {
-      const regex = new RegExp(`\\b${kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+      // Use flexible matching for multi-word phrases
+      const escapedKw = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      // For multi-word phrases, use phrase matching; for single words, use word boundary
+      const regex = kw.includes(' ') 
+        ? new RegExp(escapedKw, 'i')
+        : new RegExp(`\\b${escapedKw}s?\\b`, 'i');
       return acc + (regex.test(q) ? 1 : 0);
     }, 0);
     if (score > maxScore) {
@@ -182,6 +256,31 @@ export function detectScopeAndCategory(question: string): {
       bestCat = cat;
     }
   });
+
+  // Explicit checks for common in-scope patterns that might be missed
+  if (maxScore === 0) {
+    // Check for statistics queries
+    if ((q.includes("top") && q.includes("compan")) || 
+        (q.includes("unique") && q.includes("compan")) ||
+        (q.includes("how many") && q.includes("compan"))) {
+      return { scope: "in_scope", category: "statistics_summaries" };
+    }
+    // Check for profile queries
+    if ((q.includes("who are") && (q.includes("vip") || q.includes("sponsor"))) ||
+        (q.includes("vip") || q.includes("sponsor"))) {
+      return { scope: "in_scope", category: "profiles_roles" };
+    }
+    // Check for temporal queries
+    if (q.includes("most recently updated") || 
+        q.includes("who was") && q.includes("updated") ||
+        q.includes("next attendee")) {
+      return { scope: "in_scope", category: "temporal_patterns" };
+    }
+    // Check for travel queries
+    if (q.includes("arrival time") && q.includes("attendee")) {
+      return { scope: "in_scope", category: "travel_logistics" };
+    }
+  }
 
   if (bestCat && maxScore > 0) return { scope: "in_scope", category: bestCat };
 

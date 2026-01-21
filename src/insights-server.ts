@@ -1,6 +1,5 @@
-import { ApolloServer } from '@apollo/server';
-import { expressMiddleware } from '@apollo/server/express4';
-import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';
+import { createYoga } from 'graphql-yoga';
+import { makeExecutableSchema } from '@graphql-tools/schema';
 import express from 'express';
 import http from 'http';
 import cors from 'cors';
@@ -8,36 +7,43 @@ import { typeDefs, resolvers } from '@/app/api/graphql/schema';
 
 async function startServer() {
     const app = express();
-    const httpServer = http.createServer(app);
 
-    interface Context {
-        requestId: string;
-    }
-
-    // Initialize Apollo Server
-    const server = new ApolloServer<Context>({
+    // Create GraphQL schema
+    const schema = makeExecutableSchema({
         typeDefs,
         resolvers,
-        plugins: [ApolloServerPluginDrainHttpServer({ httpServer })],
     });
 
-    // Start Apollo Server
-    await server.start();
+    // Initialize GraphQL Yoga
+    const yoga = createYoga({
+        schema,
+        context: async ({ request }) => {
+            const requestId = request.headers.get("x-request-id") || crypto.randomUUID();
+            return {
+                requestId: requestId as string,
+            };
+        },
+        logging: {
+            debug: (...args) => console.log('[GraphQL Yoga Debug]', ...args),
+            info: (...args) => console.log('[GraphQL Yoga Info]', ...args),
+            warn: (...args) => console.warn('[GraphQL Yoga Warn]', ...args),
+            error: (...args) => console.error('[GraphQL Yoga Error]', ...args),
+        },
+    });
 
-    // Use Express middleware for Apollo
+    // CORS middleware
     app.use(
-        '/graphql',
         cors<cors.CorsRequest>({
             origin: process.env.CORS_ORIGIN || '*',
             credentials: true,
-        }),
-        express.json(),
-        expressMiddleware(server, {
-            context: async ({ req }: { req: express.Request }) => ({
-                requestId: (req.headers["x-request-id"] as string) || crypto.randomUUID(),
-            }),
-        }),
+        })
     );
+
+    // Parse JSON body
+    app.use(express.json());
+
+    // GraphQL endpoint - use Yoga's requestListener directly
+    app.use('/graphql', yoga.requestListener);
 
     // Health check endpoint
     app.get('/health', (req: express.Request, res: express.Response) => {
@@ -45,9 +51,10 @@ async function startServer() {
     });
 
     const port = parseInt(process.env.PORT || "4000");
+    const httpServer = http.createServer(app);
 
     await new Promise<void>((resolve) => httpServer.listen({ port, host: '0.0.0.0' }, resolve));
-    console.log(`🚀 Standalone Apollo Server running on http://localhost:${port}/graphql`);
+    console.log(`🚀 Standalone GraphQL Yoga Server running on http://localhost:${port}/graphql`);
     console.log(`💓 Health check available at http://localhost:${port}/health`);
 }
 

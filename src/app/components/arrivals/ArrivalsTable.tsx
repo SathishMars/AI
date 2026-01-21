@@ -286,7 +286,6 @@ export default function InsightsArrivalsTable({
             <thead ref={headerRef} className="bg-[#f3f4f6] sticky top-0 z-10">
               <tr className="text-left text-[12px] text-[#111827]">
                 {displayedHeaders.map((col) => {
-                  const dataType = getColumnDataType(rows, col);
                   const isSorted = sortColumn === col;
                   const isDragging = draggedColumn === col;
                   const isDragOver = dragOverColumn === col;
@@ -344,24 +343,6 @@ export default function InsightsArrivalsTable({
                             </button>
                           )}
                         </div>
-                        <span className="text-[10px] font-normal text-[#6b7280]">{dataType}</span>
-                        {onFilterChange && (
-                          <input
-                            type="text"
-                            placeholder="Filter..."
-                            value={filters[col] || ""}
-                            onChange={(e) => {
-                              const newFilters = { ...filters };
-                              if (e.target.value.trim()) {
-                                newFilters[col] = e.target.value;
-                              } else {
-                                delete newFilters[col];
-                              }
-                              onFilterChange(newFilters);
-                            }}
-                            className="mt-1 w-full rounded border border-[#e5e7eb] bg-white px-2 py-0.5 text-[10px] outline-none focus:ring-1 focus:ring-[#7c3aed]"
-                          />
-                        )}
                       </div>
                     </th>
                   );

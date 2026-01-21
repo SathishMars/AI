@@ -368,7 +368,8 @@ async function runTest(question: string, category: string, expectedScope: 'in_sc
             status: pass ? "PASS" : "FAIL",
             time: duration,
             answer: data.answer?.substring(0, 150) + (data.answer?.length > 150 ? "..." : ""),
-            reason
+            reason,
+            usage: data.meta?.usage || { promptTokens: 0, completionTokens: 0, totalTokens: 0 }
         };
     } catch (err) {
         return { q: question, cat: category, status: "FAIL", time: Date.now() - start, answer: String(err), reason: "Connection Error" };
