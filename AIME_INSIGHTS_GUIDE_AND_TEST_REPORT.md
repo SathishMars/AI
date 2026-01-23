@@ -109,11 +109,29 @@ root/
 
 Comprehensive unit tests have been implemented to ensure the reliability and safety of the Insights system.
 
-### Test Execution Summary (2025-01-01)
+### Test Execution Summary (2025-01-23)
 - **Total Tests**: 25
 - **Passed**: 25
 - **Failed**: 0
 - **Duration**: ~2.5s
+
+### Recent Updates (2025-01-23)
+- ✅ Excel export column ordering fixed - columns now match exact table order using `aoa_to_sheet`
+- ✅ Removed drag-and-drop and sorting arrows from main table (read-only display)
+- ✅ Background colors standardized to white (#FFFFFF) for main content area
+- ✅ Table header and progress indicator backgrounds restored to grey (#f3f4f6)
+- ✅ Export uses `aoa_to_sheet` for precise column ordering matching `displayedColumns`
+- ✅ 30-second timeout with progress indicator implemented
+- ✅ Export progress tracking (0-100%) with status messages
+- ✅ Error handling with retry option
+
+### Export Functionality Details
+- **Column Order Preservation**: Excel columns match exact table order using array-of-arrays approach
+- **Format**: .xlsx format only (never CSV)
+- **Timeout**: 30-second automatic timeout with user notification
+- **Progress**: Real-time progress indicator with percentage and status messages
+- **Error Recovery**: Comprehensive error handling with retry button
+- **Header Format**: Standardized Excel header rows (Event Data, timestamp, privacy notice)
 
 ### Coverage Highlights:
 1. **GraphQL Resolver Logic (`schema.test.ts`)**:

@@ -195,7 +195,7 @@ export function InsightsAimePanel() {
     return (
       <button
         onClick={() => setAimeOpen(true)}
-        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full border border-[#e5e7eb] bg-white px-4 py-3 shadow-lg hover:bg-gray-50 transition-all hover:scale-105 active:scale-95"
+        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full bg-purple-100 px-4 py-3 shadow-lg hover:bg-purple-200 transition-all hover:scale-105 active:scale-95"
       >
         <Image
           src={`${env.basePath}/aime-star.png`}
@@ -205,7 +205,7 @@ export function InsightsAimePanel() {
           className="w-5 h-5"
           unoptimized
         />
-        <span className="text-[14px] font-semibold text-[#111827]">aime</span>
+        <span className="text-[14px] font-semibold text-purple-700">Ask aime</span>
       </button>
     );
   }

@@ -1,7 +1,6 @@
 // INSIGHTS-SPECIFIC: Arrivals table component
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { insightsAttendeeColumns } from "@/app/lib/insights/data";
-import { ArrowUpDown, ArrowUp, ArrowDown, GripVertical } from "lucide-react";
 
 type ArrivalsTableProps = {
   rows: Record<string, any>[];
@@ -12,8 +11,6 @@ type ArrivalsTableProps = {
   onFilterChange?: (filters: Record<string, string>) => void;
   sortColumn?: string | null;
   sortDirection?: "asc" | "desc";
-  onSortChange?: (column: string | null, direction: "asc" | "desc") => void;
-  onColumnOrderChange?: (newOrder: string[]) => void;
   onVisibleRowsChange?: (visibleCount: number, totalCount: number) => void;
 };
 
@@ -70,14 +67,8 @@ export default function InsightsArrivalsTable({
   showAll,
   filters = {},
   onFilterChange,
-  sortColumn,
-  sortDirection = "asc",
-  onSortChange,
-  onColumnOrderChange,
   onVisibleRowsChange,
 }: ArrivalsTableProps) {
-  const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
-  const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   const [localColumnOrder, setLocalColumnOrder] = useState<string[]>(columnOrder);
   const [viewportHeight, setViewportHeight] = useState<number>(0);
   const [rowHeight, setRowHeight] = useState<number>(0);
@@ -154,95 +145,22 @@ export default function InsightsArrivalsTable({
   }, [rows, showAll, maxVisibleRows]);
 
   // Notify parent of visible row count
+  const prevVisibleCountRef = useRef<number | null>(null);
+  const prevTotalCountRef = useRef<number | null>(null);
+  
   useEffect(() => {
     if (onVisibleRowsChange) {
-      onVisibleRowsChange(visibleRows.length, rows.length);
+      const visibleCount = visibleRows.length;
+      const totalCount = rows.length;
+      
+      // Only call callback if values have actually changed
+      if (prevVisibleCountRef.current !== visibleCount || prevTotalCountRef.current !== totalCount) {
+        prevVisibleCountRef.current = visibleCount;
+        prevTotalCountRef.current = totalCount;
+        onVisibleRowsChange(visibleCount, totalCount);
+      }
     }
   }, [visibleRows.length, rows.length, onVisibleRowsChange]);
-
-  // Handle drag start
-  const handleDragStart = (e: React.DragEvent, column: string) => {
-    setDraggedColumn(column);
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", column);
-    // Add visual feedback
-    if (e.currentTarget instanceof HTMLElement) {
-      e.currentTarget.style.opacity = "0.5";
-    }
-  };
-
-  // Handle drag over
-  const handleDragOver = (e: React.DragEvent, targetColumn: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.dataTransfer.dropEffect = "move";
-
-    if (!draggedColumn || draggedColumn === targetColumn) {
-      setDragOverColumn(null);
-      return;
-    }
-
-    setDragOverColumn(targetColumn);
-
-    // Reorder columns
-    const draggedIndex = localColumnOrder.indexOf(draggedColumn);
-    const targetIndex = localColumnOrder.indexOf(targetColumn);
-
-    if (draggedIndex === -1 || targetIndex === -1) return;
-    if (draggedIndex === targetIndex) return;
-
-    const newOrder = [...localColumnOrder];
-    newOrder.splice(draggedIndex, 1);
-    newOrder.splice(targetIndex, 0, draggedColumn);
-    setLocalColumnOrder(newOrder);
-    
-    // Notify parent immediately for real-time updates
-    if (onColumnOrderChange) {
-      onColumnOrderChange(newOrder);
-    }
-  };
-
-  // Handle drag leave
-  const handleDragLeave = (e: React.DragEvent) => {
-    // Only clear dragOver if we're leaving the table area
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-      setDragOverColumn(null);
-    }
-  };
-
-  // Handle drag end
-  const handleDragEnd = (e: React.DragEvent) => {
-    // Restore opacity
-    if (e.currentTarget instanceof HTMLElement) {
-      e.currentTarget.style.opacity = "1";
-    }
-    setDraggedColumn(null);
-    setDragOverColumn(null);
-    
-    // Final update to parent
-    if (onColumnOrderChange && draggedColumn) {
-      onColumnOrderChange(localColumnOrder);
-    }
-  };
-
-  // Handle drop
-  const handleDrop = (e: React.DragEvent, targetColumn: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (!draggedColumn || draggedColumn === targetColumn) {
-      setDragOverColumn(null);
-      return;
-    }
-
-    // Final update
-    if (onColumnOrderChange) {
-      onColumnOrderChange(localColumnOrder);
-    }
-    
-    setDraggedColumn(null);
-    setDragOverColumn(null);
-  };
 
   if (loading) {
     return <div className="p-4 text-sm text-gray-500">Loading table data...</div>;
@@ -286,64 +204,12 @@ export default function InsightsArrivalsTable({
             <thead ref={headerRef} className="bg-[#f3f4f6] sticky top-0 z-10">
               <tr className="text-left text-[12px] text-[#111827]">
                 {displayedHeaders.map((col) => {
-                  const isSorted = sortColumn === col;
-                  const isDragging = draggedColumn === col;
-                  const isDragOver = dragOverColumn === col;
                   return (
                     <th
                       key={col}
-                      draggable={onColumnOrderChange !== undefined}
-                      onDragStart={(e) => handleDragStart(e, col)}
-                      onDragOver={(e) => handleDragOver(e, col)}
-                      onDragLeave={handleDragLeave}
-                      onDragEnd={handleDragEnd}
-                      onDrop={(e) => handleDrop(e, col)}
-                      className={`px-4 py-1.5 font-medium whitespace-nowrap transition-all ${
-                        isDragging ? "opacity-50" : ""
-                      } ${
-                        isDragOver ? "bg-[#e5e7eb] border-l-2 border-l-[#7c3aed]" : ""
-                      } ${
-                        onColumnOrderChange ? "cursor-move hover:bg-[#e5e7eb]" : ""
-                      }`}
+                      className="px-4 py-1.5 font-medium whitespace-nowrap"
                     >
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-1">
-                          {onColumnOrderChange && (
-                            <GripVertical className="h-3 w-3 text-[#9ca3af] cursor-grab active:cursor-grabbing flex-shrink-0" />
-                          )}
-                          <span className="capitalize">{col.replace(/_/g, " ")}</span>
-                          {onSortChange && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (isSorted) {
-                                  // Toggle direction or remove sort
-                                  if (sortDirection === "asc") {
-                                    onSortChange(col, "desc");
-                                  } else {
-                                    onSortChange(null, "asc");
-                                  }
-                                } else {
-                                  onSortChange(col, "asc");
-                                }
-                              }}
-                              className="ml-1 flex items-center text-[#6b7280] hover:text-[#111827] transition-colors"
-                              title={`Sort by ${col.replace(/_/g, " ")}`}
-                              onMouseDown={(e) => e.stopPropagation()}
-                            >
-                              {isSorted ? (
-                                sortDirection === "asc" ? (
-                                  <ArrowUp className="h-3 w-3" />
-                                ) : (
-                                  <ArrowDown className="h-3 w-3" />
-                                )
-                              ) : (
-                                <ArrowUpDown className="h-3 w-3" />
-                              )}
-                            </button>
-                          )}
-                        </div>
-                      </div>
+                      <span className="capitalize">{col.replace(/_/g, " ")}</span>
                     </th>
                   );
                 })}

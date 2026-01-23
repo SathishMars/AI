@@ -588,8 +588,12 @@ The insights pages are optimized for viewport fit:
     - Row 3: Download timestamp (e.g., "Wednesday, December 10, 2025, 6:23 AM")
     - Row 4: Privacy notice
     - Row 5: Empty
-    - Row 6: Column headers (bold, centered)
-    - Row 7+: Data rows
+    - Row 6: Column headers (in exact order matching table display)
+    - Row 7+: Data rows (columns in exact order matching table display)
+11. **Column Ordering**: Excel export columns match the exact order shown in the table (using `aoa_to_sheet` for precision)
+12. **Table Display**: Read-only table (no drag-and-drop or sorting arrows in main view)
+13. **Progress Indicator**: Real-time export progress with percentage and status messages
+14. **Timeout Protection**: 30-second automatic timeout with user notification
 
 ### API Endpoints
 
@@ -683,15 +687,17 @@ This section provides a comprehensive explanation of the AIME Insights architect
 - **Purpose**: Displays attendee data in a table format with search capabilities
 - **Key Features**:
   - **Page Title**: "Attendance Report" with "Attendance" badge
-  - **Default Display**: Shows 10 rows (fits viewport without scrolling)
+  - **Default Display**: Shows rows that fit viewport without scrolling
   - **Scrolling**: Enabled when "Show More" is clicked (for all data)
+  - **Table Display**: Read-only table (no drag-and-drop or sorting arrows)
   - **Export Buttons**: 
     - "Save to My Reports" - Saves report configuration
-    - "Export" - Exports to Excel with standardized header format
+    - "Export" - Exports to Excel with standardized header format and exact column ordering
 - **Key Functions**:
-  - `fetchArrivals(search?: string)`: Fetches attendee data via GraphQL
-  - `handleExport(direct: boolean)`: Exports data to Excel with header rows
+  - `fetchArrivals(search?: string, eventId?: number, limit?: number)`: Fetches attendee data via GraphQL
+  - `handleExport(direct: boolean)`: Exports data to Excel with header rows and exact column order matching table
   - Auto-loads data on component mount using `useEffect`
+  - Column ordering preserved in export using `aoa_to_sheet` with `displayedColumns`
 
 **`InsightsPickColumnsPanel.tsx`** - Column Selection Panel Component
 - **Purpose**: Allows users to customize which columns are displayed in the arrivals table
@@ -699,7 +705,7 @@ This section provides a comprehensive explanation of the AIME Insights architect
   - **Header**: "Pick Columns" title with close button (X icon)
   - **Search**: Search bar to filter columns by name
   - **Column List**: 
-    - Drag-and-drop reordering
+    - Drag-and-drop reordering (in panel only)
     - Checkbox selection for each column
     - Select all/none toggle
     - Shows selected count (e.g., "5/20")
@@ -712,7 +718,8 @@ This section provides a comprehensive explanation of the AIME Insights architect
   - `handleCancel()`: Closes panel and resets to original selections
   - `toggleColumn(column: string)`: Toggles individual column selection
   - `toggleAllColumns()`: Selects/deselects all columns
-  - Drag-and-drop handlers for column reordering
+  - Drag-and-drop handlers for column reordering (panel only)
+- **Note**: Main table display is read-only (no drag-and-drop or sorting in table itself)
 
 #### 2. **API Layer**
 
@@ -1204,9 +1211,9 @@ shouldShowExport([{ count: 50 }])
 // Returns: false (only 1 row)
 ```
 
-#### `handleExport(data: any[], format: "xlsx", filename: string)`
+#### `handleExport(direct: boolean)`
 
-**Purpose**: Exports data to Excel format with standardized header rows.
+**Purpose**: Exports data to Excel format with standardized header rows and exact column ordering.
 
 **Excel File Structure**:
 - **Row 1**: "Event Data"
@@ -1214,16 +1221,23 @@ shouldShowExport([{ count: 50 }])
 - **Row 3**: Download timestamp formatted as "Wednesday, December 10, 2025, 6:23 AM"
 - **Row 4**: Privacy notice: "Notice: This report may contain personally identifiable and other client confidential data. Usage and distribution of this report should be governed by relevant regulations and your own organization's policies."
 - **Row 5**: Empty row
-- **Row 6**: Column headers (bold, centered formatting)
-- **Row 7+**: Data rows
+- **Row 6**: Column headers (in exact order matching table display)
+- **Row 7+**: Data rows (columns in exact order matching table display)
 
 **Implementation**:
 1. Formats current date/time in specified format
-2. Creates worksheet from data using `XLSX.utils.json_to_sheet()`
-3. Shifts original data down by 5 rows
-4. Adds header rows at the top
-5. Copies column headers to row 6
-6. Creates workbook and writes file
+2. Builds array of arrays (`aoaData`) to ensure exact column order matching `displayedColumns`
+3. Creates worksheet using `XLSX.utils.aoa_to_sheet()` for precise column ordering
+4. Shifts original data down by 5 rows
+5. Adds header rows at the top
+6. Copies column headers to row 6 (preserving exact order)
+7. Creates workbook and writes file
+
+**Key Features**:
+- **Column Order Preservation**: Uses `aoa_to_sheet` with explicit `displayedColumns` order to ensure Excel columns match table exactly
+- **30-Second Timeout**: Automatic cancellation with user notification if export exceeds 30 seconds
+- **Progress Indicator**: Real-time progress updates (0-100%) with status messages
+- **Error Handling**: Comprehensive error handling with retry option
 
 **Example**:
 ```typescript
@@ -1554,6 +1568,10 @@ npm run lint
 - ✅ Removed "Load Attendee Data" button (data auto-loads on page mount)
 - ✅ Optimized layout to fit viewport without vertical scrolling
 - ✅ Auto-loading data on Arrivals page
+- ✅ Excel export column ordering fixed - columns now match exact table order using `aoa_to_sheet`
+- ✅ Removed drag-and-drop and sorting arrows from main table (read-only display)
+- ✅ Background colors standardized to white (#FFFFFF) for main content area
+- ✅ Table header and progress indicator backgrounds restored to grey (#f3f4f6)
 
 ---
 

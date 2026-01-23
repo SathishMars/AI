@@ -21,6 +21,15 @@ type AimeAction =
   | { type: "remove_column"; column: string }
   | null;
 
+type ExportState = {
+  status: "idle" | "exporting" | "error" | "success";
+  progress: number;
+  message: string;
+  onExport: () => void;
+  onRetry?: () => void;
+  onDismiss?: () => void;
+} | null;
+
 type InsightsUIState = {
   sidebarCollapsed: boolean;
   setSidebarCollapsed: (v: boolean) => void;
@@ -39,6 +48,9 @@ type InsightsUIState = {
   eventId: number;
   setEventId: (id: number) => void;
 
+  exportState: ExportState;
+  setExportState: (state: ExportState) => void;
+
   // when Customize is clicked anywhere -> ensure aime opens
   openAime: () => void;
 };
@@ -52,6 +64,7 @@ export function InsightsUIProvider({ children }: { children: React.ReactNode }) 
   const [pickColumnsData, setPickColumnsData] = useState<PickColumnsData>(null);
   const [aimeAction, setAimeAction] = useState<AimeAction>(null);
   const [eventId, setEventId] = useState(5281);
+  const [exportState, setExportState] = useState<ExportState>(null);
 
   const value = useMemo<InsightsUIState>(
     () => ({
@@ -67,12 +80,14 @@ export function InsightsUIProvider({ children }: { children: React.ReactNode }) 
       setAimeAction,
       eventId,
       setEventId,
+      exportState,
+      setExportState,
       openAime: () => {
         setAimeOpen(true);
         // Don't close pick columns - let user manage both panels
       },
     }),
-    [sidebarCollapsed, aimeOpen, pickColumnsOpen, pickColumnsData, aimeAction, eventId]
+    [sidebarCollapsed, aimeOpen, pickColumnsOpen, pickColumnsData, aimeAction, eventId, exportState]
   );
 
   return <InsightsUICtx.Provider value={value}>{children}</InsightsUICtx.Provider>;

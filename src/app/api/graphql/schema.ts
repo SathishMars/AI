@@ -428,7 +428,6 @@ export const resolvers = {
     },
 
     arrivals: async (_: unknown, args: { q?: string; eventId?: number; limit?: number; offset?: number }) => {
-      console.log("[GraphQL] arrivals resolver called with args:", args);
       console.time("arrivals-resolver");
 
       const eventId = args.eventId || 5281;
@@ -511,14 +510,14 @@ export const resolvers = {
       //const model = anthropic("claude-3-5-haiku-latest"); // Option: Claude 3.5 Haiku
       //const model = anthropic("claude-haiku-4-5"); // Option: Claude 4.5 Haiku
       //const model = anthropic("claude-sonnet-4-5"); // Option: Claude Sonnet 4.5 (CORRECT format - confirmed working)
-    
-      
+
+
       // OpenAI Models:
       //const model = openai("gpt-4o");                     // Option: GPT-4o (96% in-scope accuracy)
       //const model = openai("gpt-5");                      // Testing: GPT-5.0 (if available)
       //const model = openai("gpt-5-mini");                 // Option: GPT-5 Mini
       const model = openai("gpt-5.2");                     // Testing: GPT-5.2
-      
+
       // GPT-5.2 Model Selection - Try alternatives if access is restricted
       //let model = openai("gpt-5.2");                       // Primary: GPT-5.2 (REQUIRES API ACCESS)
       // Alternative GPT-5.2 variants (will be tried automatically if primary fails):
@@ -526,19 +525,22 @@ export const resolvers = {
       // - gpt-5.2-pro: Pro variant with higher reasoning effort
       // Note: Previous GPT-5.2 test results (when access was available): 76% in-scope (19/25), 91.8% overall (190/207)
       // Expected with improved prompts: ~95-100% in-scope accuracy (similar to GPT-4o improvement)
-      
+
       // Groq Models:
       //const model = groq("llama-3.3-70b-versatile");     // Option: Llama 3.3 70B
 
-      console.log(`[GraphQL Chat] Q: ${question} (Event: ${eventId})`);
+      console.log(`[Question] ${question}`);
 
       try {
         // UI Action Check
+        console.log(`[UI Action Check] Checking for UI actions...`);
         const action = detectUIAction(question);
         if (action) {
-          console.log(`[GraphQL Chat] UI Action detected:`, action);
+          console.log(`[UI Action] ${action.type}`);
+          console.log(`[Output] ${getActionConfirmationMessage(action)}`);
           return { ok: true, answer: getActionConfirmationMessage(action), meta: { scope: "ui_action", action, ms: Date.now() - start } };
         }
+        console.log(`[UI Action Check] No UI action detected`);
 
         // Scope Check - detectScopeAndCategory already has explicit in-scope pattern checks at the beginning
         const scope = detectScopeAndCategory(question);
@@ -546,13 +548,17 @@ export const resolvers = {
 
         // Check if this is an explicitly in-scope query pattern (for LLM instruction purposes)
         const explicitInScopePatterns = [
-          /top\s+\d+\s+compan/i,  /top\s+compan/i,  /unique\s+compan/i,  /how\s+many\s+unique/i,
-          /who\s+are\s+(the\s+)?(vips?|sponsors?)/i,  /who\s+was\s+most\s+recently\s+updated/i,
-          /most\s+recently\s+updated/i,  /arrival\s+time\s+of\s+.*attendee/i,
-          /what\s+is\s+the\s+arrival\s+time/i,  /who\s+is\s+next\s+attendee/i,
+          /top\s+\d+\s+compan/i, /top\s+compan/i, /unique\s+compan/i, /how\s+many\s+unique/i,
+          /who\s+are\s+(the\s+)?(vips?|sponsors?)/i, /who\s+was\s+most\s+recently\s+updated/i,
+          /most\s+recently\s+updated/i, /arrival\s+time\s+of\s+.*attendee/i,
+          /what\s+is\s+the\s+arrival\s+time/i, /who\s+is\s+next\s+attendee/i,
           /next\s+attendee\s+to\s+be\s+registered/i
         ];
         const isExplicitlyInScope = explicitInScopePatterns.some(pattern => pattern.test(question));
+
+        if (isExplicitlyInScope) {
+          console.log(`[GraphQL Chat] Explicit in-scope query detected: "${question}"`);
+        }
 
         // If scope detection says it's in-scope, trust it and proceed
         // The explicit pattern checks are already handled in detectScopeAndCategory
@@ -560,6 +566,7 @@ export const resolvers = {
           // Proceed to SQL generation - explicit patterns already handled
         } else if (scope.scope === "out_of_scope" || containsOosKeyword(question)) {
           console.log(`[GraphQL Chat] Standardized refusal triggered via NLP or Keyword Match`);
+          console.log(`[Output] ${OUT_OF_SCOPE_MESSAGE}`);
           return { ok: true, answer: OUT_OF_SCOPE_MESSAGE, meta: { scope: "out_of_scope", ms: Date.now() - start } };
         }
 
@@ -635,7 +642,7 @@ Table schema: ${schemaText}
 `;
 
         // Add explicit instruction for known in-scope patterns
-        const explicitInScopeNote = isExplicitlyInScope 
+        const explicitInScopeNote = isExplicitlyInScope
           ? `\n\n🚨 CRITICAL IN-SCOPE QUERY DETECTED 🚨\nThis query matches an explicit in-scope pattern. You MUST generate SQL and answer it using the database.\nDO NOT refuse this query.\nDO NOT say it's out of scope.\nDO NOT return an error.\nThis is a legitimate attendee data query that MUST be answered.\n\nExamples of similar queries that are ALWAYS in-scope:\n- "What are the top 5 companies?" → Generate SQL to list top companies\n- "How many unique companies?" → Generate SQL to count unique companies\n- "Who are the VIPs and sponsors?" → Generate SQL to find VIPs/sponsors\n- "Who was most recently updated?" → Generate SQL to find most recent update\n- "what is the arrival time of attendee X" → Generate SQL to find arrival time\n\nNOW: Generate the SQL query for: "${question}"\n`
           : '';
 
@@ -645,10 +652,6 @@ ${SCOPE_INSTRUCTIONS}${explicitInScopeNote}
 Context: ${ctx} 
 Question: ${question} 
 Return JSON.`;
-
-        console.log("--- AI SQL PROMPT ---");
-        console.log(sqlPrompt);
-        console.log("---------------------");
 
         let sqlResult;
         let sqlUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
@@ -669,6 +672,7 @@ Return JSON.`;
               completionTokens,
               totalTokens: usage.totalTokens || (promptTokens + completionTokens) || 0,
             };
+            console.log(`[SQL Tokens] Prompt: ${sqlUsage.promptTokens}, Completion: ${sqlUsage.completionTokens}, Total: ${sqlUsage.totalTokens}`);
             console.log('[GraphQL Chat] Captured SQL Usage:', JSON.stringify(sqlUsage, null, 2));
           } else {
             console.log('[GraphQL Chat] No usage field in sqlResult:', Object.keys(sqlResult));
@@ -678,20 +682,20 @@ Return JSON.`;
           const errorMessage = apiError?.message || String(apiError);
           const errorCode = apiError?.code || '';
           const errorString = String(apiError);
-          
-          const isApiAccessError = errorMessage.includes('does not have access to model') || 
-                                   errorCode === 'model_not_found' ||
-                                   errorMessage.includes('model_not_found') ||
-                                   errorString.includes('does not have access to model');
-          
+
+          const isApiAccessError = errorMessage.includes('does not have access to model') ||
+            errorCode === 'model_not_found' ||
+            errorMessage.includes('model_not_found') ||
+            errorString.includes('does not have access to model');
+
           if (isApiAccessError) {
             console.error(`[GraphQL Chat] API Access Error for model: ${model.modelId || 'unknown'}`);
             console.error(`[GraphQL Chat] Error details:`, errorMessage);
-            
+
             // Try alternative GPT-5.2 model names
             let alternativeModel = null;
             const modelName = model.modelId || '';
-            
+
             if (modelName.includes('gpt-5.2')) {
               // Try alternative GPT-5.2 variants
               try {
@@ -706,7 +710,7 @@ Return JSON.`;
                 console.log(`[GraphQL Chat] Alternative model also failed:`, altError);
               }
             }
-            
+
             // If we have an alternative model, try it
             if (alternativeModel) {
               try {
@@ -725,11 +729,11 @@ Return JSON.`;
                   return {
                     ok: true,
                     answer: `I'm unable to process this query because the current API key does not have access to GPT-5.2 models. Please request API access from OpenAI (may require an upgraded plan) or use an alternative model like GPT-4o which provides excellent performance (96% in-scope accuracy).`,
-                    meta: { 
-                      scope: "api_access_restricted", 
+                    meta: {
+                      scope: "api_access_restricted",
                       error: errorMessage,
                       model: modelName,
-                      ms: Date.now() - start 
+                      ms: Date.now() - start
                     }
                   };
                 }
@@ -741,11 +745,11 @@ Return JSON.`;
                 return {
                   ok: true,
                   answer: `I'm unable to process this query because the current API key does not have access to the GPT-5.2 model. Please request API access from OpenAI (may require an upgraded plan) or use an alternative model like GPT-4o which provides excellent performance (96% in-scope accuracy).`,
-                  meta: { 
-                    scope: "api_access_restricted", 
+                  meta: {
+                    scope: "api_access_restricted",
                     error: errorMessage,
                     model: modelName,
-                    ms: Date.now() - start 
+                    ms: Date.now() - start
                   }
                 };
               }
@@ -774,11 +778,14 @@ Return JSON.`;
 
             parsedSql = SqlOut.parse(JSON.parse(sanitizedText));
             isRobustParse = true;
+            console.log("[GraphQL Chat] Successfully parsed JSON using robust extraction");
           }
 
           // If AI detected a UI action, return it immediately (bypass SQL execution)
           if (parsedSql.action) {
             console.log(`[GraphQL Chat] AI-detected UI Action:`, parsedSql.action);
+            console.log(`[UI Action] ${parsedSql.action.type}`);
+            console.log(`[Output] ${getActionConfirmationMessage(parsedSql.action)}`);
             return { ok: true, answer: getActionConfirmationMessage(parsedSql.action), meta: { scope: "ui_action", action: parsedSql.action, ms: Date.now() - start } };
           }
 
@@ -791,7 +798,7 @@ Return JSON.`;
           let sql = "";
           try {
             sql = ensureSafeSelect(parsedSql.sql);
-            console.log(`[GraphQL Chat]Executing: ${sql}`);
+            console.log(`[SQL Query] ${sql}`);
             const dbRes = await queryWithTimeout(sql, [], 3000);
             rows = normalizeRows((dbRes as any).rows);
           } catch (sqlErr: any) {
@@ -819,10 +826,10 @@ Return JSON.`;
 
           // Check if this is an explicitly in-scope query pattern (for answer generation)
           const explicitInScopePatternsForAnswer = [
-            /top\s+\d+\s+compan/i,  /top\s+compan/i,  /unique\s+compan/i,  /how\s+many\s+unique/i,
-            /who\s+are\s+(the\s+)?(vips?|sponsors?)/i,  /who\s+was\s+most\s+recently\s+updated/i,
-            /most\s+recently\s+updated/i,  /arrival\s+time\s+of\s+.*attendee/i,
-            /what\s+is\s+the\s+arrival\s+time/i,  /who\s+is\s+next\s+attendee/i,
+            /top\s+\d+\s+compan/i, /top\s+compan/i, /unique\s+compan/i, /how\s+many\s+unique/i,
+            /who\s+are\s+(the\s+)?(vips?|sponsors?)/i, /who\s+was\s+most\s+recently\s+updated/i,
+            /most\s+recently\s+updated/i, /arrival\s+time\s+of\s+.*attendee/i,
+            /what\s+is\s+the\s+arrival\s+time/i, /who\s+is\s+next\s+attendee/i,
             /next\s+attendee\s+to\s+be\s+registered/i
           ];
           const isExplicitlyInScopeForAnswer = explicitInScopePatternsForAnswer.some(pattern => pattern.test(question));
@@ -893,10 +900,6 @@ Tone & Style:
 - Tone: Authoritative, efficient, and sophisticated.
 `;
 
-          console.log("--- AI ANSWER SYSTEM PROMPT ---");
-          console.log(answerSystem);
-          console.log("-------------------------------");
-
           const answerResult = await generateText({
             model,
             system: answerSystem,
@@ -916,11 +919,12 @@ Tone & Style:
               completionTokens,
               totalTokens: usage.totalTokens || (promptTokens + completionTokens) || 0,
             };
+            console.log(`[Answer Tokens] Prompt: ${answerUsage.promptTokens}, Completion: ${answerUsage.completionTokens}, Total: ${answerUsage.totalTokens}`);
             console.log('[GraphQL Chat] Captured Answer Usage:', JSON.stringify(answerUsage, null, 2));
           } else {
             console.log('[GraphQL Chat] No usage field in answerResult:', Object.keys(answerResult));
           }
-          
+
           // If this is an explicitly in-scope query and the LLM refused it, force it to answer
           if (isExplicitlyInScopeForAnswer) {
             const refusalPatterns = [
@@ -935,13 +939,13 @@ Tone & Style:
               /i cannot/i,
               /i'm unable/i
             ];
-            
+
             const isRefusal = refusalPatterns.some(pattern => pattern.test(finalAnswer.toLowerCase()));
-            
+
             // Force answer if refused OR if data exists (even if not explicitly refused)
             if ((isRefusal || rows.length > 0) && rows.length >= 0) {
               console.log(`[GraphQL Chat] Explicit in-scope query detected - ensuring answer is provided`);
-              
+
               // More aggressive forced answer generation
               const forcedAnswerSystem = `
 ${SCOPE_INSTRUCTIONS}
@@ -980,7 +984,7 @@ Provide a direct, factual answer based on the data above. If the data is empty, 
                   totalTokens: usage.totalTokens || (promptTokens + completionTokens) || 0,
                 };
               }
-              
+
               // If still refused, generate a simple answer from the data
               if (refusalPatterns.some(pattern => pattern.test(finalAnswer.toLowerCase()))) {
                 console.log(`[GraphQL Chat] LLM still refusing after forced attempt, generating direct answer`);
@@ -996,13 +1000,13 @@ Provide a direct, factual answer based on the data above. If the data is empty, 
                     finalAnswer = `${uniqueCompanies} unique companies are represented.`;
                   } else if (question.toLowerCase().includes("vip") || question.toLowerCase().includes("sponsor")) {
                     const vips = rows.filter(r => r.attendee_type?.toLowerCase().includes('vip') || r.attendee_type?.toLowerCase().includes('sponsor'));
-                    finalAnswer = vips.length > 0 
+                    finalAnswer = vips.length > 0
                       ? `Found ${vips.length} VIPs/sponsors:\n${vips.map(v => `- ${v.first_name} ${v.last_name} (${v.company_name || 'N/A'})`).join('\n')}`
                       : "No VIPs or sponsors found in the data.";
                   } else if (question.toLowerCase().includes("most recently updated")) {
                     const sorted = [...rows].sort((a, b) => new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime());
                     const mostRecent = sorted[0];
-                    finalAnswer = mostRecent 
+                    finalAnswer = mostRecent
                       ? `Most recently updated: ${mostRecent.first_name} ${mostRecent.last_name} (Updated: ${mostRecent.updated_at})`
                       : "No update information available.";
                   } else {
@@ -1014,7 +1018,7 @@ Provide a direct, factual answer based on the data above. If the data is empty, 
           }
 
           const duration = Date.now() - start;
-          console.log(`[GraphQL Chat]Completed in ${duration} ms(${(duration / 1000).toFixed(1)}s)`);
+          console.log(`[GraphQL Chat] Completed in ${duration} ms (${(duration / 1000).toFixed(1)}s)`);
 
           // Calculate total token usage
           const totalUsage = {
@@ -1022,17 +1026,19 @@ Provide a direct, factual answer based on the data above. If the data is empty, 
             completionTokens: sqlUsage.completionTokens + answerUsage.completionTokens,
             totalTokens: sqlUsage.totalTokens + answerUsage.totalTokens,
           };
+          console.log(`[Total Tokens] Prompt: ${totalUsage.promptTokens}, Completion: ${totalUsage.completionTokens}, Total: ${totalUsage.totalTokens}`);
           console.log('[GraphQL Chat] Total Token Usage:', JSON.stringify(totalUsage, null, 2));
+          console.log(`[Output] ${finalAnswer}`);
 
           return {
             ok: true,
             answer: finalAnswer,
             sql,
             rows,
-            meta: { 
-              scope: "in_scope", 
-              category: scope.category, 
-              intent: parsedSql.intent, 
+            meta: {
+              scope: "in_scope",
+              category: scope.category,
+              intent: parsedSql.intent,
               ms: duration,
               usage: totalUsage
             }
@@ -1047,20 +1053,20 @@ Provide a direct, factual answer based on the data above. If the data is empty, 
         }
       } catch (outerErr: any) {
         console.error("[GraphQL Chat Outer Error]", outerErr);
-        
+
         // Check for API access errors specifically
         const errorMessage = outerErr?.message || String(outerErr);
         const errorCode = outerErr?.code || '';
-        const isApiAccessError = errorMessage.includes('does not have access to model') || 
-                                 errorCode === 'model_not_found' ||
-                                 errorMessage.includes('model_not_found') ||
-                                 errorMessage.includes('Project') && errorMessage.includes('does not have access');
-        
+        const isApiAccessError = errorMessage.includes('does not have access to model') ||
+          errorCode === 'model_not_found' ||
+          errorMessage.includes('model_not_found') ||
+          errorMessage.includes('Project') && errorMessage.includes('does not have access');
+
         if (isApiAccessError) {
           console.error(`[GraphQL Chat] API Access Error detected for model: ${model.modelId || 'unknown'}`);
           const finalScope = detectScopeAndCategory(question);
           const isOOS = finalScope.scope === "out_of_scope" || containsOosKeyword(question);
-          
+
           if (isOOS) {
             // For OOS queries, return standard OOS message
             return { ok: true, answer: OUT_OF_SCOPE_MESSAGE, meta: { scope: "out_of_scope", ms: Date.now() - start } };
@@ -1069,16 +1075,16 @@ Provide a direct, factual answer based on the data above. If the data is empty, 
             return {
               ok: true,
               answer: `I'm unable to process this query because the current API key does not have access to the GPT-5.2 model. Please request API access from OpenAI (may require an upgraded plan) or use an alternative model like GPT-4o which provides excellent performance (96% in-scope accuracy).`,
-              meta: { 
-                scope: "api_access_restricted", 
+              meta: {
+                scope: "api_access_restricted",
                 error: errorMessage,
                 model: model.modelId || 'unknown',
-                ms: Date.now() - start 
+                ms: Date.now() - start
               }
             };
           }
         }
-        
+
         // For other errors, use standard error handling
         const finalScope = detectScopeAndCategory(question);
         const isOOS = finalScope.scope === "out_of_scope" || containsOosKeyword(question);

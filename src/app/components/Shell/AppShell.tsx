@@ -6,9 +6,12 @@ import { InsightsSidebar } from "./Sidebar";
 import { InsightsTopbar } from "./Topbar";
 import { InsightsAimePanel } from "./AimePanel";
 import { InsightsPickColumnsPanel } from "../arrivals/PickColumnsPanel";
+import { usePathname } from "next/navigation";
 
 function InsightsShellInner({ children }: { children: React.ReactNode }) {
   const { aimeOpen, pickColumnsOpen, pickColumnsData, sidebarCollapsed } = useInsightsUI();
+  const pathname = usePathname();
+  const isArrivalsPage = pathname?.includes('/arrivals');
 
   // Calculate right panel width based on which panels are open
   // If both are open, show Pick Columns (it overlays or replaces AIME temporarily)
@@ -20,7 +23,7 @@ function InsightsShellInner({ children }: { children: React.ReactNode }) {
   // - Main fills
   // - Right panel (AIME or Pick Columns) appears/disappears
   return (
-    <div className="flex h-screen w-full flex-col overflow-hidden bg-[#f5f5f7]">
+    <div className="flex h-screen w-full flex-col overflow-hidden bg-white">
       <InsightsTopbar />
 
       <div
@@ -33,7 +36,7 @@ function InsightsShellInner({ children }: { children: React.ReactNode }) {
 
         <main className="flex h-full flex-col overflow-hidden">
           {/* Main scroll area (like PNG center area) */}
-          <div className="flex-1 overflow-y-auto px-4 py-4">{children}</div>
+          <div className={`flex-1 px-4 py-4 ${isArrivalsPage ? 'overflow-hidden' : 'overflow-y-auto'}`}>{children}</div>
         </main>
 
         {/* Right panel */}

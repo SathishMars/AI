@@ -183,7 +183,7 @@ export function InsightsPickColumnsPanel({
     <aside className="flex h-full w-full flex-col border-l border-[#e5e7eb] bg-white px-3 py-3 shadow-[-4px_0_12px_-4px_rgba(0,0,0,0.05)] animate-in slide-in-from-right duration-300" ref={panelRef}>
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-[13px] font-semibold text-[#111827]">Pick Columns</h2>
+        <h2 className="text-[13px] font-semibold text-[#111827]">Configure Report</h2>
         <button
           onClick={handleCancel}
           className="flex h-8 w-8 items-center justify-center rounded-full border border-[#e5e7eb] bg-white text-[#9ca3af] hover:bg-[#f9fafb] transition-colors"
