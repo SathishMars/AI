@@ -46,6 +46,7 @@ function InsightsShellInner({ children }: { children: React.ReactNode }) {
             <InsightsPickColumnsPanel
               allColumns={pickColumnsData.allColumns}
               selectedColumns={pickColumnsData.selectedColumns}
+              columnTypes={pickColumnsData.columnTypes}
               onApply={pickColumnsData.onApply}
             />
           ) : (

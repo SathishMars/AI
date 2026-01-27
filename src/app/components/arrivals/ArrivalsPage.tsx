@@ -26,6 +26,7 @@ export default function InsightsArrivalsPage() {
   const router = useRouter();
   const [rows, setRows] = useState<Attendee[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
+  const [columnTypes, setColumnTypes] = useState<Record<string, string>>({});
   const [total, setTotal] = useState(0);
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
@@ -236,6 +237,10 @@ export default function InsightsArrivalsPage() {
         const query = `
           query Arrivals($q: String, $eventId: Int, $limit: Int!, $offset: Int!) {
             arrivalColumns
+            arrivalColumnTypes {
+              name
+              type
+            }
             arrivals(q: $q, eventId: $eventId, limit: $limit, offset: $offset) {
               total
               limit
@@ -273,23 +278,71 @@ export default function InsightsArrivalsPage() {
           }),
         });
 
+        // Check content type before parsing
+        const contentType = res.headers.get("content-type") || "";
+        const isJsonResponse = contentType.includes("application/json");
+
         if (!res.ok) {
           const errorText = await res.text();
-          console.error(`GraphQL Fetch Error (Attempt ${attempt}):`, res.status, errorText);
-          throw new Error(`Fetch failed: ${res.status}`);
+          console.error(`GraphQL Fetch Error (Attempt ${attempt}):`, res.status, contentType, errorText.substring(0, 200));
+          throw new Error(`Fetch failed: ${res.status} - ${errorText.substring(0, 100)}`);
         }
 
-        const json = await res.json();
+        // Read response body once and parse appropriately
+        let json;
+        try {
+          // Read response as text first (works for both JSON and non-JSON)
+          const responseText = await res.text();
+          
+          // Check if content type indicates JSON
+          if (!isJsonResponse) {
+            console.error(`GraphQL Response is not JSON (Attempt ${attempt}):`, contentType, responseText.substring(0, 200));
+            throw new Error(`Invalid response format: expected JSON but got ${contentType || 'unknown'}`);
+          }
+          
+          // Try to parse as JSON
+          json = JSON.parse(responseText);
+        } catch (parseError: any) {
+          // Handle different error types
+          if (parseError.message && parseError.message.includes("Invalid response format")) {
+            throw parseError; // Re-throw our custom error
+          }
+          
+          // JSON parsing failed
+          console.error(`JSON Parse Error (Attempt ${attempt}):`, parseError.message);
+          throw new Error(`Failed to parse JSON response: ${parseError.message}. Content-Type: ${contentType}`);
+        }
+        
+        // Check for GraphQL errors, but allow partial data if arrivalColumnTypes fails
         if (json.errors) {
-          console.error(`GraphQL Response Errors (Attempt ${attempt}):`, json.errors);
-          throw new Error(json.errors[0].message);
+          const criticalErrors = json.errors.filter((err: any) => 
+            !err.path?.includes('arrivalColumnTypes')
+          );
+          if (criticalErrors.length > 0) {
+            console.error(`GraphQL Response Errors (Attempt ${attempt}):`, json.errors);
+            throw new Error(criticalErrors[0].message);
+          }
+          // If only arrivalColumnTypes failed, log warning but continue
+          console.warn(`arrivalColumnTypes query failed, continuing without column types:`, json.errors);
         }
 
         const cols = json?.data?.arrivalColumns ?? [];
+        const columnTypesData = json?.data?.arrivalColumnTypes ?? [];
         const payload = json?.data?.arrivals;
         const fetchedRows = payload?.rows ?? [];
 
+        // Convert column types array to map (handle both array and null/undefined)
+        const typesMap: Record<string, string> = {};
+        if (Array.isArray(columnTypesData)) {
+          columnTypesData.forEach((item: { name: string; type: string }) => {
+            if (item && item.name && item.type) {
+              typesMap[item.name] = item.type;
+            }
+          });
+        }
+
         setColumns(cols);
+        setColumnTypes(typesMap);
         setRows(fetchedRows);
         setTotal(payload?.total ?? 0);
         setFetchStatus("success");
@@ -732,6 +785,7 @@ export default function InsightsArrivalsPage() {
               setPickColumnsData({
                 allColumns: columns,
                 selectedColumns: selectedColumns.length > 0 ? selectedColumns : columns,
+                columnTypes: columnTypes,
                 onApply: (cols) => setSelectedColumns(cols),
               });
               setPickColumnsOpen(true);

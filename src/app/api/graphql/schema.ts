@@ -392,9 +392,15 @@ export const typeDefs = /* GraphQL */ `
     history: JSON
   }
 
+  type ColumnType {
+    name: String!
+    type: String!
+  }
+
   type Query {
     arrivals(q: String, eventId: Int, limit: Int = 50, offset: Int = 0): ArrivalsResult!
     arrivalColumns: [String!]!
+    arrivalColumnTypes: [ColumnType!]!
   }
 
   type Mutation {
@@ -424,6 +430,74 @@ export const resolvers = {
       } catch (err) {
         console.error("DB Columns Fetch Failed, using fallback:", err);
         return insightsAttendeeColumns;
+      }
+    },
+
+    arrivalColumnTypes: async () => {
+      try {
+        const { getInsightsPool } = await import("@/app/lib/insights/db");
+        const pool = getInsightsPool();
+        if (!pool) {
+          console.warn("Database pool not available, using fallback column types");
+          throw new Error("Database pool not available");
+        }
+
+        // Query for columns (works for both tables and views)
+        const sql = `
+          SELECT column_name, data_type
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'attendee'
+            AND column_name NOT IN ('id', 'event_id', 'parent_id')
+          ORDER BY ordinal_position;
+        `;
+        
+        const result = await pool.query(sql);
+        const rows = result?.rows || [];
+        
+        if (rows.length === 0) {
+          console.warn("No columns found in information_schema, using fallback");
+          throw new Error("No columns found");
+        }
+        
+        const columnTypes = rows.map((r: { column_name: string; data_type: string }) => ({
+          name: r.column_name,
+          type: r.data_type || 'character varying', // Ensure type is never null
+        }));
+        
+        return columnTypes;
+      } catch (err: any) {
+        console.error("DB Column Types Fetch Failed:", err?.message || err);
+        // Return fallback with inferred types from GraphQL schema
+        const fallbackTypes: Array<{ name: string; type: string }> = [
+          { name: 'first_name', type: 'character varying' },
+          { name: 'middle_name', type: 'character varying' },
+          { name: 'last_name', type: 'character varying' },
+          { name: 'email', type: 'character varying' },
+          { name: 'phone', type: 'character varying' },
+          { name: 'mobile', type: 'character varying' },
+          { name: 'title', type: 'character varying' },
+          { name: 'mailing_address', type: 'character varying' },
+          { name: 'city', type: 'character varying' },
+          { name: 'state', type: 'character varying' },
+          { name: 'postal_code', type: 'character varying' },
+          { name: 'country', type: 'character varying' },
+          { name: 'company_name', type: 'character varying' },
+          { name: 'prefix', type: 'character varying' },
+          { name: 'employee_id', type: 'character varying' },
+          { name: 'concur_login_id', type: 'character varying' },
+          { name: 'attendee_type', type: 'character varying' },
+          { name: 'companion_count', type: 'integer' },
+          { name: 'emergency_contact', type: 'character varying' },
+          { name: 'registration_status', type: 'character varying' },
+          { name: 'manual_status', type: 'character varying' },
+          { name: 'room_status', type: 'character varying' },
+          { name: 'air_status', type: 'character varying' },
+          { name: 'created_at', type: 'timestamp without time zone' },
+          { name: 'updated_at', type: 'timestamp without time zone' },
+          { name: 'internal_notes', type: 'character varying' },
+        ];
+        return fallbackTypes;
       }
     },
 
@@ -728,7 +802,7 @@ Return JSON.`;
                 if (scope.scope === "in_scope") {
                   return {
                     ok: true,
-                    answer: `I'm unable to process this query because the current API key does not have access to GPT-5.2 models. Please request API access from OpenAI (may require an upgraded plan) or use an alternative model like GPT-4o which provides excellent performance (96% in-scope accuracy).`,
+                    answer: `I'm unable to process this query because the current API key does not have access to the ${modelName || 'requested'} model. Please request API access from OpenAI (may require an upgraded plan) or use an alternative model like GPT-4o which provides excellent performance (96% in-scope accuracy).`,
                     meta: {
                       scope: "api_access_restricted",
                       error: errorMessage,
@@ -744,7 +818,7 @@ Return JSON.`;
               if (scope.scope === "in_scope") {
                 return {
                   ok: true,
-                  answer: `I'm unable to process this query because the current API key does not have access to the GPT-5.2 model. Please request API access from OpenAI (may require an upgraded plan) or use an alternative model like GPT-4o which provides excellent performance (96% in-scope accuracy).`,
+                  answer: `I'm unable to process this query because the current API key does not have access to the ${modelName || 'requested'} model. Please request API access from OpenAI (may require an upgraded plan) or use an alternative model like GPT-4o which provides excellent performance (96% in-scope accuracy).`,
                   meta: {
                     scope: "api_access_restricted",
                     error: errorMessage,
@@ -1072,13 +1146,14 @@ Provide a direct, factual answer based on the data above. If the data is empty, 
             return { ok: true, answer: OUT_OF_SCOPE_MESSAGE, meta: { scope: "out_of_scope", ms: Date.now() - start } };
           } else {
             // For in-scope queries, provide helpful API access error message
+            const failedModel = model.modelId || 'requested';
             return {
               ok: true,
-              answer: `I'm unable to process this query because the current API key does not have access to the GPT-5.2 model. Please request API access from OpenAI (may require an upgraded plan) or use an alternative model like GPT-4o which provides excellent performance (96% in-scope accuracy).`,
+              answer: `I'm unable to process this query because the current API key does not have access to the ${failedModel} model. Please request API access from OpenAI (may require an upgraded plan) or use an alternative model like GPT-4o which provides excellent performance (96% in-scope accuracy).`,
               meta: {
                 scope: "api_access_restricted",
                 error: errorMessage,
-                model: model.modelId || 'unknown',
+                model: failedModel,
                 ms: Date.now() - start
               }
             };

@@ -9,15 +9,20 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 type PickColumnsPanelProps = {
   allColumns: string[];
   selectedColumns: string[];
+  columnTypes?: Record<string, string>; // Map of column name to data type
   onApply: (columns: string[]) => void;
 };
 
 export function InsightsPickColumnsPanel({
   allColumns,
   selectedColumns,
+  columnTypes = {},
   onApply,
 }: PickColumnsPanelProps) {
-  const { pickColumnsOpen, setPickColumnsOpen } = useInsightsUI();
+  const { pickColumnsOpen, setPickColumnsOpen, pickColumnsData } = useInsightsUI();
+  
+  // Use columnTypes from props, or fallback to pickColumnsData if available
+  const effectiveColumnTypes = columnTypes || pickColumnsData?.columnTypes || {};
   const [searchQuery, setSearchQuery] = useState("");
   const [localSelectedColumns, setLocalSelectedColumns] = useState<string[]>(selectedColumns);
   const [columnOrder, setColumnOrder] = useState<string[]>(allColumns); // Track order of all columns
@@ -130,6 +135,15 @@ export function InsightsPickColumnsPanel({
     } else {
       setLocalSelectedColumns([...allColumns]);
     }
+  };
+
+  // Format column name for display - capitalize first letter of each word
+  const formatColumnDisplayName = (column: string): string => {
+    return column
+      .replace(/_/g, " ")
+      .split(" ")
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ");
   };
 
   // Get data source info for a column
@@ -263,8 +277,27 @@ export function InsightsPickColumnsPanel({
               const isSelected = localSelectedColumns.includes(column);
               const isDragging = draggedColumn === column;
               const isDragOver = dragOverColumn === column && !isDragging;
-              const columnDisplayName = column.replace(/_/g, " ");
+              const columnDisplayName = formatColumnDisplayName(column);
               const dataSource = getColumnDataSource(column);
+              const columnDataType = effectiveColumnTypes[column];
+              
+              // Format data type for display (e.g., "character varying" -> "Varchar", "timestamp without time zone" -> "Timestamp")
+              const formatDataType = (type: string): string => {
+                if (!type) return '';
+                const typeMap: Record<string, string> = {
+                  'character varying': 'varchar',
+                  'character': 'char',
+                  'timestamp without time zone': 'timestamp',
+                  'timestamp with time zone': 'timestamptz',
+                  'double precision': 'float',
+                  'numeric': 'decimal',
+                  'boolean': 'bool',
+                };
+                const mappedType = typeMap[type.toLowerCase()] || type.toLowerCase();
+                // Capitalize first letter
+                return mappedType.charAt(0).toUpperCase() + mappedType.slice(1);
+              };
+              const displayType = columnDataType ? formatDataType(columnDataType) : '';
 
               return (
                 <div
@@ -284,7 +317,7 @@ export function InsightsPickColumnsPanel({
                   role="listitem"
                 >
                   {/* Drag Handle */}
-                  <div className="text-[#9ca3af] cursor-move" aria-hidden="true">
+                  <div className="text-[#9ca3af] cursor-move flex-shrink-0" aria-hidden="true">
                     <GripVertical className="h-4 w-4" strokeWidth={2} />
                   </div>
 
@@ -295,7 +328,7 @@ export function InsightsPickColumnsPanel({
                         type="checkbox"
                         checked={isSelected}
                         onChange={() => toggleColumn(column)}
-                        className="h-4 w-4 rounded border-[#d1d5db] text-[#7c3aed] focus:ring-2 focus:ring-[#7c3aed]"
+                        className="h-4 w-4 rounded border-[#d1d5db] text-[#7c3aed] focus:ring-2 focus:ring-[#7c3aed] flex-shrink-0"
                         style={{ accentColor: '#7c3aed' }}
                         aria-label={`${isSelected ? 'Hide' : 'Show'} ${columnDisplayName} column`}
                         aria-describedby={`column-${index}-description`}
@@ -304,26 +337,46 @@ export function InsightsPickColumnsPanel({
                     <TooltipContent side="right" className="max-w-xs">
                       <div className="text-xs">
                         <div className="font-semibold mb-1">{columnDisplayName}</div>
-                        <div className="text-[#6b7280]">{dataSource}</div>
+                        <div className="text-[#6b7280] mb-1">{dataSource}</div>
+                        {columnDataType && (
+                          <div className="text-[#9ca3af] font-mono text-[10px]">
+                            Type: {columnDataType}
+                          </div>
+                        )}
                       </div>
                     </TooltipContent>
                   </Tooltip>
 
-                  {/* Column Name with Tooltip */}
+                  {/* Column Name with Data Type */}
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <span 
-                        className="flex-1 text-[11px] text-[#374151] cursor-pointer"
+                      <div 
+                        className="flex-1 flex items-center justify-between gap-2 min-w-0 cursor-pointer"
                         onClick={() => toggleColumn(column)}
                         id={`column-${index}-description`}
                       >
-                        {columnDisplayName}
-                      </span>
+                        <span className="text-[11px] text-[#374151] font-medium truncate">
+                          {columnDisplayName}
+                        </span>
+                        {columnDataType && displayType && (
+                          <span 
+                            className="text-[9px] text-[#6b7280] font-mono whitespace-nowrap flex-shrink-0"
+                            title={`Data type: ${columnDataType}`}
+                          >
+                            {displayType}
+                          </span>
+                        )}
+                      </div>
                     </TooltipTrigger>
                     <TooltipContent side="right" className="max-w-xs">
                       <div className="text-xs">
                         <div className="font-semibold mb-1">{columnDisplayName}</div>
-                        <div className="text-[#6b7280]">{dataSource}</div>
+                        <div className="text-[#6b7280] mb-1">{dataSource}</div>
+                        {columnDataType && (
+                          <div className="text-[#9ca3af] font-mono text-[10px]">
+                            Type: {columnDataType}
+                          </div>
+                        )}
                       </div>
                     </TooltipContent>
                   </Tooltip>

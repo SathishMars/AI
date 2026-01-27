@@ -8,6 +8,7 @@ import React, { createContext, useContext, useMemo, useState } from "react";
 type PickColumnsData = {
   allColumns: string[];
   selectedColumns: string[];
+  columnTypes?: Record<string, string>; // Map of column name to data type
   onApply: (columns: string[]) => void;
 } | null;
 
