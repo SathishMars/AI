@@ -14,12 +14,16 @@ type PickColumnsData = {
 
 type AimeAction =
   | { type: "reorder_column"; column: string; position?: number; afterColumn?: string; beforeColumn?: string; index?: number }
+  | { type: "swap_columns"; column1: string; column2: string }
+  | { type: "list_columns" }
+  | { type: "undo_column_reorder" }
   | { type: "filter"; column: string; value: string }
   | { type: "clear_filter"; column?: string }
   | { type: "sort"; column: string; direction: "asc" | "desc" }
   | { type: "clear_sort" }
   | { type: "reset_columns" }
   | { type: "remove_column"; column: string }
+  | { type: "error"; message: string; suggestions?: string[] }
   | null;
 
 type ExportState = {

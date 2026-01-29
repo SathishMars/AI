@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import InsightsArrivalsTable from "./ArrivalsTable";
+import { Toast, useToast } from "@/components/ui/toast";
 import { InsightsPickColumnsPanel } from "./PickColumnsPanel";
 import { useInsightsUI } from "@/app/lib/insights/ui-store";
 import { Upload, Search, ChevronLeft, Columns3, User, FileDown, Lock, CheckCircle2, Users } from "lucide-react";
@@ -45,6 +46,56 @@ export default function InsightsArrivalsPage() {
   const [visibleRowCount, setVisibleRowCount] = useState<number>(0);
   const [commandError, setCommandError] = useState<string | null>(null);
   const [globalSearchQuery, setGlobalSearchQuery] = useState<string>("");
+  const [columnOrderHistory, setColumnOrderHistory] = useState<string[][]>([]); // For undo functionality
+  const [highlightedColumns, setHighlightedColumns] = useState<string[]>([]); // For visual feedback
+  const [lastReorderAction, setLastReorderAction] = useState<{ type: string; columns: string[] } | null>(null); // For undo
+  const { toast, showToast, dismissToast } = useToast();
+
+  // Helper function to calculate Levenshtein distance for fuzzy matching
+  const levenshteinDistance = (str1: string, str2: string): number => {
+    const matrix: number[][] = [];
+    for (let i = 0; i <= str2.length; i++) {
+      matrix[i] = [i];
+    }
+    for (let j = 0; j <= str1.length; j++) {
+      matrix[0][j] = j;
+    }
+    for (let i = 1; i <= str2.length; i++) {
+      for (let j = 1; j <= str1.length; j++) {
+        if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1,
+            matrix[i][j - 1] + 1,
+            matrix[i - 1][j] + 1
+          );
+        }
+      }
+    }
+    return matrix[str2.length][str1.length];
+  };
+
+  // Helper function to find close matches for column names
+  const findCloseMatches = (columnName: string, availableColumns: string[]): string[] => {
+    const normalized = columnName.toLowerCase().replace(/_/g, " ");
+    const matches: Array<{ column: string; distance: number }> = [];
+    
+    availableColumns.forEach(col => {
+      const colNormalized = col.toLowerCase().replace(/_/g, " ");
+      const distance = levenshteinDistance(normalized, colNormalized);
+      // Also check if column name contains the search term or vice versa
+      const containsMatch = colNormalized.includes(normalized) || normalized.includes(colNormalized);
+      if (distance <= 3 || containsMatch) {
+        matches.push({ column: col, distance });
+      }
+    });
+    
+    return matches
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, 3)
+      .map(m => m.column.replace(/_/g, " "));
+  };
 
   // Helper function to validate column exists
   const validateColumn = (columnName: string, availableColumns: string[]): boolean => {
@@ -56,6 +107,32 @@ export default function InsightsArrivalsPage() {
     return selectedColumns.length > 0 ? selectedColumns : columns;
   };
 
+  // Load column order from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedOrder = localStorage.getItem('arrivalsColumnOrder');
+      if (savedOrder) {
+        const parsed = JSON.parse(savedOrder);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setSelectedColumns(parsed);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load column order from localStorage:', e);
+    }
+  }, []);
+
+  // Save column order to localStorage when it changes
+  useEffect(() => {
+    if (selectedColumns.length > 0) {
+      try {
+        localStorage.setItem('arrivalsColumnOrder', JSON.stringify(selectedColumns));
+      } catch (e) {
+        console.error('Failed to save column order to localStorage:', e);
+      }
+    }
+  }, [selectedColumns]);
+
   // Handle AIME actions
   useEffect(() => {
     if (!aimeAction) return;
@@ -66,34 +143,109 @@ export default function InsightsArrivalsPage() {
     switch (aimeAction.type) {
       case "reorder_column": {
         const { column, position, afterColumn, beforeColumn } = aimeAction;
+        const availableCols = getAvailableColumns();
+        
+        // Validate column exists
+        if (!validateColumn(column, availableCols)) {
+          const suggestions = findCloseMatches(column, availableCols);
+          const errorMsg = suggestions.length > 0
+            ? `Column "${column.replace(/_/g, " ")}" not found. Did you mean: ${suggestions.join(", ")}?`
+            : `Column "${column.replace(/_/g, " ")}" not found. Available columns: ${availableCols.slice(0, 5).map(c => c.replace(/_/g, " ")).join(", ")}${availableCols.length > 5 ? "..." : ""}`;
+          setCommandError(errorMsg);
+          setAimeAction(null);
+          return;
+        }
+
         setSelectedColumns((prev) => {
-          const newCols = [...prev];
+          const newCols = prev.length > 0 ? [...prev] : [...availableCols];
           const colIndex = newCols.indexOf(column);
           if (colIndex === -1) return prev;
 
-          newCols.splice(colIndex, 1);
+          // Calculate target index
+          let targetIndex = -1;
+          if (position === 0) {
+            targetIndex = 0;
+          } else if (position === -1) {
+            targetIndex = newCols.length - 1;
+          } else if (afterColumn) {
+            const afterIndex = newCols.indexOf(afterColumn);
+            if (afterIndex !== -1) {
+              targetIndex = afterIndex + 1;
+            } else {
+              // Target column not found, push to end
+              targetIndex = newCols.length;
+            }
+          } else if (beforeColumn) {
+            const beforeIndex = newCols.indexOf(beforeColumn);
+            if (beforeIndex !== -1) {
+              targetIndex = beforeIndex;
+            } else {
+              // Target column not found, push to front
+              targetIndex = 0;
+            }
+          } else if (aimeAction.index !== undefined) {
+            targetIndex = Math.max(0, Math.min(aimeAction.index, newCols.length));
+          }
 
+          // Check if already in requested position
+          if (targetIndex !== -1 && colIndex === targetIndex) {
+            // Column already in position - acknowledge but don't change
+            setCommandError(`The "${column.replace(/_/g, " ")}" column is already in that position.`);
+            setAimeAction(null);
+            return prev;
+          }
+
+          // Save current state to history for undo
+          setColumnOrderHistory(prevHistory => [...prevHistory, [...prev]]);
+          setLastReorderAction({ type: "reorder", columns: [column, afterColumn || beforeColumn || ""].filter(Boolean) });
+
+          // Perform reorder
+          newCols.splice(colIndex, 1);
           if (position === 0) {
             newCols.unshift(column);
+            targetIndex = 0;
           } else if (position === -1) {
             newCols.push(column);
+            targetIndex = newCols.length - 1;
           } else if (afterColumn) {
             const afterIndex = newCols.indexOf(afterColumn);
             if (afterIndex !== -1) {
               newCols.splice(afterIndex + 1, 0, column);
+              targetIndex = afterIndex + 1;
             } else {
               newCols.push(column);
+              targetIndex = newCols.length - 1;
             }
           } else if (beforeColumn) {
             const beforeIndex = newCols.indexOf(beforeColumn);
             if (beforeIndex !== -1) {
               newCols.splice(beforeIndex, 0, column);
+              targetIndex = beforeIndex;
             } else {
               newCols.unshift(column);
+              targetIndex = 0;
             }
           } else if (aimeAction.index !== undefined) {
-            newCols.splice(aimeAction.index, 0, column);
+            const safeIndex = Math.max(0, Math.min(aimeAction.index, newCols.length));
+            newCols.splice(safeIndex, 0, column);
+            targetIndex = safeIndex;
           }
+
+          // Highlight moved columns
+          const columnsToHighlight = [column, afterColumn || beforeColumn || ""].filter(Boolean);
+          setHighlightedColumns(columnsToHighlight);
+          setTimeout(() => setHighlightedColumns([]), 2000);
+
+          // Show toast with undo option
+          const undoAction = () => {
+            if (columnOrderHistory.length > 0) {
+              const previousOrder = columnOrderHistory[columnOrderHistory.length - 1];
+              setColumnOrderHistory(prev => prev.slice(0, -1));
+              setSelectedColumns(previousOrder);
+              setLastReorderAction(null);
+            }
+          };
+          showToast(`Column "${column.replace(/_/g, " ")}" moved successfully.`, undoAction);
 
           return newCols;
         });
@@ -148,11 +300,95 @@ export default function InsightsArrivalsPage() {
         });
         break;
       }
+      case "swap_columns": {
+        const { column1, column2 } = aimeAction;
+        const availableCols = getAvailableColumns();
+        
+        // Validate both columns exist
+        if (!validateColumn(column1, availableCols)) {
+          const suggestions = findCloseMatches(column1, availableCols);
+          setCommandError(suggestions.length > 0
+            ? `Column "${column1.replace(/_/g, " ")}" not found. Did you mean: ${suggestions.join(", ")}?`
+            : `Column "${column1.replace(/_/g, " ")}" not found.`);
+          setAimeAction(null);
+          return;
+        }
+        if (!validateColumn(column2, availableCols)) {
+          const suggestions = findCloseMatches(column2, availableCols);
+          setCommandError(suggestions.length > 0
+            ? `Column "${column2.replace(/_/g, " ")}" not found. Did you mean: ${suggestions.join(", ")}?`
+            : `Column "${column2.replace(/_/g, " ")}" not found.`);
+          setAimeAction(null);
+          return;
+        }
+
+        setSelectedColumns((prev) => {
+          const newCols = prev.length > 0 ? [...prev] : [...availableCols];
+          const idx1 = newCols.indexOf(column1);
+          const idx2 = newCols.indexOf(column2);
+          
+          if (idx1 !== -1 && idx2 !== -1 && idx1 !== idx2) {
+            // Save to history for undo
+            setColumnOrderHistory(prevHistory => [...prevHistory, [...prev]]);
+            setLastReorderAction({ type: "swap", columns: [column1, column2] });
+            
+            // Swap columns
+            [newCols[idx1], newCols[idx2]] = [newCols[idx2], newCols[idx1]];
+            
+            // Highlight swapped columns
+            setHighlightedColumns([column1, column2]);
+            setTimeout(() => setHighlightedColumns([]), 2000);
+            
+            // Show toast with undo option
+            const undoAction = () => {
+              if (columnOrderHistory.length > 0) {
+                const previousOrder = columnOrderHistory[columnOrderHistory.length - 1];
+                setColumnOrderHistory(prev => prev.slice(0, -1));
+                setSelectedColumns(previousOrder);
+                setLastReorderAction(null);
+              }
+            };
+            showToast(`Swapped "${column1.replace(/_/g, " ")}" and "${column2.replace(/_/g, " ")}" columns.`, undoAction);
+            
+            return newCols;
+          }
+          return prev;
+        });
+        break;
+      }
+      case "list_columns": {
+        const currentOrder = getAvailableColumns();
+        const formattedList = currentOrder.map((col, idx) => 
+          `${idx + 1}. ${col.replace(/_/g, " ")}`
+        ).join(", ");
+        // Show as informational message, not error
+        showToast(`Current column order: ${formattedList}`);
+        setAimeAction(null);
+        return;
+      }
+      case "undo_column_reorder": {
+        if (columnOrderHistory.length > 0) {
+          const previousOrder = columnOrderHistory[columnOrderHistory.length - 1];
+          setColumnOrderHistory(prev => prev.slice(0, -1));
+          setSelectedColumns(previousOrder);
+          setLastReorderAction(null);
+          setCommandError("Column order has been restored to the previous state.");
+        } else {
+          setCommandError("No previous column order to restore.");
+        }
+        setAimeAction(null);
+        return;
+      }
+      case "error": {
+        setCommandError(aimeAction.message);
+        setAimeAction(null);
+        return;
+      }
     }
 
     // Clear the action after processing
     setAimeAction(null);
-  }, [aimeAction, setAimeAction]);
+  }, [aimeAction, setAimeAction, columns]);
 
 
   // Apply filters, global search, and sorting to rows
@@ -209,7 +445,224 @@ export default function InsightsArrivalsPage() {
 
   // Pass all processed rows to table - it will handle viewport height limiting
   const displayedRows = processedRows;
-  const displayedColumns = selectedColumns.length > 0 ? selectedColumns : columns;
+  // Always show all columns from the dataset if selectedColumns is empty
+  const displayedColumns = selectedColumns.length > 0 ? selectedColumns : (columns.length > 0 ? columns : []);
+  
+  // Ref for hide bar overlay
+  const hideBarOverlayRef = useRef<HTMLDivElement>(null);
+  
+  const mainContainerRef = useRef<HTMLDivElement>(null);
+  const tableAreaRef = useRef<HTMLDivElement>(null);
+  
+  // Debug info removed for production
+  
+
+  // CRITICAL: Continuously monitor and fix wrapper div heights
+  const wrapperDivRef = useRef<HTMLDivElement | null>(null);
+  const innerWrapperDivRef = useRef<HTMLDivElement | null>(null);
+  
+  
+  useEffect(() => {
+    const fixWrapperHeights = () => {
+      // Fix outer wrapper div (line 1677)
+      if (wrapperDivRef.current && tableAreaRef.current) {
+        const tableAreaRect = tableAreaRef.current.getBoundingClientRect();
+        const wrapperRect = wrapperDivRef.current.getBoundingClientRect();
+        const computedStyle = window.getComputedStyle(wrapperDivRef.current);
+        
+        const needsFix = wrapperRect.height < tableAreaRect.height - 5;
+        const targetHeight = tableAreaRect.height;
+        
+        // ALWAYS force fix if height is less than parent (with 5px tolerance)
+        if (needsFix) {
+          wrapperDivRef.current.style.setProperty('height', `${targetHeight}px`, 'important');
+          wrapperDivRef.current.style.setProperty('max-height', `${targetHeight}px`, 'important');
+          wrapperDivRef.current.style.setProperty('min-height', '0', 'important');
+        }
+      }
+      
+      // Fix inner wrapper div (line 1711) - this is the GrandParent
+      if (innerWrapperDivRef.current && wrapperDivRef.current) {
+        const wrapperRect = wrapperDivRef.current.getBoundingClientRect();
+        const innerRect = innerWrapperDivRef.current.getBoundingClientRect();
+        const computedStyle = window.getComputedStyle(innerWrapperDivRef.current);
+        const parentComputedStyle = window.getComputedStyle(wrapperDivRef.current);
+        
+        const needsFix = innerRect.height < wrapperRect.height - 5;
+        const targetHeight = wrapperRect.height;
+        
+        // ALWAYS force fix if height is less than parent (with 5px tolerance)
+        let fixApplied = false;
+        let fixOverridden = false;
+        
+        if (needsFix) {
+          // CRITICAL: Set min-height FIRST to force expansion, then height
+          // This ensures the element expands even if content is smaller
+          innerWrapperDivRef.current.style.setProperty('min-height', `${targetHeight}px`, 'important');
+          innerWrapperDivRef.current.style.setProperty('height', `${targetHeight}px`, 'important');
+          innerWrapperDivRef.current.style.setProperty('max-height', `${targetHeight}px`, 'important');
+          
+          // Remove all constraints
+          innerWrapperDivRef.current.style.setProperty('padding-top', '0', 'important');
+          innerWrapperDivRef.current.style.setProperty('padding-bottom', '0', 'important');
+          innerWrapperDivRef.current.style.setProperty('margin-top', '0', 'important');
+          innerWrapperDivRef.current.style.setProperty('margin-bottom', '0', 'important');
+          
+          // Force flex to fill - use flex-basis instead of just flex
+          innerWrapperDivRef.current.style.setProperty('flex', '1 1 0%', 'important');
+          innerWrapperDivRef.current.style.setProperty('flex-basis', `${targetHeight}px`, 'important');
+          innerWrapperDivRef.current.style.setProperty('flex-grow', '1', 'important');
+          innerWrapperDivRef.current.style.setProperty('flex-shrink', '0', 'important');
+          
+          // Also ensure display and box-sizing
+          innerWrapperDivRef.current.style.setProperty('display', 'flex', 'important');
+          innerWrapperDivRef.current.style.setProperty('box-sizing', 'border-box', 'important');
+          
+          fixApplied = true;
+          
+          // Verify fix was applied - check multiple times
+          setTimeout(() => {
+            if (!innerWrapperDivRef.current) return;
+            const newRect = innerWrapperDivRef.current.getBoundingClientRect();
+            if (Math.abs(newRect.height - targetHeight) > 5) {
+              fixOverridden = true;
+              // Try even more aggressive fix
+              innerWrapperDivRef.current.style.setProperty('min-height', `${targetHeight}px`, 'important');
+              innerWrapperDivRef.current.style.setProperty('height', `${targetHeight}px`, 'important');
+            }
+          }, 10);
+          
+          // Double-check after a longer delay
+          setTimeout(() => {
+            if (!innerWrapperDivRef.current) return;
+            const newRect = innerWrapperDivRef.current.getBoundingClientRect();
+            if (Math.abs(newRect.height - targetHeight) > 5) {
+              // Last resort: try setting it again
+              innerWrapperDivRef.current.style.setProperty('min-height', `${targetHeight}px`, 'important');
+              innerWrapperDivRef.current.style.setProperty('height', `${targetHeight}px`, 'important');
+            }
+          }, 50);
+        }
+        
+      }
+    };
+    
+    // Fix immediately and continuously every 50ms (more frequent)
+    // Use multiple timeouts to ensure refs are set
+    fixWrapperHeights();
+    const t1 = setTimeout(fixWrapperHeights, 50);
+    const t2 = setTimeout(fixWrapperHeights, 100);
+    const t3 = setTimeout(fixWrapperHeights, 200);
+    const t4 = setTimeout(fixWrapperHeights, 500);
+    const t5 = setTimeout(fixWrapperHeights, 1000);
+    const interval = setInterval(fixWrapperHeights, 100);
+    
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      clearTimeout(t4);
+      clearTimeout(t5);
+      clearInterval(interval);
+    };
+  }, [loading, fetchStatus, rows.length]);
+  
+  // Position hide bar overlay above horizontal scrollbar
+  useEffect(() => {
+    if (!showAll) {
+      const adjustOverlayPosition = () => {
+        const overlay = hideBarOverlayRef.current;
+        if (!overlay) {
+          setTimeout(adjustOverlayPosition, 100);
+          return;
+        }
+        
+        // Find scrollbar element
+        const tableWrapper = document.querySelector('.custom-horizontal-scrollbar') as HTMLElement;
+        let scrollbarRect: DOMRect | null = null;
+        
+        if (tableWrapper) {
+          scrollbarRect = tableWrapper.getBoundingClientRect();
+          
+          // Check if scrollbar is actually visible
+          const scrollbarVisible = tableWrapper.scrollWidth > tableWrapper.clientWidth;
+          if (!scrollbarVisible) {
+            scrollbarRect = null;
+          }
+        }
+        
+        const container = overlay.parentElement;
+        const containerRect = container?.getBoundingClientRect();
+        
+        // Dynamically adjust overlay position to sit just above horizontal scrollbar
+        if (scrollbarRect && containerRect) {
+          const gap = 2; // Small gap between overlay bottom and scrollbar top
+          const scrollbarBottom = scrollbarRect.bottom;
+          const estimatedScrollbarHeight = 18; // Typical scrollbar height
+          const scrollbarTop = scrollbarBottom - estimatedScrollbarHeight;
+          const targetOverlayBottom = scrollbarTop - gap;
+          
+          // Calculate bottom value relative to container
+          const targetBottom = containerRect.bottom - targetOverlayBottom;
+          
+          // Clamp to reasonable values
+          const minBottom = 0;
+          const maxBottom = containerRect.height - 220; // Overlay height is 220px
+          const clampedBottom = Math.max(minBottom, Math.min(targetBottom, maxBottom));
+          
+          // Only adjust if difference is significant (> 1px) and value is reasonable
+          const currentBottom = parseFloat(overlay.style.bottom) || 20;
+          if (Math.abs(currentBottom - clampedBottom) > 1 && clampedBottom >= 0 && clampedBottom <= containerRect.height) {
+            overlay.style.setProperty('bottom', `${clampedBottom}px`, 'important');
+          }
+        }
+      };
+      
+      // Wait for DOM to be ready, then adjust
+      const timeoutId = setTimeout(adjustOverlayPosition, 100);
+      
+      // Update on resize/scroll
+      window.addEventListener('resize', adjustOverlayPosition);
+      window.addEventListener('scroll', adjustOverlayPosition);
+      
+      // Also check periodically
+      const interval = setInterval(adjustOverlayPosition, 500);
+      
+      return () => {
+        clearTimeout(timeoutId);
+        window.removeEventListener('resize', adjustOverlayPosition);
+        window.removeEventListener('scroll', adjustOverlayPosition);
+        clearInterval(interval);
+      };
+    }
+  }, [showAll]);
+  // Handle column order change from table drag-and-drop
+  const handleColumnOrderChange = useCallback((newOrder: string[]) => {
+    // Save to history for undo
+    setColumnOrderHistory(prevHistory => [...prevHistory, [...selectedColumns]]);
+    setLastReorderAction({ type: "reorder", columns: newOrder });
+    
+    // Update selected columns with new order
+    setSelectedColumns(newOrder);
+    
+    // Highlight changed columns
+    const changedColumns = newOrder.filter((col, idx) => displayedColumns[idx] !== col);
+    if (changedColumns.length > 0) {
+      setHighlightedColumns(changedColumns);
+      setTimeout(() => setHighlightedColumns([]), 2000);
+      
+      // Show toast with undo option
+      const undoAction = () => {
+        if (columnOrderHistory.length > 0) {
+          const previousOrder = columnOrderHistory[columnOrderHistory.length - 1];
+          setColumnOrderHistory(prev => prev.slice(0, -1));
+          setSelectedColumns(previousOrder);
+          setLastReorderAction(null);
+        }
+      };
+      showToast(`Column order updated.`, undoAction);
+    }
+  }, [selectedColumns, displayedColumns, columnOrderHistory, showToast]);
 
   // Auto-load data on component mount or eventId change (debounced)
   useEffect(() => {
@@ -385,7 +838,43 @@ export default function InsightsArrivalsPage() {
     }, 30000);
 
     try {
-      let dataToExport = processedRows;
+      // For export, ignore global search filter but keep other filters and sorting
+      // Start with all rows (not processedRows which includes globalSearchQuery)
+      let dataToExport = [...rows];
+      
+      // Apply filters (but NOT global search)
+      Object.entries(filters).forEach(([column, value]) => {
+        if (value.trim()) {
+          dataToExport = dataToExport.filter(row => {
+            const cellValue = String(row[column] || "").toLowerCase();
+            return cellValue.includes(value.toLowerCase());
+          });
+        }
+      });
+
+      // Apply sorting
+      if (sortColumn) {
+        dataToExport.sort((a, b) => {
+          const aVal = a[sortColumn];
+          const bVal = b[sortColumn];
+
+          // Handle null/undefined
+          if (aVal == null && bVal == null) return 0;
+          if (aVal == null) return 1;
+          if (bVal == null) return -1;
+
+          // Compare values
+          let comparison = 0;
+          if (typeof aVal === 'number' && typeof bVal === 'number') {
+            comparison = aVal - bVal;
+          } else {
+            comparison = String(aVal).localeCompare(String(bVal));
+          }
+
+          return sortDirection === "asc" ? comparison : -comparison;
+        });
+      }
+
       const needsFullFetch = total > rows.length;
 
       // Ensure we have all data if there's more on the server than in memory
@@ -398,7 +887,7 @@ export default function InsightsArrivalsPage() {
           setExportProgress(40);
 
           if (direct || needsFullFetch) {
-            // Re-apply local filters if they exist to the newly fetched data
+            // Re-apply local filters (but NOT global search) to the newly fetched data
             let filtered = [...fetched];
             Object.entries(filters).forEach(([column, value]) => {
               if (value.trim()) {
@@ -407,6 +896,28 @@ export default function InsightsArrivalsPage() {
                 );
               }
             });
+            
+            // Apply sorting
+            if (sortColumn) {
+              filtered.sort((a, b) => {
+                const aVal = a[sortColumn];
+                const bVal = b[sortColumn];
+
+                if (aVal == null && bVal == null) return 0;
+                if (aVal == null) return 1;
+                if (bVal == null) return -1;
+
+                let comparison = 0;
+                if (typeof aVal === 'number' && typeof bVal === 'number') {
+                  comparison = aVal - bVal;
+                } else {
+                  comparison = String(aVal).localeCompare(String(bVal));
+                }
+
+                return sortDirection === "asc" ? comparison : -comparison;
+              });
+            }
+            
             dataToExport = filtered;
           }
           setExportProgress(50);
@@ -529,7 +1040,7 @@ export default function InsightsArrivalsPage() {
       setExportProgress(100);
       setExportMessage("Export complete!");
       
-      console.log("Export complete!");
+      // Export complete (removed debug logging)
       
       // Show success notification
       setExportStatus("success");
@@ -546,7 +1057,7 @@ export default function InsightsArrivalsPage() {
       console.error("Export Error Caught:", err);
 
       if (err?.name === 'AbortError' || err?.message === 'Export cancelled') {
-        console.log("Export was cancelled or timed out");
+        // Export was cancelled or timed out (removed debug logging)
       } else {
         const errorMessage = err?.message || String(err) || "An unexpected error occurred during export.";
         setExportStatus("error");
@@ -555,7 +1066,7 @@ export default function InsightsArrivalsPage() {
     } finally {
       clearTimeout(timeoutId);
     }
-  }, [exportStatus, processedRows, total, rows.length, q, eventId, filters, displayedColumns, fetchArrivals, setExportStatus, setExportProgress, setExportMessage, setShowExportSuccess]);
+  }, [exportStatus, total, rows, q, eventId, filters, sortColumn, sortDirection, displayedColumns, fetchArrivals, setExportStatus, setExportProgress, setExportMessage, setShowExportSuccess]);
 
   // Sync export state to UI store for Topbar
   const prevExportStateRef = useRef<{ status: string; progress: number; message: string } | null>(null);
@@ -613,7 +1124,21 @@ export default function InsightsArrivalsPage() {
   return (
     <>
       {/* Main Content */}
-      <div className="flex max-w-full flex-col" style={{ marginTop: '0px', paddingTop: '0', height: 'calc(100vh - 56px)', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#FFFFFF' }}>
+      <div 
+        ref={mainContainerRef} 
+        className="flex max-w-full flex-col" 
+        style={{ 
+          marginTop: '0px', 
+          paddingTop: '0', 
+          height: 'calc(100vh - 56px)', 
+          maxHeight: 'calc(100vh - 56px)', // CRITICAL: Prevent overflow
+          overflow: 'hidden', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          background: '#FFFFFF',
+          boxSizing: 'border-box'
+        }}
+      >
       {/* PageHeader */}
       <div className="flex flex-row items-end p-0 gap-6 flex-shrink-0" style={{ width: '100%', height: '64px', marginTop: '0', paddingTop: '0' }}>
         {/* Left Container */}
@@ -703,7 +1228,7 @@ export default function InsightsArrivalsPage() {
             </div>
             <Input
               className="flex-1 border-none bg-transparent p-0 outline-none flex-none"
-              placeholder="Search across all columns (Ctrl+F)"
+              placeholder="Search (Ctrl+F)"
               value={globalSearchQuery}
               onChange={(e) => {
                 const value = e.target.value;
@@ -724,7 +1249,7 @@ export default function InsightsArrivalsPage() {
                   setGlobalSearchQuery("");
                 }
               }}
-              aria-label="Search across all columns in the report"
+              aria-label="Search"
               aria-describedby={globalSearchQuery ? "search-results-count" : undefined}
               style={{
                 fontFamily: "'Open Sans', sans-serif",
@@ -843,7 +1368,7 @@ export default function InsightsArrivalsPage() {
       )}
 
       {/* Table Area */}
-      <div className="flex-1 min-h-0 overflow-hidden" style={{ height: '100%', maxHeight: '100%' }}>
+      <div ref={tableAreaRef} className="flex-1 min-h-0 overflow-hidden" style={{ flex: '1 1 0%', minHeight: 0, height: '100%', maxHeight: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', position: 'relative', zIndex: 0 }}>
         {loading ? (
           <div className="p-4 text-center text-gray-500">
             <div className="flex flex-col items-center gap-2">
@@ -881,9 +1406,21 @@ export default function InsightsArrivalsPage() {
             </div>
           </div>
         ) : rows.length > 0 ? (
-          <div className={`h-full relative ${showAll ? 'overflow-auto' : 'overflow-hidden'}`} style={{ height: '100%', maxHeight: '100%', overflow: showAll ? 'auto' : 'hidden' }}>
+          <div 
+            className={`h-full relative flex flex-col`} 
+            style={{ flex: '1 1 0%', minHeight: 0, height: '100%', maxHeight: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}
+            ref={(el) => {
+              wrapperDivRef.current = el;
+              // CRITICAL: Force height to 100% via direct DOM manipulation
+              if (el) {
+                el.style.setProperty('height', '100%', 'important');
+                el.style.setProperty('max-height', '100%', 'important');
+                el.style.setProperty('min-height', '0', 'important');
+              }
+            }}
+          >
             {globalSearchQuery && processedRows.length === 0 ? (
-              <div className="flex flex-col items-center justify-center p-8 text-center" style={{ height: '200px' }}>
+              <div className="flex flex-col items-center justify-center p-8 text-center" style={{ height: '200px', flexShrink: 0 }}>
                 <Search className="w-12 h-12 mb-4" style={{ color: '#9ca3af', strokeWidth: 1.5 }} />
                 <p className="text-lg font-medium" style={{ color: '#374151', marginBottom: '8px' }}>
                   No results found
@@ -893,63 +1430,181 @@ export default function InsightsArrivalsPage() {
                 </p>
               </div>
             ) : (
-              <InsightsArrivalsTable
-                rows={displayedRows}
-                columnOrder={displayedColumns}
-                loading={loading}
-                showAll={showAll}
-                filters={filters}
-                onFilterChange={setFilters}
-                onVisibleRowsChange={handleVisibleRowsChange}
-              />
-            )}
-            {/* Dimming overlay - only show when showAll is false */}
-            {!showAll && (
               <div 
-                className="absolute bottom-0 left-0 right-0 pointer-events-none z-10"
-                style={{
-                  height: '260px',
-                  minHeight: '260px',
-                  background: 'linear-gradient(180deg, rgba(255, 255, 255, 0) 0.32%, #FFFFFF 73.64%)',
-                  display: 'flex',
-                  alignItems: 'flex-end',
-                  justifyContent: 'center',
-                  paddingBottom: '48px',
-                  boxSizing: 'border-box'
+                className="flex-1 min-h-0 relative" 
+                style={{ 
+                  flex: '1 1 0%', 
+                  minHeight: '100%', // CRITICAL: Set to 100% to force expansion
+                  overflow: 'visible', 
+                  height: '100%', 
+                  maxHeight: '100%', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  boxSizing: 'border-box', 
+                  width: '100%',
+                  // CRITICAL: Ensure this div fills the parent completely
+                  position: 'relative',
+                  zIndex: 0, // Ensure table content is below overlay (z-index: 5)
+                  // Remove any padding/margin that might constrain height
+                  paddingTop: 0,
+                  paddingBottom: 0,
+                  marginTop: 0,
+                  marginBottom: 0,
+                  // Force flex properties
+                  flexGrow: 1,
+                  flexShrink: 0,
+                  flexBasis: '100%'
+                }}
+                ref={(el) => {
+                  innerWrapperDivRef.current = el;
+                  // CRITICAL: Force height to match parent via direct DOM manipulation
+                  if (el) {
+                    const parent = el.parentElement;
+                    if (parent) {
+                      const parentRect = parent.getBoundingClientRect();
+                      const targetHeight = parentRect.height;
+                      
+                      // Set min-height FIRST to force expansion
+                      el.style.setProperty('min-height', `${targetHeight}px`, 'important');
+                      el.style.setProperty('height', `${targetHeight}px`, 'important');
+                      el.style.setProperty('max-height', `${targetHeight}px`, 'important');
+                      
+                      // Remove all constraints
+                      el.style.setProperty('padding-top', '0', 'important');
+                      el.style.setProperty('padding-bottom', '0', 'important');
+                      el.style.setProperty('margin-top', '0', 'important');
+                      el.style.setProperty('margin-bottom', '0', 'important');
+                      
+                      // Force flex properties
+                      el.style.setProperty('flex', '1 1 0%', 'important');
+                      el.style.setProperty('flex-basis', `${targetHeight}px`, 'important');
+                      el.style.setProperty('flex-grow', '1', 'important');
+                      el.style.setProperty('flex-shrink', '0', 'important');
+                      
+                      // Ensure display
+                      el.style.setProperty('display', 'flex', 'important');
+                      el.style.setProperty('box-sizing', 'border-box', 'important');
+                      
+                      // Use ResizeObserver to maintain height
+                      const resizeObserver = new ResizeObserver(() => {
+                        if (el && parent) {
+                          const newParentRect = parent.getBoundingClientRect();
+                          const currentRect = el.getBoundingClientRect();
+                          if (Math.abs(currentRect.height - newParentRect.height) > 5) {
+                            el.style.setProperty('min-height', `${newParentRect.height}px`, 'important');
+                            el.style.setProperty('height', `${newParentRect.height}px`, 'important');
+                          }
+                        }
+                      });
+                      resizeObserver.observe(parent);
+                      resizeObserver.observe(el);
+                    }
+                  }
                 }}
               >
-                {/* Text container */}
+                <InsightsArrivalsTable
+                  rows={displayedRows}
+                  columnOrder={displayedColumns}
+                  loading={loading}
+                  showAll={showAll}
+                  filters={filters}
+                  onFilterChange={setFilters}
+                  onVisibleRowsChange={handleVisibleRowsChange}
+                  onColumnOrderChange={handleColumnOrderChange}
+                  highlightedColumns={highlightedColumns}
+                  onDebugInfoChange={undefined}
+                />
+              </div>
+            )}
+            {/* Hide bar overlay - only show when showAll is false */}
+            {!showAll && (
+              <div 
+                ref={hideBarOverlayRef}
+                className="absolute left-0 right-0 pointer-events-none"
+                style={{
+                  // Position overlay just above horizontal scrollbar TOP (not bottom)
+                  // This ensures scrollbar is fully visible below the overlay
+                  // Will be adjusted dynamically in useEffect to position above scrollbar.top
+                  bottom: '20px', // Initial value - will be adjusted dynamically to sit above scrollbar top
+                  width: '100%',
+                  height: '220px', // Fixed height as per design
+                  // Smooth fade-out gradient: starts transparent at top, gradually becomes opaque white at bottom
+                  // Made VERY aggressive for maximum visibility - starts fading immediately and reaches full opacity quickly
+                  // This creates a strong dimming effect that should be clearly visible
+                  // Use only backgroundImage (not background shorthand) to avoid React warnings
+                  // TEMPORARY TEST: Using a colored gradient to verify gradient is rendering
+                  // If you can see red/yellow/blue fade, the gradient works - we'll change back to white
+                  // backgroundImage: 'linear-gradient(180deg, rgba(255, 0, 0, 0) 0%, rgba(255, 255, 0, 0.5) 50%, rgba(0, 0, 255, 1) 100%)',
+                  
+                  // Gradient optimized for ~4 rows fade (220px height / ~30px per row = ~7 rows visible, fade last 4)
+                  // Start fading at ~60% (where 4th row from bottom begins), reach full opacity at bottom
+                  // This creates a visible dimming effect on the last 4 rows
+                  backgroundImage: 'linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0) 60%, rgba(255, 255, 255, 0.30) 70%, rgba(255, 255, 255, 0.60) 80%, rgba(255, 255, 255, 0.85) 90%, rgba(255, 255, 255, 0.95) 95%, #FFFFFF 100%)',
+                  backgroundColor: 'transparent', // Set background color separately to avoid conflicts
+                  // Also add backdrop-filter for additional dimming effect
+                  backdropFilter: 'blur(0px)', // No blur, just using for browser compatibility hint
+                  WebkitBackdropFilter: 'blur(0px)',
+                  position: 'absolute',
+                  left: 0,
+                  zIndex: 5, // Above table content (z-index: auto/0) but below scrollbar (z-index: 10) so gradient overlays rows
+                  overflow: 'visible', // Allow content to be visible through gradient
+                  opacity: 1,
+                  pointerEvents: 'none', // Ensure overlay doesn't block scrollbar interactions
+                  // Ensure overlay is in correct stacking context
+                  isolation: 'isolate' // Create new stacking context to ensure z-index works correctly
+                }}
+              >
+                {/* Text container - positioned at top: 142px as per design */}
                 <div 
-                  className="flex flex-col items-center gap-1.5"
                   style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    padding: 0,
+                    gap: '6px',
+                    position: 'absolute',
                     width: '348px',
-                    paddingTop: '0',
-                    paddingBottom: '0'
+                    height: 'auto',
+                    minHeight: '58px',
+                    left: 'calc(50% - 174px)', // Center: calc(50% - 348px/2)
+                    top: '142px'
                   }}
                 >
                   {/* Lock icon */}
-                  <Lock className="w-5 h-5 flex-none" style={{ color: '#637584', strokeWidth: 1.5, height: '20px', width: '20px' }} />
+                  <Lock 
+                    className="flex-none" 
+                    style={{ 
+                      color: '#637584', 
+                      strokeWidth: 1.5, 
+                      height: '20px', 
+                      width: '20px',
+                      flex: 'none',
+                      order: 0,
+                      flexGrow: 0
+                    }} 
+                  />
+                  
                   {/* Message text */}
                   <div 
-                    className="w-[348px] text-center"
                     style={{
+                      width: '348px',
+                      height: '32px',
                       fontFamily: 'Open Sans, sans-serif',
                       fontStyle: 'normal',
                       fontWeight: 400,
                       fontSize: '12px',
                       lineHeight: '16px',
+                      textAlign: 'center',
                       color: '#637584',
+                      flex: 'none',
+                      order: 1,
+                      flexGrow: 0,
                       whiteSpace: 'normal',
-                      wordWrap: 'break-word',
-                      minHeight: '36px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'center',
-                      alignItems: 'center'
+                      wordWrap: 'break-word'
                     }}
                   >
-                    <span>This view shows a subset of the data.</span>
-                    <span>Download the report to see all results!</span>
+                    This view shows a subset of the data.<br />
+                    Download the report to see all results!
                   </div>
                 </div>
               </div>
@@ -1007,6 +1662,15 @@ export default function InsightsArrivalsPage() {
           </div>
         </div>
       )}
+      {/* Toast notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          onUndo={toast.onUndo}
+          onDismiss={dismissToast}
+        />
+      )}
+
     </>
   );
 }

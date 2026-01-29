@@ -3,7 +3,7 @@
 
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useInsightsUI } from "@/app/lib/insights/ui-store";
-import { Search, ChevronDown, GripVertical, X, Loader2 } from "lucide-react";
+import { Search, ChevronDown, X, Loader2 } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 type PickColumnsPanelProps = {
@@ -27,8 +27,6 @@ export function InsightsPickColumnsPanel({
   const [localSelectedColumns, setLocalSelectedColumns] = useState<string[]>(selectedColumns);
   const [columnOrder, setColumnOrder] = useState<string[]>(allColumns); // Track order of all columns
   const [categoryExpanded, setCategoryExpanded] = useState(true);
-  const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
-  const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -72,48 +70,6 @@ export function InsightsPickColumnsPanel({
     return columnOrder.filter(col => col.toLowerCase().includes(query));
   }, [columnOrder, searchQuery]);
 
-  // Handle drag start
-  const handleDragStart = (column: string) => {
-    setDraggedColumn(column);
-  };
-
-  // Handle drag over
-  const handleDragOver = (e: React.DragEvent, targetColumn: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (!draggedColumn || draggedColumn === targetColumn) {
-      setDragOverColumn(null);
-      return;
-    }
-
-    setDragOverColumn(targetColumn);
-
-    // Reorder all columns (both selected and unselected)
-    const draggedIndex = columnOrder.indexOf(draggedColumn);
-    const targetIndex = columnOrder.indexOf(targetColumn);
-
-    if (draggedIndex === -1 || targetIndex === -1) return;
-
-    // Only update if position actually changed
-    if (draggedIndex === targetIndex) return;
-
-    const newOrder = [...columnOrder];
-    newOrder.splice(draggedIndex, 1);
-    newOrder.splice(targetIndex, 0, draggedColumn);
-    setColumnOrder(newOrder);
-  };
-
-  // Handle drag leave
-  const handleDragLeave = () => {
-    setDragOverColumn(null);
-  };
-
-  // Handle drag end
-  const handleDragEnd = () => {
-    setDraggedColumn(null);
-    setDragOverColumn(null);
-  };
 
   // Calculate selected count
   const selectedCount = localSelectedColumns.length;
@@ -275,8 +231,6 @@ export function InsightsPickColumnsPanel({
           <div id="column-list" className="space-y-1 mt-1" role="group" aria-label="Column list">
             {filteredColumns.map((column, index) => {
               const isSelected = localSelectedColumns.includes(column);
-              const isDragging = draggedColumn === column;
-              const isDragOver = dragOverColumn === column && !isDragging;
               const columnDisplayName = formatColumnDisplayName(column);
               const dataSource = getColumnDataSource(column);
               const columnDataType = effectiveColumnTypes[column];
@@ -303,23 +257,9 @@ export function InsightsPickColumnsPanel({
                 <div
                   key={column}
                   ref={(el) => { columnRefs.current[index] = el; }}
-                  draggable={true}
-                  onDragStart={() => handleDragStart(column)}
-                  onDragOver={(e) => handleDragOver(e, column)}
-                  onDragLeave={handleDragLeave}
-                  onDragEnd={handleDragEnd}
-                  className={`flex items-center gap-2 py-1.5 rounded-xl px-3 border border-[#e5e7eb] bg-[#f9fafb] transition-all ${isDragging
-                      ? 'opacity-50 cursor-grabbing'
-                      : isDragOver
-                        ? 'bg-[#ede9fe] border-[#7c3aed]'
-                        : 'hover:bg-[#f3f4f6] cursor-move'
-                    }`}
+                  className="flex items-center gap-2 py-1.5 rounded-xl px-3 border border-[#e5e7eb] bg-[#f9fafb] transition-all hover:bg-[#f3f4f6]"
                   role="listitem"
                 >
-                  {/* Drag Handle */}
-                  <div className="text-[#9ca3af] cursor-move flex-shrink-0" aria-hidden="true">
-                    <GripVertical className="h-4 w-4" strokeWidth={2} />
-                  </div>
 
                   {/* Checkbox */}
                   <Tooltip>

@@ -206,6 +206,31 @@ function detectUIAction(question: string): any {
     console.log(`[detectUIAction] No move pattern matched`);
   }
 
+  // 2b. Swap columns
+  if (q.includes("swap")) {
+    const swapMatch = q.match(/swap\s+(.+?)\s+(?:and|with)\s+(.+)/i);
+    if (swapMatch) {
+      console.log(`[detectUIAction] Matched: swap columns`);
+      return { 
+        type: "swap_columns", 
+        column1: normalizeColumnName(swapMatch[1]), 
+        column2: normalizeColumnName(swapMatch[2]) 
+      };
+    }
+  }
+
+  // 2c. List/Show column order
+  if (q.match(/(?:list|show|display)\s+(?:current\s+)?(?:column\s+)?(?:order|columns)/i)) {
+    console.log(`[detectUIAction] Matched: list columns`);
+    return { type: "list_columns" };
+  }
+
+  // 2d. Undo column reorder
+  if (q.match(/undo\s+(?:last\s+)?(?:change|reorder|column\s+order|column\s+reorder)/i)) {
+    console.log(`[detectUIAction] Matched: undo column reorder`);
+    return { type: "undo_column_reorder" };
+  }
+
   // 3. Filter
   const filterMatch = q.match(/(?:show|filter|display|only)\s+(?:only\s+)?(?:attendees|records|rows|data)\s+(?:from|with|where|that\s+have|that\s+are)\s+(.+?)(?:\s+companies?|\s+status|\s+type)?$/i);
   if (filterMatch) {
@@ -327,6 +352,12 @@ function getActionConfirmationMessage(action: any): string {
       if (action.beforeColumn) return `I've moved the "${col}" column before "${action.beforeColumn.replace(/_/g, " ")}".`;
       if (action.index !== undefined) return `I've moved the "${col}" column to position ${action.index + 1}.`;
       return `I've reordered the "${col}" column.`;
+    case "swap_columns":
+      return `I've swapped the positions of "${action.column1?.replace(/_/g, " ")}" and "${action.column2?.replace(/_/g, " ")}" columns.`;
+    case "list_columns":
+      return `I'll show you the current column order.`;
+    case "undo_column_reorder":
+      return `I've restored the column order to the previous state.`;
     case "filter": return `I've applied a filter: showing only records where "${col}" contains "${action.value}".`;
     case "clear_filter": return `I've cleared all filters.`;
     case "sort": return `I've sorted the data by "${col}" in ${action.direction === "asc" ? "ascending" : "descending"} order.`;
@@ -588,9 +619,8 @@ export const resolvers = {
 
       // OpenAI Models:
       //const model = openai("gpt-4o");                     // Option: GPT-4o (96% in-scope accuracy)
-      //const model = openai("gpt-5");                      // Testing: GPT-5.0 (if available)
       //const model = openai("gpt-5-mini");                 // Option: GPT-5 Mini
-      const model = openai("gpt-5.2");                     // Testing: GPT-5.2
+     const model = openai("gpt-5.2");                     // Testing: GPT-5.2
 
       // GPT-5.2 Model Selection - Try alternatives if access is restricted
       //let model = openai("gpt-5.2");                       // Primary: GPT-5.2 (REQUIRES API ACCESS)

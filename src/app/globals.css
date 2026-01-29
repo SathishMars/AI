@@ -233,4 +233,56 @@
     }
 
   }
+
+  /* Custom horizontal scrollbar styling - ensures visibility */
+  .custom-horizontal-scrollbar {
+    scrollbar-width: thin !important;
+    scrollbar-color: #94a3b8 #f1f5f9 !important; /* Darker thumb for better visibility */
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    max-height: 100% !important; /* Force 100% - no calc subtraction */
+  }
+
+  .custom-horizontal-scrollbar::-webkit-scrollbar {
+    height: 18px !important; /* Slightly taller for better visibility */
+    display: block !important;
+    -webkit-appearance: none;
+    position: relative;
+    z-index: 20 !important; /* Ensure scrollbar appears above overlay */
+    background: transparent !important;
+  }
+
+  .custom-horizontal-scrollbar::-webkit-scrollbar-track {
+    background: #f1f5f9 !important;
+    border-radius: 0 !important; /* Full width track */
+    border: 1px solid #e2e8f0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .custom-horizontal-scrollbar::-webkit-scrollbar-thumb {
+    background: #94a3b8 !important; /* Darker by default for visibility */
+    border-radius: 9px !important;
+    min-width: 40px !important;
+    border: 2px solid #f1f5f9 !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15) !important; /* Stronger shadow */
+  }
+
+  .custom-horizontal-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #64748b !important; /* Even darker on hover */
+  }
+
+  .custom-horizontal-scrollbar::-webkit-scrollbar-thumb:active {
+    background: #475569 !important; /* Darkest when active */
+  }
+  
+  /* Force scrollbar to always be visible when content overflows */
+  .custom-horizontal-scrollbar:not(:hover)::-webkit-scrollbar-thumb {
+    background: #94a3b8 !important; /* Darker when not hovering for better visibility */
+  }
+  
+  /* Ensure scrollbar is always visible when there's overflow */
+  .custom-horizontal-scrollbar:has(> *:first-child)::-webkit-scrollbar {
+    display: block !important;
+  }
 }
