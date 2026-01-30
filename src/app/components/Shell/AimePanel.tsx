@@ -143,6 +143,7 @@ export function InsightsAimePanel() {
     setIsTyping(true);
 
     try {
+      // No timeout - allow queries to complete regardless of duration
       const response = await apiFetch("/api/graphql", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -169,7 +170,30 @@ export function InsightsAimePanel() {
         }),
       });
 
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Chat API HTTP error:", response.status, response.statusText, errorText);
+        
+        // Check for timeout status codes
+        if (response.status === 504 || response.status === 408) {
+          push("assistant", ERROR_MESSAGES.TIMEOUT_ERROR);
+        } else {
+          push("assistant", ERROR_MESSAGES.SERVICE_UNAVAILABLE);
+        }
+        return;
+      }
+
       const resJson = await response.json();
+      console.log("Chat API response:", { status: response.status, hasData: !!resJson.data, hasChat: !!resJson.data?.chat, errors: resJson.errors });
+      
+      // Check for GraphQL errors
+      if (resJson.errors && resJson.errors.length > 0) {
+        console.error("GraphQL errors:", resJson.errors);
+        const errorMessage = resJson.errors[0]?.message || "Unknown GraphQL error";
+        push("assistant", `Error: ${errorMessage}`);
+        return;
+      }
+      
       const data = resJson.data?.chat;
 
       if (data && data.ok) {
@@ -181,11 +205,47 @@ export function InsightsAimePanel() {
           setAimeAction(data.meta.action);
         }
       } else {
-        push("assistant", ERROR_MESSAGES.PROCESSING_ERROR);
+        console.error("Chat API data error:", { data, resJson });
+        push("assistant", data?.answer || ERROR_MESSAGES.PROCESSING_ERROR);
       }
     } catch (error) {
       console.error("Chat API error:", error);
-      push("assistant", ERROR_MESSAGES.SERVICE_UNAVAILABLE);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorName = error instanceof Error ? error.name : '';
+      
+      // Detect timeout errors
+      const isTimeout = 
+        errorName === 'AbortError' ||
+        errorMessage.includes('timeout') ||
+        errorMessage.includes('Timeout') ||
+        errorMessage.includes('timed out') ||
+        errorMessage.includes('ETIMEDOUT') ||
+        errorMessage.includes('network timeout');
+      
+      // Detect network errors
+      const isNetworkError =
+        errorMessage.includes('Failed to fetch') ||
+        errorMessage.includes('NetworkError') ||
+        errorMessage.includes('network') ||
+        errorMessage.includes('ECONNREFUSED') ||
+        errorMessage.includes('ENOTFOUND');
+      
+      console.error("Chat API error details:", { 
+        errorMessage, 
+        errorName, 
+        isTimeout, 
+        isNetworkError,
+        error 
+      });
+      
+      // Provide specific error messages
+      if (isTimeout) {
+        push("assistant", ERROR_MESSAGES.TIMEOUT_ERROR);
+      } else if (isNetworkError) {
+        push("assistant", ERROR_MESSAGES.NETWORK_ERROR);
+      } else {
+        push("assistant", ERROR_MESSAGES.SERVICE_UNAVAILABLE);
+      }
     } finally {
       setIsTyping(false);
     }

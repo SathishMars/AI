@@ -29,7 +29,31 @@ async function startServer() {
             warn: (...args) => console.warn('[GraphQL Yoga Warn]', ...args),
             error: (...args) => console.error('[GraphQL Yoga Error]', ...args),
         },
+        // Add error handling for serialization issues
+        maskedErrors: false, // Show full error details for debugging
     });
+    
+    // Wrap Yoga's requestListener to catch serialization errors
+    const originalRequestListener = yoga.requestListener;
+    yoga.requestListener = async (req: any, res: any) => {
+        try {
+            await originalRequestListener(req, res);
+        } catch (error: any) {
+            console.error('[GraphQL Yoga] Request listener error:', error);
+            console.error('[GraphQL Yoga] Error stack:', error?.stack);
+            if (!res.headersSent) {
+                res.status(500).json({
+                    errors: [{
+                        message: 'Internal server error during response serialization',
+                        extensions: {
+                            code: 'INTERNAL_SERVER_ERROR',
+                            originalError: error?.message || String(error)
+                        }
+                    }]
+                });
+            }
+        }
+    };
 
     // CORS middleware
     app.use(

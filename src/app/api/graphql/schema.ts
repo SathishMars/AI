@@ -619,8 +619,8 @@ export const resolvers = {
 
       // OpenAI Models:
       //const model = openai("gpt-4o");                     // Option: GPT-4o (96% in-scope accuracy)
-      //const model = openai("gpt-5-mini");                 // Option: GPT-5 Mini
-     const model = openai("gpt-5.2");                     // Testing: GPT-5.2
+      const model = openai("gpt-5-mini");                 // Testing: GPT-5 Mini
+      //const model = openai("gpt-5.2");                     // Option: GPT-5.2
 
       // GPT-5.2 Model Selection - Try alternatives if access is restricted
       //let model = openai("gpt-5.2");                       // Primary: GPT-5.2 (REQUIRES API ACCESS)
@@ -1133,20 +1133,152 @@ Provide a direct, factual answer based on the data above. If the data is empty, 
           console.log(`[Total Tokens] Prompt: ${totalUsage.promptTokens}, Completion: ${totalUsage.completionTokens}, Total: ${totalUsage.totalTokens}`);
           console.log('[GraphQL Chat] Total Token Usage:', JSON.stringify(totalUsage, null, 2));
           console.log(`[Output] ${finalAnswer}`);
+          console.log(`[GraphQL Chat] ===== STARTING RESPONSE BUILDING =====`);
+          console.log(`[GraphQL Chat] Starting response building, rows count: ${Array.isArray(rows) ? rows.length : 0}`);
+          console.log(`[GraphQL Chat] Rows type: ${typeof rows}, isArray: ${Array.isArray(rows)}`);
 
-          return {
-            ok: true,
-            answer: finalAnswer,
-            sql,
-            rows,
-            meta: {
-              scope: "in_scope",
-              category: scope.category,
-              intent: parsedSql.intent,
-              ms: duration,
-              usage: totalUsage
-            }
+          // Return ALL rows - no limitations
+          // Rows are already normalized by normalizeRows() function which handles Date objects
+          const allRows = Array.isArray(rows) ? rows : [];
+          console.log(`[GraphQL Chat] Processing all ${allRows.length} rows (no limitations)`);
+          
+          // Ensure rows are serializable (normalizeRows should have handled dates, but double-check)
+          console.log(`[GraphQL Chat] Starting row serialization check`);
+          let serializableRows: any[] = [];
+          try {
+            serializableRows = allRows.map((row: any, index: number) => {
+              // Quick check - if row serializes fine, use it as-is
+              try {
+                JSON.stringify(row);
+                return row;
+              } catch (e) {
+                console.warn(`[GraphQL Chat] Row ${index} failed serialization check, creating safe copy`);
+                // If serialization fails, create a safe copy
+                const safeRow: any = {};
+                for (const [key, value] of Object.entries(row)) {
+                  if (value === undefined) {
+                    safeRow[key] = null;
+                  } else if (value instanceof Date) {
+                    safeRow[key] = value.toISOString();
+                  } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                    try {
+                      safeRow[key] = JSON.parse(JSON.stringify(value));
+                    } catch {
+                      safeRow[key] = String(value);
+                    }
+                  } else {
+                    safeRow[key] = value;
+                  }
+                }
+                return safeRow;
+              }
+            });
+            console.log(`[GraphQL Chat] Row serialization check completed, ${serializableRows.length} rows processed`);
+          } catch (rowError: any) {
+            console.error(`[GraphQL Chat] Error during row serialization:`, rowError);
+            console.error(`[GraphQL Chat] Row serialization error stack:`, rowError?.stack);
+            // Use empty array if row serialization fails
+            serializableRows = [];
+          }
+          
+          // Ensure meta is serializable (remove any non-serializable properties)
+          const serializableMeta = {
+            scope: "in_scope",
+            category: scope.category || "unknown",
+            intent: parsedSql.intent || "unknown",
+            ms: duration,
+            usage: {
+              promptTokens: totalUsage.promptTokens || 0,
+              completionTokens: totalUsage.completionTokens || 0,
+              totalTokens: totalUsage.totalTokens || 0
+            },
+            totalRows: Array.isArray(rows) ? rows.length : 0,
+            rowsReturned: serializableRows.length
           };
+
+          // Ensure all data is JSON-serializable
+          console.log(`[GraphQL Chat] Building response object with ${serializableRows.length} rows`);
+          const response = {
+            ok: true,
+            answer: finalAnswer || "",
+            sql: sql || "",
+            rows: serializableRows,
+            meta: serializableMeta
+          };
+          console.log(`[GraphQL Chat] Response object built successfully`);
+
+          // Validate response can be serialized
+          console.log(`[GraphQL Chat] Testing response serialization`);
+          try {
+            const testSerialization = JSON.stringify(response);
+            console.log(`[GraphQL Chat] Response size: ${testSerialization.length} bytes, rows: ${serializableRows.length}`);
+            console.log(`[GraphQL Chat] Response serialization test passed`);
+          } catch (serializationError: any) {
+            console.error("[GraphQL Chat] Serialization error:", serializationError);
+            console.error("[GraphQL Chat] Failed to serialize response, returning minimal response");
+            // Return minimal response if serialization fails
+            return {
+              ok: true,
+              answer: finalAnswer || "",
+              sql: sql || "",
+              rows: [],
+              meta: {
+                scope: "in_scope",
+                category: scope.category || "unknown",
+                intent: parsedSql.intent || "unknown",
+                ms: duration,
+                serializationError: true,
+                totalRows: Array.isArray(rows) ? rows.length : 0
+              }
+            };
+          }
+
+          console.log(`[GraphQL Chat] About to return response with ${serializableRows.length} rows`);
+          
+          // Final validation - ensure response matches GraphQL schema exactly
+          const finalResponse = {
+            ok: true,
+            answer: String(finalAnswer || ""),
+            sql: String(sql || ""),
+            rows: serializableRows,
+            meta: serializableMeta
+          };
+          
+          // Double-check serialization one more time before return
+          try {
+            const finalCheck = JSON.stringify(finalResponse);
+            console.log(`[GraphQL Chat] Final serialization check passed: ${finalCheck.length} bytes`);
+          } catch (finalError: any) {
+            console.error(`[GraphQL Chat] Final serialization check FAILED:`, finalError);
+            throw finalError;
+          }
+          
+          console.log(`[GraphQL Chat] ===== ABOUT TO RETURN RESPONSE =====`);
+          console.log(`[GraphQL Chat] Returning response now...`);
+          console.log(`[GraphQL Chat] Response structure: ok=${finalResponse.ok}, answer length=${finalResponse.answer.length}, rows count=${finalResponse.rows.length}, meta keys=${Object.keys(finalResponse.meta).join(',')}`);
+          
+          // Wrap return in try-catch to catch any GraphQL Yoga serialization errors
+          try {
+            const result = finalResponse;
+            console.log(`[GraphQL Chat] ===== RETURNING RESPONSE =====`);
+            return result;
+          } catch (returnError: any) {
+            console.error(`[GraphQL Chat] ===== ERROR DURING RETURN =====`);
+            console.error(`[GraphQL Chat] Return error:`, returnError);
+            console.error(`[GraphQL Chat] Return error stack:`, returnError?.stack);
+            // Return minimal response if return fails
+            return {
+              ok: true,
+              answer: finalAnswer || "An error occurred while processing your request.",
+              sql: sql || "",
+              rows: [],
+              meta: {
+                scope: "error",
+                error: String(returnError),
+                ms: duration
+              }
+            };
+          }
 
         } catch (err: any) {
           console.error("[GraphQL Chat Error]", err);
@@ -1158,13 +1290,52 @@ Provide a direct, factual answer based on the data above. If the data is empty, 
       } catch (outerErr: any) {
         console.error("[GraphQL Chat Outer Error]", outerErr);
 
-        // Check for API access errors specifically
+        // Check for timeout errors specifically
         const errorMessage = outerErr?.message || String(outerErr);
         const errorCode = outerErr?.code || '';
+        const lastError = outerErr?.lastError || outerErr?.cause || {};
+        const lastErrorCode = lastError?.code || '';
+        const lastErrorMessage = lastError?.message || '';
+        
+        // Detect timeout errors (ETIMEDOUT, timeout in message, RetryError with timeout cause)
+        const isTimeoutError = 
+          errorCode === 'ETIMEDOUT' ||
+          lastErrorCode === 'ETIMEDOUT' ||
+          errorMessage.includes('ETIMEDOUT') ||
+          lastErrorMessage.includes('ETIMEDOUT') ||
+          errorMessage.includes('timeout') ||
+          errorMessage.includes('Timeout') ||
+          errorMessage.includes('timed out') ||
+          (outerErr?.reason === 'maxRetriesExceeded' && lastErrorCode === 'ETIMEDOUT');
+
+        // Check for API access errors specifically
         const isApiAccessError = errorMessage.includes('does not have access to model') ||
           errorCode === 'model_not_found' ||
           errorMessage.includes('model_not_found') ||
           errorMessage.includes('Project') && errorMessage.includes('does not have access');
+
+        if (isTimeoutError) {
+          console.error(`[GraphQL Chat] Timeout Error detected: ${errorMessage}`);
+          const finalScope = detectScopeAndCategory(question);
+          const isOOS = finalScope.scope === "out_of_scope" || containsOosKeyword(question);
+
+          if (isOOS) {
+            // For OOS queries, return standard OOS message
+            return { ok: true, answer: OUT_OF_SCOPE_MESSAGE, meta: { scope: "out_of_scope", ms: Date.now() - start } };
+          } else {
+            // For in-scope queries, provide timeout error message
+            return {
+              ok: true,
+              answer: "The request timed out while connecting to the AI service. This query is taking longer than expected. Please try a simpler query or try again in a moment.",
+              meta: {
+                scope: "timeout_error",
+                error: errorMessage,
+                errorCode: errorCode || lastErrorCode,
+                ms: Date.now() - start
+              }
+            };
+          }
+        }
 
         if (isApiAccessError) {
           console.error(`[GraphQL Chat] API Access Error detected for model: ${model.modelId || 'unknown'}`);

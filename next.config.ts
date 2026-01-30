@@ -38,10 +38,8 @@ const nextConfig: NextConfig = {
         source: '/accounts/:accountId/:rest*',
         destination: '/:rest*',
       },
-      {
-        source: '/api/graphql',
-        destination: process.env.GRAPHQL_URL || 'http://localhost:4000/graphql',
-      },
+      // Note: /api/graphql is now handled by a custom route handler (src/app/api/graphql/route.ts)
+      // instead of a rewrite, to provide better error handling and logging
     ];
   },
   turbopack: {

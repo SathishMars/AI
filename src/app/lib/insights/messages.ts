@@ -19,6 +19,8 @@ export const ERROR_MESSAGES = {
   CONNECTION_ERROR: "I'm having trouble connecting to my brain right now. Please try again.",
   PROCESSING_ERROR: "I'm sorry, I encountered an error while processing your request.",
   SERVICE_UNAVAILABLE: "Sorry, I'm having trouble connecting to the service right now.",
+  TIMEOUT_ERROR: "The request timed out. This query is taking longer than expected. Please try a simpler query or try again.",
+  NETWORK_ERROR: "Network error occurred. Please check your connection and try again.",
 } as const;
 
 /**
