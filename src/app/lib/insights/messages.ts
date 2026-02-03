@@ -10,7 +10,7 @@ export const OUT_OF_SCOPE_MESSAGE = `I appreciate your question. However, that t
 /**
  * Messages for PII (Personally Identifiable Information) blocked queries
  */
-export const PII_BLOCKED_MESSAGE = `AIME Insights policy prohibits the disclosure of personal data, including dietary restrictions. This information is considered out of scope and PII, and cannot be disclosed. I can provide statistical trends or high-level attendee profiles upon request.`;
+export const PII_BLOCKED_MESSAGE = `AIME Insights policy prohibits the disclosure of personal data. This information is considered out of scope and PII, and cannot be disclosed. I can provide statistical trends or high-level attendee profiles upon request.`;
 
 /**
  * Error messages

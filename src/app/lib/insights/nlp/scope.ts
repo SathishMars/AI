@@ -1,5 +1,6 @@
 // INSIGHTS-SPECIFIC: NLP scope detection for chat queries
 import { OUT_OF_SCOPE_MESSAGE } from "../messages";
+import { logger } from "@/app/lib/logger";
 
 export type InsightsScope =
   | "in_scope"
@@ -97,7 +98,7 @@ export function detectScopeAndCategory(question: string): {
   
   // Check explicit in-scope patterns FIRST - if matched, return in-scope immediately
   if (explicitInScopePatterns.some(pattern => pattern.test(q))) {
-    console.log(`[detectScopeAndCategory] Explicit in-scope pattern matched: ${q}`);
+    logger.debugScope(`[detectScopeAndCategory] Explicit in-scope pattern matched: ${q}`);
     // Determine category based on pattern
     if (/top|unique|how\s+many/i.test(q)) {
       return { scope: "in_scope", category: "statistics_summaries" };
@@ -201,7 +202,7 @@ export function detectScopeAndCategory(question: string): {
 
     // Only allow if it's CLEARLY and PURELY about attendee data
     if (!isActuallyInScope) {
-      console.log(`[detectScopeAndCategory] OOS Pattern matched: ${q}`);
+      logger.debugScope(`[detectScopeAndCategory] OOS Pattern matched: ${q}`);
       return { scope: "out_of_scope", outOfScopeType: "regex_match" };
     }
   }
@@ -211,7 +212,7 @@ export function detectScopeAndCategory(question: string): {
   if (actionVerbs.some(v => q.startsWith(v) || q.includes(` ${v} `) || q.includes(` ${v}s `))) {
     // Only block if it looks like an action attempt
     if (q.includes("registration") || q.includes("attendee") || q.includes("record") || q.includes("table") || q.includes("status")) {
-      console.log(`[detectScopeAndCategory] Action verb matched: ${q}`);
+      logger.debugScope(`[detectScopeAndCategory] Action verb matched: ${q}`);
       return { scope: "out_of_scope", outOfScopeType: "system_actions" };
     }
   }
@@ -226,7 +227,7 @@ export function detectScopeAndCategory(question: string): {
       if (regex.test(q)) {
         // High-risk categories: ALWAYS out of scope
         if (["system_actions", "personal_private", "finance", "technical_ai", "hotel_proposals", "legal_compliance"].includes(bucket.type)) {
-          console.log(`[detectScopeAndCategory] Strong OOS matched: ${bucket.type} via "${w}"`);
+          logger.debugScope(`[detectScopeAndCategory] Strong OOS matched: ${bucket.type} via "${w}"`);
           return { scope: "out_of_scope", outOfScopeType: bucket.type };
         }
 
@@ -248,7 +249,7 @@ export function detectScopeAndCategory(question: string): {
         // If it's a general OOS keyword and it EITHER has no attendee context OR it looks like a trick multi-intent (e.g. joke)
         const isGeneral = bucket.type === "general_knowledge" || bucket.type === "marketing";
         if (!hasAttendeeContext || isGeneral) {
-          console.log(`[detectScopeAndCategory] Keyword match OOS: ${bucket.type} via "${w}"`);
+          logger.debugScope(`[detectScopeAndCategory] Keyword match OOS: ${bucket.type} via "${w}"`);
           return { scope: "out_of_scope", outOfScopeType: bucket.type };
         }
       }

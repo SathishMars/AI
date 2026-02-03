@@ -8,7 +8,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { apiFetch } from "@/app/utils/api";
 import { ERROR_MESSAGES } from "@/app/lib/insights/messages";
-import { Sparkles, Send } from "lucide-react";
+import { Sparkles, Send, Minus, X } from "lucide-react";
 import Image from "next/image";
 import { env } from "@/app/lib/env";
 import { CommandHistory } from "./CommandHistory";
@@ -272,34 +272,116 @@ export function InsightsAimePanel() {
 
   return (
     <aside className="flex h-full w-full flex-col border-l border-[#e5e7eb] bg-white px-3 py-3 shadow-[-4px_0_12px_-4px_rgba(0,0,0,0.05)] animate-in slide-in-from-right duration-300">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 font-semibold text-[#111827]">
-          <Image
-            src={`${env.basePath}/aime-star.png`}
-            alt="aime logo"
-            width={24}
-            height={24}
-            className="w-6 h-6"
-            unoptimized
-          />
-          <span className="text-[13px]">aime</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <CommandHistory 
-            messages={messages} 
-            onRepeatCommand={(command) => {
-              // Command will be executed via setAimeAction
-              console.log("Repeating command:", command);
+      {/* Header */}
+      <div 
+        style={{
+          display: 'flex',
+          flexDirection: 'row',
+          justifyContent: 'flex-end',
+          alignItems: 'center',
+          padding: '0px',
+          gap: '24px',
+          width: '100%',
+          height: '32px',
+          background: '#FFFFFF',
+          flex: 'none',
+          order: 0,
+          alignSelf: 'stretch',
+          flexGrow: 0
+        }}
+      >
+        {/* aime section */}
+        <div 
+          style={{
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'center',
+            padding: '0px',
+            gap: '10px',
+            width: '258px',
+            height: '28px',
+            minHeight: '24px',
+            flex: 'none',
+            order: 0,
+            flexGrow: 1
+          }}
+        >
+          {/* Icon */}
+          <div style={{ width: '24px', height: '24px', flex: 'none', order: 0, flexGrow: 0, position: 'relative' }}>
+            <Image
+              src={`${env.basePath}/aime-star.png`}
+              alt="aime logo"
+              width={24}
+              height={24}
+              className="w-6 h-6"
+              unoptimized
+              style={{
+                position: 'absolute',
+                width: '24px',
+                left: 'calc(50% - 24px/2)',
+                top: '0%',
+                bottom: '0%'
+              }}
+            />
+          </div>
+          {/* Profile Name */}
+          <span 
+            style={{
+              width: '47px',
+              height: '28px',
+              fontFamily: "'Instrument Sans', sans-serif",
+              fontStyle: 'normal',
+              fontWeight: 700,
+              fontSize: '20px',
+              lineHeight: '28px',
+              color: '#161C24',
+              flex: 'none',
+              order: 1,
+              flexGrow: 0
             }}
-          />
-          <button
-            onClick={() => setAimeOpen(false)}
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-[#e5e7eb] bg-white text-[#9ca3af] hover:bg-[#f9fafb] transition-colors"
-            title="Collapse"
           >
-            –
-          </button>
+            aime
+          </span>
         </div>
+
+        {/* Minimize Button */}
+        <button
+          onClick={() => setAimeOpen(false)}
+          style={{
+            display: 'flex',
+            flexDirection: 'row',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: '8px',
+            gap: '8px',
+            width: '32px',
+            minWidth: '32px',
+            maxWidth: '32px',
+            height: '32px',
+            minHeight: '32px',
+            maxHeight: '32px',
+            borderRadius: '8px',
+            flex: 'none',
+            order: 1,
+            flexGrow: 0,
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer'
+          }}
+          title="Minimize"
+        >
+          <Minus 
+            style={{ 
+              width: '16px', 
+              height: '16px',
+              flex: 'none',
+              order: 0,
+              flexGrow: 0,
+              color: '#161C24'
+            }} 
+            strokeWidth={1.33}
+          />
+        </button>
       </div>
 
       <div className="flex flex-1 flex-col overflow-hidden">

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { env } from '@/app/lib/env';
 import { requireSessionFromToken, requireAccountAccess, requireOrganizationAccess } from '@/app/lib/dal';
+import { logger } from '@/app/lib/logger';
 
 const MIDDLEWARE_SKIP_HEADER = 'x-middleware-skip';
 const MIDDLEWARE_SKIP_VALUE = '1';
@@ -13,7 +14,7 @@ export async function proxy(request: NextRequest) {
   try {
     const pathname = request.nextUrl.pathname;
 
-    console.log('[Auth Middleware] Processing request for:', pathname);
+    logger.debugMiddleware('[Auth Middleware] Processing request for:', pathname);
     if (
       pathname.startsWith('/_next') ||
       pathname.startsWith('/static') ||
@@ -46,7 +47,7 @@ export async function proxy(request: NextRequest) {
 
     // Skip internal API routes - they use service token auth via withServiceAuth wrapper
     if (pathname.startsWith('/api/internal/') || pathname.startsWith(`${env.basePath}/api/internal/`)) {
-      console.log('[Auth Middleware] Skipping internal API route (uses service auth)');
+      logger.debugMiddleware('[Auth Middleware] Skipping internal API route (uses service auth)');
       return NextResponse.next();
     }
 
@@ -57,7 +58,7 @@ export async function proxy(request: NextRequest) {
       pathname.startsWith('/initialize') || 
       pathname.startsWith(`${env.basePath}/initialize`)
     ) {
-      console.log('[Auth Middleware] Skipping database initialization endpoint');
+      logger.debugMiddleware('[Auth Middleware] Skipping database initialization endpoint');
       return NextResponse.next();
     }
 
@@ -68,7 +69,7 @@ export async function proxy(request: NextRequest) {
       pathname.startsWith(`${env.basePath}/insights`) ||
       pathname.startsWith(`${env.basePath}/arrivals`)
     ) {
-      console.log('[Auth Middleware] Skipping insights route (no auth required)');
+      logger.debugMiddleware('[Auth Middleware] Skipping insights route (no auth required)');
       return NextResponse.next();
     }
 
@@ -108,7 +109,7 @@ async function handleUserAuth(request: NextRequest, pathname: string) {
   
   if (!token) {
     const railsUrl = getRailsAppUrl();
-    console.log('[Auth Middleware] No token found, redirecting to rails app:', railsUrl.toString());
+    logger.debugMiddleware('[Auth Middleware] No token found, redirecting to rails app:', railsUrl.toString());
     return NextResponse.redirect(railsUrl);
   }
 

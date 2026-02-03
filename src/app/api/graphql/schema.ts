@@ -14,6 +14,7 @@ import { queryWithTimeout } from "@/app/lib/insights/sql/timeout";
 import { detectScopeAndCategory, outOfScopeMessage, containsOosKeyword } from "@/app/lib/insights/nlp/scope";
 import { PII_BLOCKED_MESSAGE, ERROR_MESSAGES, OUT_OF_SCOPE_MESSAGE } from "@/app/lib/insights/messages";
 import { buildContextSummary, type InsightsChatMsg } from "@/app/lib/insights/nlp/context";
+import { logger } from "@/app/lib/logger";
 
 // Chat Helpers & Zod Schemas
 const SCOPE_INSTRUCTIONS = `
@@ -143,74 +144,74 @@ function detectUIAction(question: string): any {
   let q = question.toLowerCase().trim();
   q = q.replace(/^["']|["']$/g, ''); // Remove leading/trailing quotes
 
-  console.log(`[detectUIAction] Input: "${question}" -> Normalized: "${q}"`);
+  logger.debugUIActions(`[detectUIAction] Input: "${question}" -> Normalized: "${q}"`);
 
   // 1. Reset (Highest Priority)
   if (q.match(/(?:reset|restore|original|default)\s+(?:column\s+)?(?:order|position|columns|layout)/i) ||
     q.includes("back to original") ||
     q.includes("original order")) {
-    console.log(`[detectUIAction] Matched: reset_columns`);
+    logger.debugUIActions(`[detectUIAction] Matched: reset_columns`);
     return { type: "reset_columns" };
   }
 
   // 2. Reorder column
   if (q.includes("move")) {
-    console.log(`[detectUIAction] Contains "move", testing patterns...`);
+    logger.debugUIActions(`[detectUIAction] Contains "move", testing patterns...`);
 
     const front = q.match(/move\s+(.+?)\s+(?:to\s+)?(?:the\s+)?(front|beginning|start|first)/i);
     if (front) {
-      console.log(`[detectUIAction] Matched: move to front`);
+      logger.debugUIActions(`[detectUIAction] Matched: move to front`);
       return { type: "reorder_column", column: normalizeColumnName(front[1]), position: 0 };
     }
 
     const back = q.match(/move\s+(.+?)\s+(?:to\s+)?(?:the\s+)?(back|end|last)/i);
     if (back) {
-      console.log(`[detectUIAction] Matched: move to back`);
+      logger.debugUIActions(`[detectUIAction] Matched: move to back`);
       return { type: "reorder_column", column: normalizeColumnName(back[1]), position: -1 };
     }
 
     const after = q.match(/move\s+(.+?)\s+after\s+(.+)/i);
     if (after) {
-      console.log(`[detectUIAction] Matched: move after`);
+      logger.debugUIActions(`[detectUIAction] Matched: move after`);
       return { type: "reorder_column", column: normalizeColumnName(after[1]), afterColumn: normalizeColumnName(after[2]) };
     }
 
     const before = q.match(/move\s+(.+?)\s+before\s+(.+)/i);
     if (before) {
-      console.log(`[detectUIAction] Matched: move before`);
+      logger.debugUIActions(`[detectUIAction] Matched: move before`);
       return { type: "reorder_column", column: normalizeColumnName(before[1]), beforeColumn: normalizeColumnName(before[2]) };
     }
 
     // Match "move X to 4 position" or "move X to position 4"
     const toPosition = q.match(/move\s+(.+?)\s+to\s+(?:the\s+)?(\d+)(?:st|nd|rd|th)?\s+position/i);
     if (toPosition) {
-      console.log(`[detectUIAction] Matched: move to X position - column: "${toPosition[1]}", pos: ${toPosition[2]}`);
+      logger.debugUIActions(`[detectUIAction] Matched: move to X position - column: "${toPosition[1]}", pos: ${toPosition[2]}`);
       const pos = parseInt(toPosition[2], 10) - 1;
       return { type: "reorder_column", column: normalizeColumnName(toPosition[1]), index: Math.max(0, pos) };
     }
 
     const ordinal = q.match(/move\s+(.+?)\s+(?:to\s+)?(?:the\s+)?(\d+)(?:st|nd|rd|th)?\s+(?:place|index)/i);
     if (ordinal) {
-      console.log(`[detectUIAction] Matched: ordinal position`);
+      logger.debugUIActions(`[detectUIAction] Matched: ordinal position`);
       const pos = parseInt(ordinal[2], 10) - 1; // 1-based to 0-based
       return { type: "reorder_column", column: normalizeColumnName(ordinal[1]), index: Math.max(0, pos) };
     }
 
     const positionX = q.match(/move\s+(.+?)\s+(?:to\s+)?(?:the\s+)?(?:position|place|index)\s+(\d+)/i);
     if (positionX) {
-      console.log(`[detectUIAction] Matched: position X`);
+      logger.debugUIActions(`[detectUIAction] Matched: position X`);
       const pos = parseInt(positionX[2], 10) - 1;
       return { type: "reorder_column", column: normalizeColumnName(positionX[1]), index: Math.max(0, pos) };
     }
 
-    console.log(`[detectUIAction] No move pattern matched`);
+    logger.debugUIActions(`[detectUIAction] No move pattern matched`);
   }
 
   // 2b. Swap columns
   if (q.includes("swap")) {
     const swapMatch = q.match(/swap\s+(.+?)\s+(?:and|with)\s+(.+)/i);
     if (swapMatch) {
-      console.log(`[detectUIAction] Matched: swap columns`);
+      logger.debugUIActions(`[detectUIAction] Matched: swap columns`);
       return { 
         type: "swap_columns", 
         column1: normalizeColumnName(swapMatch[1]), 
@@ -221,13 +222,13 @@ function detectUIAction(question: string): any {
 
   // 2c. List/Show column order
   if (q.match(/(?:list|show|display)\s+(?:current\s+)?(?:column\s+)?(?:order|columns)/i)) {
-    console.log(`[detectUIAction] Matched: list columns`);
+    logger.debugUIActions(`[detectUIAction] Matched: list columns`);
     return { type: "list_columns" };
   }
 
   // 2d. Undo column reorder
   if (q.match(/undo\s+(?:last\s+)?(?:change|reorder|column\s+order|column\s+reorder)/i)) {
-    console.log(`[detectUIAction] Matched: undo column reorder`);
+    logger.debugUIActions(`[detectUIAction] Matched: undo column reorder`);
     return { type: "undo_column_reorder" };
   }
 
@@ -321,24 +322,24 @@ function detectUIAction(question: string): any {
     // Try exact match first
     const normalizedCol = normalizeColumnName(colName);
     if (columnMappings[colName.toLowerCase()]) {
-      console.log(`[detectUIAction] Matched: remove column via fuzzy match`);
+      logger.debugUIActions(`[detectUIAction] Matched: remove column via fuzzy match`);
       return { type: "remove_column", column: columnMappings[colName.toLowerCase()] };
     }
 
     // Try partial match
     for (const [pattern, dbColumn] of Object.entries(columnMappings)) {
       if (colName.toLowerCase().includes(pattern)) {
-        console.log(`[detectUIAction] Matched: remove column via partial match`);
+        logger.debugUIActions(`[detectUIAction] Matched: remove column via partial match`);
         return { type: "remove_column", column: dbColumn };
       }
     }
 
     // Fallback to normalizeColumnName
-    console.log(`[detectUIAction] Matched: remove column via normalizeColumnName`);
+    logger.debugUIActions(`[detectUIAction] Matched: remove column via normalizeColumnName`);
     return { type: "remove_column", column: normalizedCol };
   }
 
-  console.log(`[detectUIAction] No UI action detected, returning null`);
+  logger.debugUIActions(`[detectUIAction] No UI action detected, returning null`);
   return null;
 }
 
@@ -562,17 +563,24 @@ export const resolvers = {
         let dataParams: (string | number)[];
         let countParams: (string | number)[];
 
+        // SQL Injection Protection: Using parameterized queries ($1, $2, etc.)
+        // All user input is passed as parameters, not concatenated into SQL string
+        // This is safe from SQL injection attacks
         const baseWhere = `WHERE event_id = $1 AND parent_id IS NULL`;
 
         if (q && q.length > 0) {
           const searchPattern = `%${q}%`;
+          // Parameterized query - q is sanitized and passed as $2 parameter, not concatenated
           dataSql = `SELECT * FROM public.attendee ${baseWhere} AND (first_name ILIKE $2 OR last_name ILIKE $2 OR email ILIKE $2 OR company_name ILIKE $2) ORDER BY last_name, first_name LIMIT $3 OFFSET $4`;
           dataParams = [eventId, searchPattern, limit, offset];
+          // Parameterized query - safe from SQL injection
           countSql = `SELECT COUNT(*)::int AS total FROM public.attendee ${baseWhere} AND (first_name ILIKE $2 OR last_name ILIKE $2 OR email ILIKE $2 OR company_name ILIKE $2)`;
           countParams = [eventId, searchPattern];
         } else {
+          // Parameterized query - eventId, limit, offset are passed as parameters
           dataSql = `SELECT * FROM public.attendee ${baseWhere} ORDER BY last_name, first_name LIMIT $2 OFFSET $3`;
           dataParams = [eventId, limit, offset];
+          // Parameterized query - safe from SQL injection
           countSql = `SELECT COUNT(*)::int AS total FROM public.attendee ${baseWhere}`;
           countParams = [eventId];
         }
@@ -613,13 +621,13 @@ export const resolvers = {
       // SELECT MODEL (Uncomment the one you want to use)
       // Anthropic Models:
       //const model = anthropic("claude-3-5-haiku-latest"); // Option: Claude 3.5 Haiku
-      //const model = anthropic("claude-haiku-4-5"); // Option: Claude 4.5 Haiku
+      const model = anthropic("claude-haiku-4-5"); // Option: Claude 4.5 Haiku
       //const model = anthropic("claude-sonnet-4-5"); // Option: Claude Sonnet 4.5 (CORRECT format - confirmed working)
 
 
       // OpenAI Models:
       //const model = openai("gpt-4o");                     // Option: GPT-4o (96% in-scope accuracy)
-      const model = openai("gpt-5-mini");                 // Testing: GPT-5 Mini
+      //const model = openai("gpt-5-mini");                 // Testing: GPT-5 Mini
       //const model = openai("gpt-5.2");                     // Option: GPT-5.2
 
       // GPT-5.2 Model Selection - Try alternatives if access is restricted
@@ -633,22 +641,22 @@ export const resolvers = {
       // Groq Models:
       //const model = groq("llama-3.3-70b-versatile");     // Option: Llama 3.3 70B
 
-      console.log(`[Question] ${question}`);
+      logger.debugQueries(`[Question] ${question}`);
 
       try {
         // UI Action Check
-        console.log(`[UI Action Check] Checking for UI actions...`);
+        logger.debugUIActions(`[UI Action Check] Checking for UI actions...`);
         const action = detectUIAction(question);
         if (action) {
-          console.log(`[UI Action] ${action.type}`);
-          console.log(`[Output] ${getActionConfirmationMessage(action)}`);
+          logger.debugUIActions(`[UI Action] ${action.type}`);
+          logger.debugUIActions(`[Output] ${getActionConfirmationMessage(action)}`);
           return { ok: true, answer: getActionConfirmationMessage(action), meta: { scope: "ui_action", action, ms: Date.now() - start } };
         }
-        console.log(`[UI Action Check] No UI action detected`);
+        logger.debugUIActions(`[UI Action Check] No UI action detected`);
 
         // Scope Check - detectScopeAndCategory already has explicit in-scope pattern checks at the beginning
         const scope = detectScopeAndCategory(question);
-        console.log(`[GraphQL Chat] Scope: ${scope.scope}, Category: ${scope.category}`);
+        logger.debugScope(`[GraphQL Chat] Scope: ${scope.scope}, Category: ${scope.category}`);
 
         // Check if this is an explicitly in-scope query pattern (for LLM instruction purposes)
         const explicitInScopePatterns = [
@@ -661,7 +669,7 @@ export const resolvers = {
         const isExplicitlyInScope = explicitInScopePatterns.some(pattern => pattern.test(question));
 
         if (isExplicitlyInScope) {
-          console.log(`[GraphQL Chat] Explicit in-scope query detected: "${question}"`);
+          logger.debugScope(`[GraphQL Chat] Explicit in-scope query detected: "${question}"`);
         }
 
         // If scope detection says it's in-scope, trust it and proceed
@@ -669,8 +677,8 @@ export const resolvers = {
         if (scope.scope === "in_scope") {
           // Proceed to SQL generation - explicit patterns already handled
         } else if (scope.scope === "out_of_scope" || containsOosKeyword(question)) {
-          console.log(`[GraphQL Chat] Standardized refusal triggered via NLP or Keyword Match`);
-          console.log(`[Output] ${OUT_OF_SCOPE_MESSAGE}`);
+          logger.debugScope(`[GraphQL Chat] Standardized refusal triggered via NLP or Keyword Match`);
+          logger.debugScope(`[Output] ${OUT_OF_SCOPE_MESSAGE}`);
           return { ok: true, answer: OUT_OF_SCOPE_MESSAGE, meta: { scope: "out_of_scope", ms: Date.now() - start } };
         }
 
@@ -768,7 +776,7 @@ Return JSON.`;
           // Capture token usage from SQL generation
           if (sqlResult.usage) {
             const usage = sqlResult.usage as any;
-            console.log('[GraphQL Chat] SQL Generation Usage:', JSON.stringify(usage, null, 2));
+            logger.debugGraphQL('[GraphQL Chat] SQL Generation Usage:', JSON.stringify(usage, null, 2));
             const promptTokens = usage.promptTokens || usage.inputTokens || 0;
             const completionTokens = usage.completionTokens || usage.outputTokens || 0;
             sqlUsage = {
@@ -776,10 +784,10 @@ Return JSON.`;
               completionTokens,
               totalTokens: usage.totalTokens || (promptTokens + completionTokens) || 0,
             };
-            console.log(`[SQL Tokens] Prompt: ${sqlUsage.promptTokens}, Completion: ${sqlUsage.completionTokens}, Total: ${sqlUsage.totalTokens}`);
-            console.log('[GraphQL Chat] Captured SQL Usage:', JSON.stringify(sqlUsage, null, 2));
+            logger.debugGraphQL(`[SQL Tokens] Prompt: ${sqlUsage.promptTokens}, Completion: ${sqlUsage.completionTokens}, Total: ${sqlUsage.totalTokens}`);
+            logger.debugGraphQL('[GraphQL Chat] Captured SQL Usage:', JSON.stringify(sqlUsage, null, 2));
           } else {
-            console.log('[GraphQL Chat] No usage field in sqlResult:', Object.keys(sqlResult));
+            logger.debugGraphQL('[GraphQL Chat] No usage field in sqlResult:', Object.keys(sqlResult));
           }
         } catch (apiError: any) {
           // Check for API access errors specifically
@@ -804,21 +812,21 @@ Return JSON.`;
               // Try alternative GPT-5.2 variants
               try {
                 if (!modelName.includes('chat')) {
-                  console.log(`[GraphQL Chat] Trying alternative: gpt-5.2-chat-latest`);
+                  logger.debugGraphQL(`[GraphQL Chat] Trying alternative: gpt-5.2-chat-latest`);
                   alternativeModel = openai("gpt-5.2-chat-latest");
                 } else if (!modelName.includes('pro')) {
-                  console.log(`[GraphQL Chat] Trying alternative: gpt-5.2-pro`);
+                  logger.debugGraphQL(`[GraphQL Chat] Trying alternative: gpt-5.2-pro`);
                   alternativeModel = openai("gpt-5.2-pro");
                 }
               } catch (altError) {
-                console.log(`[GraphQL Chat] Alternative model also failed:`, altError);
+                logger.debugGraphQL(`[GraphQL Chat] Alternative model also failed:`, altError);
               }
             }
 
             // If we have an alternative model, try it
             if (alternativeModel) {
               try {
-                console.log(`[GraphQL Chat] Retrying with alternative model: ${alternativeModel.modelId}`);
+                logger.debugGraphQL(`[GraphQL Chat] Retrying with alternative model: ${alternativeModel.modelId}`);
                 sqlResult = await generateText({
                   model: alternativeModel,
                   system: sqlSystem,
@@ -872,7 +880,7 @@ Return JSON.`;
           try {
             parsedSql = SqlOut.parse(JSON.parse(raw.trim()));
           } catch (e) {
-            console.log("[GraphQL Chat] JSON Parse failed, trying robust extraction...");
+            logger.debugGraphQL("[GraphQL Chat] JSON Parse failed, trying robust extraction...");
             const jsonMatch = raw.match(/\{[\s\S]*\}/);
             if (!jsonMatch) throw new Error("No JSON found in response");
 
@@ -882,14 +890,14 @@ Return JSON.`;
 
             parsedSql = SqlOut.parse(JSON.parse(sanitizedText));
             isRobustParse = true;
-            console.log("[GraphQL Chat] Successfully parsed JSON using robust extraction");
+            logger.debugGraphQL("[GraphQL Chat] Successfully parsed JSON using robust extraction");
           }
 
           // If AI detected a UI action, return it immediately (bypass SQL execution)
           if (parsedSql.action) {
-            console.log(`[GraphQL Chat] AI-detected UI Action:`, parsedSql.action);
-            console.log(`[UI Action] ${parsedSql.action.type}`);
-            console.log(`[Output] ${getActionConfirmationMessage(parsedSql.action)}`);
+            logger.debugUIActions(`[GraphQL Chat] AI-detected UI Action:`, parsedSql.action);
+            logger.debugUIActions(`[UI Action] ${parsedSql.action.type}`);
+            logger.debugUIActions(`[Output] ${getActionConfirmationMessage(parsedSql.action)}`);
             return { ok: true, answer: getActionConfirmationMessage(parsedSql.action), meta: { scope: "ui_action", action: parsedSql.action, ms: Date.now() - start } };
           }
 
@@ -902,7 +910,7 @@ Return JSON.`;
           let sql = "";
           try {
             sql = ensureSafeSelect(parsedSql.sql);
-            console.log(`[SQL Query] ${sql}`);
+            logger.debugSQL(`[SQL Query] ${sql}`);
             const dbRes = await queryWithTimeout(sql, [], 3000);
             rows = normalizeRows((dbRes as any).rows);
           } catch (sqlErr: any) {
@@ -1015,7 +1023,7 @@ Tone & Style:
           // Capture token usage from answer generation
           if (answerResult.usage) {
             const usage = answerResult.usage as any;
-            console.log('[GraphQL Chat] Answer Generation Usage:', JSON.stringify(usage, null, 2));
+            logger.debugGraphQL('[GraphQL Chat] Answer Generation Usage:', JSON.stringify(usage, null, 2));
             const promptTokens = usage.promptTokens || usage.inputTokens || 0;
             const completionTokens = usage.completionTokens || usage.outputTokens || 0;
             answerUsage = {
@@ -1023,10 +1031,10 @@ Tone & Style:
               completionTokens,
               totalTokens: usage.totalTokens || (promptTokens + completionTokens) || 0,
             };
-            console.log(`[Answer Tokens] Prompt: ${answerUsage.promptTokens}, Completion: ${answerUsage.completionTokens}, Total: ${answerUsage.totalTokens}`);
-            console.log('[GraphQL Chat] Captured Answer Usage:', JSON.stringify(answerUsage, null, 2));
+            logger.debugGraphQL(`[Answer Tokens] Prompt: ${answerUsage.promptTokens}, Completion: ${answerUsage.completionTokens}, Total: ${answerUsage.totalTokens}`);
+            logger.debugGraphQL('[GraphQL Chat] Captured Answer Usage:', JSON.stringify(answerUsage, null, 2));
           } else {
-            console.log('[GraphQL Chat] No usage field in answerResult:', Object.keys(answerResult));
+            logger.debugGraphQL('[GraphQL Chat] No usage field in answerResult:', Object.keys(answerResult));
           }
 
           // If this is an explicitly in-scope query and the LLM refused it, force it to answer
@@ -1048,7 +1056,7 @@ Tone & Style:
 
             // Force answer if refused OR if data exists (even if not explicitly refused)
             if ((isRefusal || rows.length > 0) && rows.length >= 0) {
-              console.log(`[GraphQL Chat] Explicit in-scope query detected - ensuring answer is provided`);
+              logger.debugScope(`[GraphQL Chat] Explicit in-scope query detected - ensuring answer is provided`);
 
               // More aggressive forced answer generation
               const forcedAnswerSystem = `
@@ -1091,7 +1099,7 @@ Provide a direct, factual answer based on the data above. If the data is empty, 
 
               // If still refused, generate a simple answer from the data
               if (refusalPatterns.some(pattern => pattern.test(finalAnswer.toLowerCase()))) {
-                console.log(`[GraphQL Chat] LLM still refusing after forced attempt, generating direct answer`);
+                logger.debugScope(`[GraphQL Chat] LLM still refusing after forced attempt, generating direct answer`);
                 if (rows.length === 0) {
                   finalAnswer = "No records match the specified criteria.";
                 } else {
@@ -1122,7 +1130,7 @@ Provide a direct, factual answer based on the data above. If the data is empty, 
           }
 
           const duration = Date.now() - start;
-          console.log(`[GraphQL Chat] Completed in ${duration} ms (${(duration / 1000).toFixed(1)}s)`);
+          logger.debugGraphQL(`[GraphQL Chat] Completed in ${duration} ms (${(duration / 1000).toFixed(1)}s)`);
 
           // Calculate total token usage
           const totalUsage = {
@@ -1130,20 +1138,20 @@ Provide a direct, factual answer based on the data above. If the data is empty, 
             completionTokens: sqlUsage.completionTokens + answerUsage.completionTokens,
             totalTokens: sqlUsage.totalTokens + answerUsage.totalTokens,
           };
-          console.log(`[Total Tokens] Prompt: ${totalUsage.promptTokens}, Completion: ${totalUsage.completionTokens}, Total: ${totalUsage.totalTokens}`);
-          console.log('[GraphQL Chat] Total Token Usage:', JSON.stringify(totalUsage, null, 2));
-          console.log(`[Output] ${finalAnswer}`);
-          console.log(`[GraphQL Chat] ===== STARTING RESPONSE BUILDING =====`);
-          console.log(`[GraphQL Chat] Starting response building, rows count: ${Array.isArray(rows) ? rows.length : 0}`);
-          console.log(`[GraphQL Chat] Rows type: ${typeof rows}, isArray: ${Array.isArray(rows)}`);
+          logger.debugGraphQL(`[Total Tokens] Prompt: ${totalUsage.promptTokens}, Completion: ${totalUsage.completionTokens}, Total: ${totalUsage.totalTokens}`);
+          logger.debugGraphQL('[GraphQL Chat] Total Token Usage:', JSON.stringify(totalUsage, null, 2));
+          logger.debugGraphQL(`[Output] ${finalAnswer}`);
+          logger.debugResponse(`[GraphQL Chat] ===== STARTING RESPONSE BUILDING =====`);
+          logger.debugResponse(`[GraphQL Chat] Starting response building, rows count: ${Array.isArray(rows) ? rows.length : 0}`);
+          logger.debugResponse(`[GraphQL Chat] Rows type: ${typeof rows}, isArray: ${Array.isArray(rows)}`);
 
           // Return ALL rows - no limitations
           // Rows are already normalized by normalizeRows() function which handles Date objects
           const allRows = Array.isArray(rows) ? rows : [];
-          console.log(`[GraphQL Chat] Processing all ${allRows.length} rows (no limitations)`);
+          logger.debugResponse(`[GraphQL Chat] Processing all ${allRows.length} rows (no limitations)`);
           
           // Ensure rows are serializable (normalizeRows should have handled dates, but double-check)
-          console.log(`[GraphQL Chat] Starting row serialization check`);
+          logger.debugResponse(`[GraphQL Chat] Starting row serialization check`);
           let serializableRows: any[] = [];
           try {
             serializableRows = allRows.map((row: any, index: number) => {
@@ -1173,7 +1181,7 @@ Provide a direct, factual answer based on the data above. If the data is empty, 
                 return safeRow;
               }
             });
-            console.log(`[GraphQL Chat] Row serialization check completed, ${serializableRows.length} rows processed`);
+            logger.debugResponse(`[GraphQL Chat] Row serialization check completed, ${serializableRows.length} rows processed`);
           } catch (rowError: any) {
             console.error(`[GraphQL Chat] Error during row serialization:`, rowError);
             console.error(`[GraphQL Chat] Row serialization error stack:`, rowError?.stack);
@@ -1197,7 +1205,7 @@ Provide a direct, factual answer based on the data above. If the data is empty, 
           };
 
           // Ensure all data is JSON-serializable
-          console.log(`[GraphQL Chat] Building response object with ${serializableRows.length} rows`);
+          logger.debugResponse(`[GraphQL Chat] Building response object with ${serializableRows.length} rows`);
           const response = {
             ok: true,
             answer: finalAnswer || "",
@@ -1205,14 +1213,14 @@ Provide a direct, factual answer based on the data above. If the data is empty, 
             rows: serializableRows,
             meta: serializableMeta
           };
-          console.log(`[GraphQL Chat] Response object built successfully`);
+          logger.debugResponse(`[GraphQL Chat] Response object built successfully`);
 
           // Validate response can be serialized
-          console.log(`[GraphQL Chat] Testing response serialization`);
+          logger.debugResponse(`[GraphQL Chat] Testing response serialization`);
           try {
             const testSerialization = JSON.stringify(response);
-            console.log(`[GraphQL Chat] Response size: ${testSerialization.length} bytes, rows: ${serializableRows.length}`);
-            console.log(`[GraphQL Chat] Response serialization test passed`);
+            logger.debugResponse(`[GraphQL Chat] Response size: ${testSerialization.length} bytes, rows: ${serializableRows.length}`);
+            logger.debugResponse(`[GraphQL Chat] Response serialization test passed`);
           } catch (serializationError: any) {
             console.error("[GraphQL Chat] Serialization error:", serializationError);
             console.error("[GraphQL Chat] Failed to serialize response, returning minimal response");
@@ -1233,7 +1241,7 @@ Provide a direct, factual answer based on the data above. If the data is empty, 
             };
           }
 
-          console.log(`[GraphQL Chat] About to return response with ${serializableRows.length} rows`);
+          logger.debugResponse(`[GraphQL Chat] About to return response with ${serializableRows.length} rows`);
           
           // Final validation - ensure response matches GraphQL schema exactly
           const finalResponse = {
@@ -1247,20 +1255,20 @@ Provide a direct, factual answer based on the data above. If the data is empty, 
           // Double-check serialization one more time before return
           try {
             const finalCheck = JSON.stringify(finalResponse);
-            console.log(`[GraphQL Chat] Final serialization check passed: ${finalCheck.length} bytes`);
+            logger.debugResponse(`[GraphQL Chat] Final serialization check passed: ${finalCheck.length} bytes`);
           } catch (finalError: any) {
             console.error(`[GraphQL Chat] Final serialization check FAILED:`, finalError);
             throw finalError;
           }
           
-          console.log(`[GraphQL Chat] ===== ABOUT TO RETURN RESPONSE =====`);
-          console.log(`[GraphQL Chat] Returning response now...`);
-          console.log(`[GraphQL Chat] Response structure: ok=${finalResponse.ok}, answer length=${finalResponse.answer.length}, rows count=${finalResponse.rows.length}, meta keys=${Object.keys(finalResponse.meta).join(',')}`);
+          logger.debugResponse(`[GraphQL Chat] ===== ABOUT TO RETURN RESPONSE =====`);
+          logger.debugResponse(`[GraphQL Chat] Returning response now...`);
+          logger.debugResponse(`[GraphQL Chat] Response structure: ok=${finalResponse.ok}, answer length=${finalResponse.answer.length}, rows count=${finalResponse.rows.length}, meta keys=${Object.keys(finalResponse.meta).join(',')}`);
           
           // Wrap return in try-catch to catch any GraphQL Yoga serialization errors
           try {
             const result = finalResponse;
-            console.log(`[GraphQL Chat] ===== RETURNING RESPONSE =====`);
+            logger.debugResponse(`[GraphQL Chat] ===== RETURNING RESPONSE =====`);
             return result;
           } catch (returnError: any) {
             console.error(`[GraphQL Chat] ===== ERROR DURING RETURN =====`);

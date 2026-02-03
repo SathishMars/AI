@@ -18,6 +18,9 @@ function InsightsShellInner({ children }: { children: React.ReactNode }) {
   // Otherwise show whichever is open
   const rightPanelWidth = (aimeOpen || pickColumnsOpen) ? 360 : 0;
 
+  // Sidebar width based on collapse state
+  const sidebarWidth = sidebarCollapsed ? 72 : 260;
+
   // Exact 3-column behavior like PNG:
   // - Sidebar fixed
   // - Main fills
@@ -29,7 +32,7 @@ function InsightsShellInner({ children }: { children: React.ReactNode }) {
       <div
         className="grid flex-1 overflow-hidden"
         style={{
-          gridTemplateColumns: `${sidebarCollapsed ? 72 : 260}px 1fr ${rightPanelWidth}px`,
+          gridTemplateColumns: `${sidebarWidth}px 1fr ${rightPanelWidth}px`,
         }}
       >
         <InsightsSidebar />

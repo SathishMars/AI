@@ -24,7 +24,8 @@ SELECT
   r.created_at       AS created_at,
   r.updated_at       AS updated_at,
   r.concur_login_id  AS concur_login_id,
-  r.notes            AS internal_notes
+  r.notes            AS internal_notes,
+  COALESCE(r.dietary, r.dietary_restrictions, NULL::text) AS dietary_restrictions
 FROM public.registrations r
 LEFT JOIN public.attendee_types at ON at.id = r.attendee_type_id
 LEFT JOIN public.room_requests rr ON rr.registration_id = r.id AND rr.event_id = r.event_id

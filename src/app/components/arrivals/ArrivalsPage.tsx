@@ -1532,9 +1532,6 @@ export default function InsightsArrivalsPage() {
                   // Made VERY aggressive for maximum visibility - starts fading immediately and reaches full opacity quickly
                   // This creates a strong dimming effect that should be clearly visible
                   // Use only backgroundImage (not background shorthand) to avoid React warnings
-                  // TEMPORARY TEST: Using a colored gradient to verify gradient is rendering
-                  // If you can see red/yellow/blue fade, the gradient works - we'll change back to white
-                  // backgroundImage: 'linear-gradient(180deg, rgba(255, 0, 0, 0) 0%, rgba(255, 255, 0, 0.5) 50%, rgba(0, 0, 255, 1) 100%)',
                   
                   // Gradient optimized for ~4 rows fade (220px height / ~30px per row = ~7 rows visible, fade last 4)
                   // Start fading at ~60% (where 4th row from bottom begins), reach full opacity at bottom

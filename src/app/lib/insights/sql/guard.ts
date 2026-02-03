@@ -42,7 +42,7 @@ export function forceLimit(sql: string, limit = 50) {
   return `${sql}\nLIMIT ${limit}`;
 }
 export const PII_COLUMNS = [
-  "concur_login_id", "internal_notes", "dietary", "dietary_restrictions"
+  "concur_login_id", "internal_notes"
 ];
 
 /**

@@ -4,6 +4,7 @@ import express from 'express';
 import http from 'http';
 import cors from 'cors';
 import { typeDefs, resolvers } from '@/app/api/graphql/schema';
+import { logger } from '@/app/lib/logger';
 
 async function startServer() {
     const app = express();
@@ -78,8 +79,8 @@ async function startServer() {
     const httpServer = http.createServer(app);
 
     await new Promise<void>((resolve) => httpServer.listen({ port, host: '0.0.0.0' }, resolve));
-    console.log(`🚀 Standalone GraphQL Yoga Server running on http://localhost:${port}/graphql`);
-    console.log(`💓 Health check available at http://localhost:${port}/health`);
+    logger.info(`🚀 Standalone GraphQL Yoga Server running on http://localhost:${port}/graphql`);
+    logger.info(`💓 Health check available at http://localhost:${port}/health`);
 }
 
 startServer().catch((err) => {

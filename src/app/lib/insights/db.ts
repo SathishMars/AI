@@ -2,6 +2,7 @@
 // This is separate from workflow database connections
 
 import { env } from '@/app/lib/env';
+import { logger } from '@/app/lib/logger';
 
 /**
  * Logging utilities for Insights DB
@@ -9,22 +10,22 @@ import { env } from '@/app/lib/env';
  */
 function logInfo(message: string): void {
   if (env.databaseInitLogging === 'verbose' || env.isDevelopment) {
-    console.log(`[Insights DB] ${message}`);
+    logger.info(`[Insights DB] ${message}`);
   }
 }
 
 function logDebug(message: string): void {
   if (env.databaseInitLogging === 'verbose') {
-    console.debug(`[Insights DB] ${message}`);
+    logger.debug(`[Insights DB] ${message}`);
   }
 }
 
 function logWarn(message: string): void {
-  console.warn(`[Insights DB] ${message}`);
+  logger.warn(`[Insights DB] ${message}`);
 }
 
 function logError(message: string, error?: unknown): void {
-  console.error(`[Insights DB] ${message}`, error || '');
+  logger.error(`[Insights DB] ${message}`, error || '');
 }
 
 const connectionString = process.env.DATABASE_URL;
