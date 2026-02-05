@@ -162,3 +162,7 @@ MCP is a new standard for connecting AI models to tools and data.
 
 ### Recommendation:
 Stay with the current **Direct Bridge** for now because it is faster and gives us full control over the SQL Guard and Timeouts. Switch to MCP if you plan to integrate **multiple external tools** beyond just the database.
+
+---
+
+**Last Updated:** February 2, 2026, 12:00 PM UTC

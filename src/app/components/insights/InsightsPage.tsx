@@ -4,59 +4,170 @@
 import { InsightsReportsAccordion } from "./ReportsAccordion";
 import { InsightsSystemReports } from "./SystemReports";
 import { useState } from "react";
+import { Search } from "lucide-react";
+import { useInsightsUI } from "@/app/lib/insights/ui-store";
 
 export function InsightsPageComponent() {
   // My Reports vs System Reports tabs (like PNG)
   const [tab, setTab] = useState<"my" | "system">("my");
+  const { aimeOpen, pickColumnsOpen, sidebarCollapsed } = useInsightsUI();
+  
+  // When AIME is minimized OR sidebar is collapsed, stretch to fill available space
+  const shouldExpand = (!aimeOpen && !pickColumnsOpen) || sidebarCollapsed;
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex-shrink-0">
-        <div className="text-[12px] text-[#9ca3af]">Big event 2025 Groupize</div>
+    <div
+      style={{
+        display: 'flex',
+        width: shouldExpand ? '100%' : '754px',
+        height: '878px',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        gap: '24px',
+      }}
+    >
+      {/* Page Header */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'flex-end',
+          gap: 'var(--spacing-6, 24px)',
+          alignSelf: 'stretch',
+        }}
+      >
+        {/* Left Section - Title and Tabs */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
+          <h1
+            style={{
+              margin: 0,
+              fontFamily: "'Instrument Sans', sans-serif",
+              fontSize: '32px',
+              fontWeight: 700,
+              lineHeight: '40px',
+              color: '#111827',
+            }}
+          >
+            Insights
+          </h1>
+          <p
+            style={{
+              margin: 0,
+              fontFamily: "'Open Sans', sans-serif",
+              fontSize: '14px',
+              fontWeight: 400,
+              lineHeight: '20px',
+              color: '#6b7280',
+            }}
+          >
+            Realtime insights powered by aime Insights
+          </p>
 
-        <div className="mt-2 flex items-start justify-between gap-4">
-          <div>
-            <h1 className="m-0 text-[32px] font-bold tracking-tight text-[#111827]">Insights</h1>
-            <p className="mt-1 text-[14px] text-[#6b7280]">Realtime insights powered by aime Insights</p>
-
-            {/* Tabs like PNG: My Reports | System Reports */}
-            <div className="mt-4 inline-flex rounded-full border border-[#e5e7eb] bg-white p-1">
-              <button
-                onClick={() => setTab("my")}
-                className={[
-                  "rounded-full px-4 py-2 text-[13px]",
-                  tab === "my" ? "bg-[#111827] text-white" : "text-[#374151]",
-                ].join(" ")}
-              >
-                My Reports
-              </button>
-              <button
-                onClick={() => setTab("system")}
-                className={[
-                  "rounded-full px-4 py-2 text-[13px]",
-                  tab === "system" ? "bg-[#111827] text-white" : "text-[#374151]",
-                ].join(" ")}
-              >
-                System Reports
-              </button>
-            </div>
+          {/* Tabs Component */}
+          <div
+            style={{
+              display: 'flex',
+              width: '300px',
+              height: 'var(--height-h-9, 36px)',
+              padding: '3px var(--spacing-2, 8px)',
+              alignItems: 'center',
+              flexShrink: 0,
+              borderRadius: 'var(--border-radius-rounded-lg, 10px)',
+              border: '1px solid var(--base-border, #E6EAF0)',
+              background: 'var(--base-accent, #F1F3F7)',
+              marginTop: '16px',
+            }}
+          >
+            <button
+              onClick={() => setTab("my")}
+              style={{
+                flex: 1,
+                height: '30px',
+                padding: '0 12px',
+                borderRadius: '8px',
+                border: 'none',
+                background: tab === "my" ? '#FFFFFF' : 'transparent',
+                color: tab === "my" ? '#111827' : '#374151',
+                fontFamily: "'Open Sans', sans-serif",
+                fontSize: '13px',
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+            >
+              My Reports
+            </button>
+            <button
+              onClick={() => setTab("system")}
+              style={{
+                flex: 1,
+                height: '30px',
+                padding: '0 12px',
+                borderRadius: '8px',
+                border: 'none',
+                background: tab === "system" ? '#FFFFFF' : 'transparent',
+                color: tab === "system" ? '#111827' : '#374151',
+                fontFamily: "'Open Sans', sans-serif",
+                fontSize: '13px',
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+            >
+              System Reports
+            </button>
           </div>
+        </div>
 
-          {/* Search (top-right) */}
-          <div className="mt-2 flex items-center gap-2">
-            <div className="flex items-center rounded-full border border-[#e5e7eb] bg-white px-4 py-2">
-              <span className="mr-2 h-4 w-4 rounded-full border border-[#9ca3af]" />
-              <input
-                className="w-[220px] border-none text-[13px] outline-none"
-                placeholder="Search reports"
-              />
-            </div>
+        {/* Right Section - Search */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              width: '296px',
+              height: '36px',
+              padding: '4px 12px',
+              borderRadius: '8px',
+              border: '1px solid var(--base-input, #E6EAF0)',
+              background: '#FFFFFF',
+            }}
+          >
+            <Search
+              size={16}
+              style={{ flexShrink: 0, color: '#637584' }}
+            />
+            <input
+              type="text"
+              placeholder="Search"
+              style={{
+                flex: 1,
+                border: 'none',
+                outline: 'none',
+                background: 'transparent',
+                fontFamily: "'Open Sans', sans-serif",
+                fontSize: '14px',
+                color: '#637584',
+              }}
+            />
           </div>
         </div>
       </div>
 
       {/* Content - scrollable area */}
-      <div className="flex-1 overflow-y-auto">
+      <div
+        style={{
+          flex: 1,
+          overflowY: 'auto',
+          width: '100%',
+        }}
+      >
         {tab === "my" ? <InsightsReportsAccordion /> : <InsightsSystemReports />}
       </div>
     </div>

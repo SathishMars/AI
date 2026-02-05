@@ -25,10 +25,10 @@ async function startServer() {
             };
         },
         logging: {
-            debug: (...args) => console.log('[GraphQL Yoga Debug]', ...args),
-            info: (...args) => console.log('[GraphQL Yoga Info]', ...args),
-            warn: (...args) => console.warn('[GraphQL Yoga Warn]', ...args),
-            error: (...args) => console.error('[GraphQL Yoga Error]', ...args),
+            debug: (...args) => logger.debugGraphQL('[GraphQL Yoga Debug]', ...args),
+            info: (...args) => logger.info('[GraphQL Yoga Info]', ...args),
+            warn: (...args) => logger.warn('[GraphQL Yoga Warn]', ...args),
+            error: (...args) => logger.error('[GraphQL Yoga Error]', ...args),
         },
         // Add error handling for serialization issues
         maskedErrors: false, // Show full error details for debugging
@@ -40,8 +40,8 @@ async function startServer() {
         try {
             await originalRequestListener(req, res);
         } catch (error: any) {
-            console.error('[GraphQL Yoga] Request listener error:', error);
-            console.error('[GraphQL Yoga] Error stack:', error?.stack);
+            logger.error('[GraphQL Yoga] Request listener error:', error);
+            logger.debugGraphQL('[GraphQL Yoga] Error stack:', error?.stack);
             if (!res.headersSent) {
                 res.status(500).json({
                     errors: [{
@@ -84,6 +84,6 @@ async function startServer() {
 }
 
 startServer().catch((err) => {
-    console.error('Failed to start server:', err);
+    logger.error('Failed to start server:', err);
     process.exit(1);
 });

@@ -4,6 +4,7 @@
 import { insightsMyReports, insightsSharedReports } from "@/app/lib/insights/data";
 import { InsightsReportCard } from "./ReportCard";
 import { useState } from "react";
+import { ChevronDown, Users } from "lucide-react";
 
 function Section({
   title,
@@ -19,20 +20,65 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="mt-4">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0', width: '100%', marginTop: '16px' }}>
       <button
         onClick={onToggle}
-        className="flex w-full items-center justify-between rounded-xl border border-[#e5e7eb] bg-white px-4 py-3"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '12px 0',
+          border: 'none',
+          background: 'transparent',
+          cursor: 'pointer',
+          textAlign: 'left',
+          width: '100%',
+        }}
       >
-        <div className="flex items-center gap-2">
-          <span className="text-[12px] text-[#6b7280]">{open ? "▾" : "▸"}</span>
-          <div className="text-[13px] font-semibold text-[#111827]">
-            {title}
-          </div>
-        </div>
+        {/* Chevron Icon */}
+        <ChevronDown
+          size={16}
+          style={{
+            transform: open ? 'rotate(0deg)' : 'rotate(-90deg)',
+            transition: 'transform 0.2s',
+            flexShrink: 0,
+            color: '#6b7280',
+          }}
+        />
+        
+        {/* User Icon */}
+        <Users
+          size={16}
+          style={{ flexShrink: 0, color: '#6b7280' }}
+        />
+        
+        {/* Category Title */}
+        <span
+          style={{
+            fontFamily: "'Open Sans', sans-serif",
+            fontSize: '13px',
+            fontWeight: 600,
+            color: '#111827',
+            flexShrink: 0,
+          }}
+        >
+          {title} ({count})
+        </span>
       </button>
 
-      {open && <div className="mt-3 grid grid-cols-3 gap-3">{children}</div>}
+      {open && (
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+            width: '100%',
+            marginTop: '8px',
+          }}
+        >
+          {children}
+        </div>
+      )}
     </div>
   );
 }
@@ -43,10 +89,10 @@ export function InsightsReportsAccordion() {
   const [openShared, setOpenShared] = useState(true);
 
   return (
-    <div className="pb-4">
+    <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: '16px', width: '100%' }}>
       <Section
         title="My Reports"
-        count={3}
+        count={insightsMyReports.length}
         open={openMy}
         onToggle={() => setOpenMy((v) => !v)}
       >
@@ -57,7 +103,7 @@ export function InsightsReportsAccordion() {
 
       <Section
         title="Shared With Me"
-        count={4}
+        count={insightsSharedReports.length}
         open={openShared}
         onToggle={() => setOpenShared((v) => !v)}
       >

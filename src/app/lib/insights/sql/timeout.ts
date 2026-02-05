@@ -1,5 +1,6 @@
 // INSIGHTS-SPECIFIC: SQL query timeout utilities
 import { insightsPool } from "@/app/lib/insights/db";
+import { logger } from "@/app/lib/logger";
 
 /**
  * Runs a query with a strict statement_timeout.
@@ -34,7 +35,7 @@ export async function queryWithTimeout<T = any>(sql: string, params: any[] = [],
         await client.query("ROLLBACK");
       } catch (rollbackError) {
         // Log but don't throw - we're already in error state
-        console.error("[queryWithTimeout] Rollback failed:", rollbackError);
+        logger.error("[queryWithTimeout] Rollback failed:", rollbackError);
       }
     }
     throw e;
@@ -45,7 +46,7 @@ export async function queryWithTimeout<T = any>(sql: string, params: any[] = [],
         client.release();
       } catch (releaseError) {
         // Log but don't throw - connection may already be released
-        console.error("[queryWithTimeout] Release failed:", releaseError);
+        logger.error("[queryWithTimeout] Release failed:", releaseError);
       }
     }
   }

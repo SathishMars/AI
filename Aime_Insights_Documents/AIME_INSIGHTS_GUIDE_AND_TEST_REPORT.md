@@ -164,3 +164,7 @@ npm test src/test/api/graphql/schema.test.ts src/test/lib/insights/sql/schema.te
 | **Chat Errors** | API Keys missing | Restart container: `docker-compose up -d`. |
 | **Old Data** | View out of date | Run the latest `datadump_view.sql` script. |
 | **Limit Applied** | Logic Cap | Ensure `forceLimit` is removed in `schema.ts`. |
+
+---
+
+**Last Updated:** February 2, 2026, 12:00 PM UTC

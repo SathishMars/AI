@@ -54,7 +54,14 @@ export function containsOosKeyword(question: string): boolean {
     /arrival\s+time\s+of\s+.*attendee/i,        // "arrival time of attendee X"
     /what\s+is\s+the\s+arrival\s+time/i,       // "what is the arrival time"
     /who\s+is\s+next\s+attendee/i,              // "who is next attendee"
-    /next\s+attendee\s+to\s+be\s+registered/i   // "next attendee to be registered"
+    /next\s+attendee\s+to\s+be\s+registered/i,   // "next attendee to be registered"
+    /dietary\s+restriction/i,                   // "dietary restriction"
+    /dietary\s+preference/i,                    // "dietary preference"
+    /food\s+allerg/i,                           // "food allergy" or "food allergies"
+    /meal\s+preference/i,                       // "meal preference"
+    /list.*attendee.*dietary/i,                 // "list attendees with dietary"
+    /who.*dietary/i,                            // "who has dietary"
+    /show.*dietary/i                            // "show dietary"
   ];
   
   // If it matches explicit in-scope patterns, don't block it
@@ -93,7 +100,14 @@ export function detectScopeAndCategory(question: string): {
     /who\s+is.*(?:registered|person|people|attendee|that person|those people)/i,  // "who is that person registered", "who is registered"
     /who\s+are.*(?:registered|people|attendees)/i,  // "who are registered", "who are the registered people"
     /details?\s+of\s+.*(?:person|people|attendee).*registered/i,  // "details of person registered"
-    /(?:person|people|attendee).*registered/i  // "person registered", "people registered"
+    /(?:person|people|attendee).*registered/i,  // "person registered", "people registered"
+    /dietary\s+restriction/i,                   // "dietary restriction"
+    /dietary\s+preference/i,                    // "dietary preference"
+    /food\s+allerg/i,                           // "food allergy" or "food allergies"
+    /meal\s+preference/i,                       // "meal preference"
+    /list.*attendee.*dietary/i,                 // "list attendees with dietary"
+    /who.*dietary/i,                            // "who has dietary"
+    /show.*dietary/i                            // "show dietary"
   ];
   
   // Check explicit in-scope patterns FIRST - if matched, return in-scope immediately

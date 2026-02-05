@@ -1,5 +1,6 @@
 import { MongoClient, MongoClientOptions, Db } from 'mongodb';
 import { env } from '@/app/lib/env';
+import { logger } from '@/app/lib/logger';
 
 /**
  * MongoDB Connection Pool Utility

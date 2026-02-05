@@ -73,12 +73,11 @@ export async function proxy(request: NextRequest) {
       return NextResponse.next();
     }
 
-    // Skip insights API routes - chat and graphql don't require workflow authentication
+    // Skip insights API routes - chat doesn't require workflow authentication
+    // Note: GraphQL now connects directly to standalone server, so /api/graphql proxy is no longer used
     if (
       pathname.startsWith('/api/chat') ||
-      pathname.startsWith('/api/graphql') ||
-      pathname.startsWith(`${env.basePath}/api/chat`) ||
-      pathname.startsWith(`${env.basePath}/api/graphql`)
+      pathname.startsWith(`${env.basePath}/api/chat`)
     ) {
       console.log('[Auth Middleware] Skipping insights API route (no auth required)');
       return NextResponse.next();

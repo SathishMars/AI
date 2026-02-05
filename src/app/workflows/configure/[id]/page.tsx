@@ -18,7 +18,7 @@ export default function WorkflowConfigurePage({ params }: PageProps) {
 
   // Callback when template is saved (trigger selector refresh)
   const handleTemplateSaved = useCallback((savedTemplate: WorkflowTemplate) => {
-    console.log('[Page] Template saved, ID:', savedTemplate.id);
+    logger.info('[Page] Template saved, ID:', savedTemplate.id);
   }, []);
 
 

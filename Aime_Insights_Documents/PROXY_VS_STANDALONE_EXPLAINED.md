@@ -325,3 +325,7 @@ Customer → Department → Customer
 - More complex architecture
 
 For your use case, the proxy approach is the right choice because it provides flexibility, security, and maintainability while keeping the frontend code simple and environment-agnostic.
+
+---
+
+**Last Updated:** February 2, 2026, 12:00 PM UTC

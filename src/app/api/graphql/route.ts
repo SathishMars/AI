@@ -1,5 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+/**
+ * DEPRECATED: This proxy route is no longer used.
+ * 
+ * GraphQL now connects directly to the standalone server.
+ * Clients use getGraphQLUrl() from @/app/utils/api to get the GraphQL server URL
+ * and connect directly via fetch() instead of going through this proxy.
+ * 
+ * This file is kept for reference but can be removed if not needed.
+ */
+
 // Increase timeout for AI queries (can take several minutes)
 export const maxDuration = 300; // 5 minutes
 

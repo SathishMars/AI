@@ -643,3 +643,7 @@ Token usage data enables cost analysis:
 - For 10,000 queries/month = $100/month
 
 **Note**: Actual token usage values are available in real-time API responses. Check `meta.usage` in GraphQL responses for current token counts per query.
+
+---
+
+**Last Updated:** February 2, 2026, 12:00 PM UTC

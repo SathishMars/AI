@@ -849,18 +849,19 @@ export default function InsightsArrivalsTable({
             minHeight: 0,
             position: 'relative',
             WebkitOverflowScrolling: 'touch',
-            overflowX: 'auto', // Enable horizontal scrolling - scrollbar will appear at bottom
-            overflowY: showAll ? 'auto' : 'hidden', // Vertical scrolling only when showAll is true
-            // Use full container height - scrollbar will appear at bottom
+            overflowX: 'auto',
+            overflowY: showAll ? 'auto' : 'hidden',
             height: '100%',
             width: '100%',
-            boxSizing: 'border-box', // Ensure borders/padding don't add to height
-            flex: '1 1 0%', // Use flex to fill available space
-            zIndex: 10, // Higher z-index than overlay to ensure scrollbar is visible
-            paddingBottom: '0px', // Ensure no padding interferes with scrollbar
-            marginBottom: '0px', // Ensure no margin interferes with scrollbar
-            // Force scrollbar to be visible
-            scrollbarGutter: 'stable'
+            maxWidth: '100%',
+            boxSizing: 'border-box',
+            flex: '1 1 0%',
+            zIndex: 10,
+            paddingBottom: '0px',
+            marginBottom: '0px',
+            scrollbarGutter: 'stable',
+            // Ensure scrollbar is always visible when content overflows
+            msOverflowStyle: 'scrollbar',
           } as React.CSSProperties}
           onScroll={(e) => {
             // Scrollbar interaction - details shown in debug panel
@@ -870,12 +871,13 @@ export default function InsightsArrivalsTable({
             ref={tableRef}
             className="border-collapse"
             style={{ 
-              minWidth: 'max-content', // Force table to expand to fit all columns
               width: 'max-content',
+              minWidth: '100%',
               tableLayout: 'auto',
               display: 'table',
               borderSpacing: 0,
-              whiteSpace: 'nowrap' // Prevent cell content from wrapping
+              // Ensure table expands to show all columns
+              whiteSpace: 'nowrap',
             }}
           >
             <thead ref={headerRef} className="bg-[#f3f4f6] sticky top-0 z-10">
@@ -893,7 +895,17 @@ export default function InsightsArrivalsTable({
                       onDragOver={(e) => handleDragOver(e, col)}
                       onDragLeave={handleDragLeave}
                       onDragEnd={handleDragEnd}
-                      className={`px-4 py-1.5 font-medium whitespace-nowrap relative ${
+                      style={{
+                        height: 'var(--height-h-10, 40px)',
+                        minWidth: '85px',
+                        width: '201px',
+                        padding: '0 var(--spacing-2, 8px)',
+                        borderBottom: 'var(--border-width-border, 1px) solid var(--base-border, #E6EAF0)',
+                        background: 'var(--base-muted, #F1F3F7)',
+                        verticalAlign: 'middle',
+                        textAlign: 'left',
+                      }}
+                      className={`font-medium whitespace-nowrap relative ${
                         isDragging
                           ? 'opacity-50 cursor-grabbing'
                           : isDragOver
@@ -920,7 +932,19 @@ export default function InsightsArrivalsTable({
                     className="border-t border-[#e5e7eb] text-[12px] text-[#111827] hover:bg-gray-50 transition-colors"
                   >
                     {displayedHeaders.map((col) => (
-                      <td key={col} className="px-4 py-1.5" style={{ whiteSpace: 'nowrap' }}>
+                      <td 
+                        key={col} 
+                        style={{
+                          height: '53px',
+                          minWidth: '85px',
+                          width: '201px',
+                          padding: 'var(--spacing-2, 8px)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          verticalAlign: 'middle',
+                        }}
+                      >
                         {row[col] || ""}
                       </td>
                     ))}

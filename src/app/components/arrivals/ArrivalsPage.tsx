@@ -6,9 +6,10 @@ import InsightsArrivalsTable from "./ArrivalsTable";
 import { Toast, useToast } from "@/components/ui/toast";
 import { InsightsPickColumnsPanel } from "./PickColumnsPanel";
 import { useInsightsUI } from "@/app/lib/insights/ui-store";
-import { Upload, Search, ChevronLeft, Columns3, User, FileDown, Lock, CheckCircle2, Users } from "lucide-react";
+import { Upload, Search, ChevronLeft, Columns3, User, FileDown, LockKeyhole, CheckCircle2, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { apiFetch } from "@/app/utils/api";
+import { apiFetch, getGraphQLUrl } from "@/app/utils/api";
+import { logger } from "@/app/lib/logger";
 
 function Input({ ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50" />;
@@ -17,7 +18,7 @@ function Input({ ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
 type Attendee = Record<string, any>;
 
 export default function InsightsArrivalsPage() {
-  const { openAime, setPickColumnsOpen, setAimeOpen, setPickColumnsData, aimeAction, setAimeAction, eventId, setEventId, setExportState } = useInsightsUI();
+  const { aimeOpen, setPickColumnsOpen, setAimeOpen, setPickColumnsData, aimeAction, setAimeAction, eventId, setEventId, setExportState } = useInsightsUI();
   
   // Store setExportState in a ref to ensure it's stable
   const setExportStateRef = useRef(setExportState);
@@ -118,7 +119,7 @@ export default function InsightsArrivalsPage() {
         }
       }
     } catch (e) {
-      console.error('Failed to load column order from localStorage:', e);
+      logger.error('Failed to load column order from localStorage:', e);
     }
   }, []);
 
@@ -128,7 +129,7 @@ export default function InsightsArrivalsPage() {
       try {
         localStorage.setItem('arrivalsColumnOrder', JSON.stringify(selectedColumns));
       } catch (e) {
-        console.error('Failed to save column order to localStorage:', e);
+        logger.error('Failed to save column order to localStorage:', e);
       }
     }
   }, [selectedColumns]);
@@ -462,110 +463,215 @@ export default function InsightsArrivalsPage() {
   const innerWrapperDivRef = useRef<HTMLDivElement | null>(null);
   
   
+  // CRITICAL: Table height enforcement - runs continuously regardless of state
   useEffect(() => {
+    const targetTableHeight = 960;
+    
     const fixWrapperHeights = () => {
-      // Fix outer wrapper div (line 1677)
-      if (wrapperDivRef.current && tableAreaRef.current) {
-        const tableAreaRect = tableAreaRef.current.getBoundingClientRect();
-        const wrapperRect = wrapperDivRef.current.getBoundingClientRect();
-        const computedStyle = window.getComputedStyle(wrapperDivRef.current);
+      // First, ensure main container allows enough space
+      if (mainContainerRef.current) {
+        const mainEl = mainContainerRef.current;
+        // Ensure main container is at least 960px + header space
+        // Header is approximately 120px, so we need at least 1080px total
+        // But we'll set it to allow the table to be 960px
+        mainEl.style.setProperty('min-height', '960px', 'important');
+        mainEl.style.setProperty('display', 'flex', 'important');
+        mainEl.style.setProperty('flex-direction', 'column', 'important');
+      }
+      
+      // Fix outer wrapper div (table wrapper) - ALWAYS 960px
+      if (wrapperDivRef.current) {
+        const el = wrapperDivRef.current;
         
-        const needsFix = wrapperRect.height < tableAreaRect.height - 5;
-        const targetHeight = tableAreaRect.height;
+        // Force height immediately
+        el.style.setProperty('height', `${targetTableHeight}px`, 'important');
+        el.style.setProperty('max-height', `${targetTableHeight}px`, 'important');
+        el.style.setProperty('min-height', `${targetTableHeight}px`, 'important');
         
-        // ALWAYS force fix if height is less than parent (with 5px tolerance)
-        if (needsFix) {
-          wrapperDivRef.current.style.setProperty('height', `${targetHeight}px`, 'important');
-          wrapperDivRef.current.style.setProperty('max-height', `${targetHeight}px`, 'important');
-          wrapperDivRef.current.style.setProperty('min-height', '0', 'important');
+        // Also ensure parent allows this height
+        const parent = el.parentElement;
+        if (parent) {
+          parent.style.setProperty('min-height', `${targetTableHeight}px`, 'important');
+          parent.style.setProperty('height', 'auto', 'important');
+          parent.style.setProperty('display', 'flex', 'important');
+          parent.style.setProperty('flex-direction', 'column', 'important');
+          parent.style.setProperty('flex', '1 1 0%', 'important');
+        }
+        
+        // Verify height matches - if not, force again
+        const wrapperRect = el.getBoundingClientRect();
+        if (Math.abs(wrapperRect.height - targetTableHeight) > 1) {
+          el.style.setProperty('height', `${targetTableHeight}px`, 'important');
+          el.style.setProperty('max-height', `${targetTableHeight}px`, 'important');
+          el.style.setProperty('min-height', `${targetTableHeight}px`, 'important');
         }
       }
       
-      // Fix inner wrapper div (line 1711) - this is the GrandParent
-      if (innerWrapperDivRef.current && wrapperDivRef.current) {
-        const wrapperRect = wrapperDivRef.current.getBoundingClientRect();
-        const innerRect = innerWrapperDivRef.current.getBoundingClientRect();
-        const computedStyle = window.getComputedStyle(innerWrapperDivRef.current);
-        const parentComputedStyle = window.getComputedStyle(wrapperDivRef.current);
+      // Fix inner wrapper div - should fill the 960px wrapper
+      if (innerWrapperDivRef.current) {
+        const el = innerWrapperDivRef.current;
+        const targetHeight = targetTableHeight; // Use fixed 960px
         
-        const needsFix = innerRect.height < wrapperRect.height - 5;
-        const targetHeight = wrapperRect.height;
+        // ALWAYS enforce 960px height - execute unconditionally
+        el.style.setProperty('min-height', `${targetHeight}px`, 'important');
+        el.style.setProperty('height', `${targetHeight}px`, 'important');
+        el.style.setProperty('max-height', `${targetHeight}px`, 'important');
         
-        // ALWAYS force fix if height is less than parent (with 5px tolerance)
-        let fixApplied = false;
-        let fixOverridden = false;
+        // Remove all constraints
+        el.style.setProperty('padding-top', '0', 'important');
+        el.style.setProperty('padding-bottom', '0', 'important');
+        el.style.setProperty('margin-top', '0', 'important');
+        el.style.setProperty('margin-bottom', '0', 'important');
         
-        if (needsFix) {
-          // CRITICAL: Set min-height FIRST to force expansion, then height
-          // This ensures the element expands even if content is smaller
-          innerWrapperDivRef.current.style.setProperty('min-height', `${targetHeight}px`, 'important');
-          innerWrapperDivRef.current.style.setProperty('height', `${targetHeight}px`, 'important');
-          innerWrapperDivRef.current.style.setProperty('max-height', `${targetHeight}px`, 'important');
-          
-          // Remove all constraints
-          innerWrapperDivRef.current.style.setProperty('padding-top', '0', 'important');
-          innerWrapperDivRef.current.style.setProperty('padding-bottom', '0', 'important');
-          innerWrapperDivRef.current.style.setProperty('margin-top', '0', 'important');
-          innerWrapperDivRef.current.style.setProperty('margin-bottom', '0', 'important');
-          
-          // Force flex to fill - use flex-basis instead of just flex
-          innerWrapperDivRef.current.style.setProperty('flex', '1 1 0%', 'important');
-          innerWrapperDivRef.current.style.setProperty('flex-basis', `${targetHeight}px`, 'important');
-          innerWrapperDivRef.current.style.setProperty('flex-grow', '1', 'important');
-          innerWrapperDivRef.current.style.setProperty('flex-shrink', '0', 'important');
-          
-          // Also ensure display and box-sizing
-          innerWrapperDivRef.current.style.setProperty('display', 'flex', 'important');
-          innerWrapperDivRef.current.style.setProperty('box-sizing', 'border-box', 'important');
-          
-          fixApplied = true;
-          
-          // Verify fix was applied - check multiple times
-          setTimeout(() => {
-            if (!innerWrapperDivRef.current) return;
-            const newRect = innerWrapperDivRef.current.getBoundingClientRect();
-            if (Math.abs(newRect.height - targetHeight) > 5) {
-              fixOverridden = true;
-              // Try even more aggressive fix
-              innerWrapperDivRef.current.style.setProperty('min-height', `${targetHeight}px`, 'important');
-              innerWrapperDivRef.current.style.setProperty('height', `${targetHeight}px`, 'important');
-            }
-          }, 10);
-          
-          // Double-check after a longer delay
-          setTimeout(() => {
-            if (!innerWrapperDivRef.current) return;
-            const newRect = innerWrapperDivRef.current.getBoundingClientRect();
-            if (Math.abs(newRect.height - targetHeight) > 5) {
-              // Last resort: try setting it again
-              innerWrapperDivRef.current.style.setProperty('min-height', `${targetHeight}px`, 'important');
-              innerWrapperDivRef.current.style.setProperty('height', `${targetHeight}px`, 'important');
-            }
-          }, 50);
+        // Force flex to fill
+        el.style.setProperty('flex', '1 1 0%', 'important');
+        el.style.setProperty('display', 'flex', 'important');
+        el.style.setProperty('box-sizing', 'border-box', 'important');
+        
+        // Verify height
+        const innerRect = el.getBoundingClientRect();
+        if (Math.abs(innerRect.height - targetHeight) > 1) {
+          el.style.setProperty('min-height', `${targetHeight}px`, 'important');
+          el.style.setProperty('height', `${targetHeight}px`, 'important');
+          el.style.setProperty('max-height', `${targetHeight}px`, 'important');
         }
-        
       }
     };
     
-    // Fix immediately and continuously every 50ms (more frequent)
-    // Use multiple timeouts to ensure refs are set
+    // Fix immediately
     fixWrapperHeights();
-    const t1 = setTimeout(fixWrapperHeights, 50);
-    const t2 = setTimeout(fixWrapperHeights, 100);
-    const t3 = setTimeout(fixWrapperHeights, 200);
-    const t4 = setTimeout(fixWrapperHeights, 500);
-    const t5 = setTimeout(fixWrapperHeights, 1000);
-    const interval = setInterval(fixWrapperHeights, 100);
+    
+    // Use requestAnimationFrame for immediate enforcement after render
+    const rafEnforce = () => {
+      requestAnimationFrame(() => {
+        fixWrapperHeights();
+        requestAnimationFrame(() => {
+          fixWrapperHeights();
+        });
+      });
+    };
+    rafEnforce();
+    
+    // Multiple timeouts to ensure refs are set
+    const timeouts: NodeJS.Timeout[] = [];
+    for (let i = 0; i <= 2000; i += 50) {
+      timeouts.push(setTimeout(fixWrapperHeights, i));
+    }
+    
+    // Continuous enforcement every 25ms
+    const interval = setInterval(fixWrapperHeights, 25);
+    
+    // Use ResizeObserver to monitor and enforce height changes
+    const resizeObserver = new ResizeObserver(() => {
+      fixWrapperHeights();
+    });
+    
+    // Use MutationObserver to watch for style/attribute changes and re-enforce
+    const mutationObserver = new MutationObserver((mutations) => {
+      let shouldEnforce = false;
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes') {
+          const target = mutation.target as HTMLElement;
+          if (target === wrapperDivRef.current || 
+              target === innerWrapperDivRef.current ||
+              (wrapperDivRef.current && target.contains(wrapperDivRef.current)) ||
+              (innerWrapperDivRef.current && target.contains(innerWrapperDivRef.current))) {
+            shouldEnforce = true;
+          }
+        }
+      });
+      if (shouldEnforce) {
+        fixWrapperHeights();
+      }
+    });
+    
+    // Set up observers
+    const setupObservers = () => {
+      if (wrapperDivRef.current) {
+        resizeObserver.observe(wrapperDivRef.current);
+        mutationObserver.observe(wrapperDivRef.current, {
+          attributes: true,
+          attributeFilter: ['style', 'class'],
+          subtree: false
+        });
+        // Also observe parent
+        if (wrapperDivRef.current.parentElement) {
+          resizeObserver.observe(wrapperDivRef.current.parentElement);
+          mutationObserver.observe(wrapperDivRef.current.parentElement, {
+            attributes: true,
+            attributeFilter: ['style', 'class'],
+            subtree: false
+          });
+        }
+      }
+      if (innerWrapperDivRef.current) {
+        resizeObserver.observe(innerWrapperDivRef.current);
+        mutationObserver.observe(innerWrapperDivRef.current, {
+          attributes: true,
+          attributeFilter: ['style', 'class'],
+          subtree: false
+        });
+      }
+    };
+    
+    setupObservers();
+    setTimeout(setupObservers, 0);
+    setTimeout(setupObservers, 100);
+    setTimeout(setupObservers, 300);
+    setTimeout(setupObservers, 500);
+    setTimeout(setupObservers, 1000);
+    
+    // Also enforce on window focus and visibility change
+    const handleFocus = () => {
+      fixWrapperHeights();
+      setTimeout(fixWrapperHeights, 50);
+      setTimeout(fixWrapperHeights, 100);
+    };
+    window.addEventListener('focus', handleFocus);
+    
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fixWrapperHeights();
+        setTimeout(fixWrapperHeights, 50);
+        setTimeout(fixWrapperHeights, 100);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     
     return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
-      clearTimeout(t4);
-      clearTimeout(t5);
+      timeouts.forEach(timeout => clearTimeout(timeout));
       clearInterval(interval);
+      resizeObserver.disconnect();
+      mutationObserver.disconnect();
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [loading, fetchStatus, rows.length]);
+  }, []); // Run once on mount - enforcement runs continuously regardless of state
+  
+  // Additional enforcement when AIME state changes (as backup)
+  useEffect(() => {
+    const targetTableHeight = 960;
+    
+    const enforceTableHeight = () => {
+      if (wrapperDivRef.current) {
+        wrapperDivRef.current.style.setProperty('height', `${targetTableHeight}px`, 'important');
+        wrapperDivRef.current.style.setProperty('max-height', `${targetTableHeight}px`, 'important');
+        wrapperDivRef.current.style.setProperty('min-height', `${targetTableHeight}px`, 'important');
+      }
+      if (innerWrapperDivRef.current) {
+        innerWrapperDivRef.current.style.setProperty('height', `${targetTableHeight}px`, 'important');
+        innerWrapperDivRef.current.style.setProperty('max-height', `${targetTableHeight}px`, 'important');
+        innerWrapperDivRef.current.style.setProperty('min-height', `${targetTableHeight}px`, 'important');
+      }
+    };
+    
+    // Enforce immediately and after delays
+    enforceTableHeight();
+    setTimeout(enforceTableHeight, 0);
+    setTimeout(enforceTableHeight, 50);
+    setTimeout(enforceTableHeight, 100);
+    setTimeout(enforceTableHeight, 200);
+  }, [aimeOpen]); // Re-enforce when AIME state changes
   
   // Position hide bar overlay above horizontal scrollbar
   useEffect(() => {
@@ -651,18 +757,9 @@ export default function InsightsArrivalsPage() {
       setHighlightedColumns(changedColumns);
       setTimeout(() => setHighlightedColumns([]), 2000);
       
-      // Show toast with undo option
-      const undoAction = () => {
-        if (columnOrderHistory.length > 0) {
-          const previousOrder = columnOrderHistory[columnOrderHistory.length - 1];
-          setColumnOrderHistory(prev => prev.slice(0, -1));
-          setSelectedColumns(previousOrder);
-          setLastReorderAction(null);
-        }
-      };
-      showToast(`Column order updated.`, undoAction);
+      // Do not show toast notification - user requested to remove this
     }
-  }, [selectedColumns, displayedColumns, columnOrderHistory, showToast]);
+  }, [selectedColumns, displayedColumns]);
 
   // Auto-load data on component mount or eventId change (debounced)
   useEffect(() => {
@@ -675,7 +772,7 @@ export default function InsightsArrivalsPage() {
     return () => clearTimeout(timer);
   }, [eventId]);
 
-  async function fetchArrivals(search?: string, targetEventId?: number, requestedLimit?: number) {
+  async function fetchArrivals(search?: string, targetEventId?: number, requestedLimit?: number, abortSignal?: AbortSignal) {
     const maxRetries = 3;
     const retryDelay = 5000; // 5 seconds gap
 
@@ -722,13 +819,18 @@ export default function InsightsArrivalsPage() {
           }
         `;
 
-        const res = await apiFetch("/api/graphql", {
+        // Connect directly to GraphQL server (no proxy)
+        const graphqlUrl = getGraphQLUrl();
+        const res = await fetch(graphqlUrl, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+          },
           body: JSON.stringify({
             query,
             variables: { q: search?.trim() || null, eventId: currentEventId, limit: requestedLimit || 50000, offset: 0 },
           }),
+          ...(abortSignal ? { signal: abortSignal } : {}),
         });
 
         // Check content type before parsing
@@ -737,7 +839,7 @@ export default function InsightsArrivalsPage() {
 
         if (!res.ok) {
           const errorText = await res.text();
-          console.error(`GraphQL Fetch Error (Attempt ${attempt}):`, res.status, contentType, errorText.substring(0, 200));
+          logger.error(`GraphQL Fetch Error (Attempt ${attempt}):`, res.status, contentType, errorText.substring(0, 200));
           throw new Error(`Fetch failed: ${res.status} - ${errorText.substring(0, 100)}`);
         }
 
@@ -749,7 +851,7 @@ export default function InsightsArrivalsPage() {
           
           // Check if content type indicates JSON
           if (!isJsonResponse) {
-            console.error(`GraphQL Response is not JSON (Attempt ${attempt}):`, contentType, responseText.substring(0, 200));
+            logger.error(`GraphQL Response is not JSON (Attempt ${attempt}):`, contentType, responseText.substring(0, 200));
             throw new Error(`Invalid response format: expected JSON but got ${contentType || 'unknown'}`);
           }
           
@@ -762,7 +864,7 @@ export default function InsightsArrivalsPage() {
           }
           
           // JSON parsing failed
-          console.error(`JSON Parse Error (Attempt ${attempt}):`, parseError.message);
+          logger.error(`JSON Parse Error (Attempt ${attempt}):`, parseError.message);
           throw new Error(`Failed to parse JSON response: ${parseError.message}. Content-Type: ${contentType}`);
         }
         
@@ -772,11 +874,11 @@ export default function InsightsArrivalsPage() {
             !err.path?.includes('arrivalColumnTypes')
           );
           if (criticalErrors.length > 0) {
-            console.error(`GraphQL Response Errors (Attempt ${attempt}):`, json.errors);
+            logger.error(`GraphQL Response Errors (Attempt ${attempt}):`, json.errors);
             throw new Error(criticalErrors[0].message);
           }
           // If only arrivalColumnTypes failed, log warning but continue
-          console.warn(`arrivalColumnTypes query failed, continuing without column types:`, json.errors);
+          logger.warn(`arrivalColumnTypes query failed, continuing without column types:`, json.errors);
         }
 
         const cols = json?.data?.arrivalColumns ?? [];
@@ -808,7 +910,19 @@ export default function InsightsArrivalsPage() {
 
         return fetchedRows;
       } catch (err: any) {
-        console.error(`fetchArrivals error (Attempt ${attempt}):`, err);
+        // Check if aborted
+        if (err?.name === 'AbortError' || abortSignal?.aborted) {
+          setLoading(false);
+          throw new DOMException('Export cancelled', 'AbortError');
+        }
+
+        logger.error(`fetchArrivals error (Attempt ${attempt}):`, err);
+
+        // Don't retry if aborted
+        if (abortSignal?.aborted) {
+          setLoading(false);
+          throw new DOMException('Export cancelled', 'AbortError');
+        }
 
         if (attempt < maxRetries) {
           setFetchMessage(`Attempt ${attempt} failed. Retrying in 5 seconds...`);
@@ -879,11 +993,23 @@ export default function InsightsArrivalsPage() {
 
       // Ensure we have all data if there's more on the server than in memory
       if (direct || needsFullFetch || dataToExport.length === 0) {
+        // Check if aborted before starting fetch
+        if (controller.signal.aborted) {
+          throw new DOMException('Export cancelled', 'AbortError');
+        }
+
         setExportProgress(10);
         setExportMessage("Fetching complete dataset for export...");
         try {
           // Fetch data with a limit equal to the total count (up to backend cap)
-          const fetched = await fetchArrivals(q, eventId, total || 50000);
+          // Pass abort signal to allow cancellation
+          const fetched = await fetchArrivals(q, eventId, total || 50000, controller.signal);
+          
+          // Check if aborted after fetch completes
+          if (controller.signal.aborted) {
+            throw new DOMException('Export cancelled', 'AbortError');
+          }
+          
           setExportProgress(40);
 
           if (direct || needsFullFetch) {
@@ -938,13 +1064,28 @@ export default function InsightsArrivalsPage() {
         return;
       }
 
+      // Check if aborted before Excel generation
+      if (controller.signal.aborted) {
+        throw new DOMException('Export cancelled', 'AbortError');
+      }
+
       setExportProgress(60);
       setExportMessage("Preparing columns...");
+
+      // Check if aborted before starting Excel generation
+      if (controller.signal.aborted) {
+        throw new DOMException('Export cancelled', 'AbortError');
+      }
 
       setExportProgress(70);
       setExportMessage("Generating Excel file...");
 
       const XLSX = await import("xlsx");
+
+      // Check if aborted after XLSX import (which can take time)
+      if (controller.signal.aborted) {
+        throw new DOMException('Export cancelled', 'AbortError');
+      }
 
       // Format date: "Wednesday, December 10, 2025, 6:23 AM"
       const now = new Date();
@@ -1026,16 +1167,31 @@ export default function InsightsArrivalsPage() {
         e: { r: range.e.r + 5, c: range.e.c }
       });
 
+      // Check if aborted before finalizing
+      if (controller.signal.aborted) {
+        throw new DOMException('Export cancelled', 'AbortError');
+      }
+
       setExportProgress(85);
       setExportMessage("Finalizing export...");
 
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Arrivals");
       
+      // Check if aborted before saving file
+      if (controller.signal.aborted) {
+        throw new DOMException('Export cancelled', 'AbortError');
+      }
+      
       setExportProgress(95);
       setExportMessage("Saving file...");
       
       XLSX.writeFile(wb, `Arrivals_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+
+      // Final check before marking as complete
+      if (controller.signal.aborted) {
+        throw new DOMException('Export cancelled', 'AbortError');
+      }
 
       setExportProgress(100);
       setExportMessage("Export complete!");
@@ -1054,10 +1210,12 @@ export default function InsightsArrivalsPage() {
         setExportProgress(0);
       }, 5000);
     } catch (err: any) {
-      console.error("Export Error Caught:", err);
+      logger.error("Export Error Caught:", err);
 
-      if (err?.name === 'AbortError' || err?.message === 'Export cancelled') {
-        // Export was cancelled or timed out (removed debug logging)
+      if (err?.name === 'AbortError' || err?.message === 'Export cancelled' || controller.signal.aborted) {
+        // Export was cancelled or timed out
+        setExportStatus("error");
+        setExportMessage("Export was cancelled or timed out. Please try again.");
       } else {
         const errorMessage = err?.message || String(err) || "An unexpected error occurred during export.";
         setExportStatus("error");
@@ -1126,108 +1284,117 @@ export default function InsightsArrivalsPage() {
       {/* Main Content */}
       <div 
         ref={mainContainerRef} 
-        className="flex max-w-full flex-col" 
         style={{ 
+          display: 'flex',
+          width: aimeOpen ? '994px' : '100%',
+          maxWidth: aimeOpen ? '994px' : '100%',
+          flexDirection: 'column',
+          alignItems: 'flex-start',
+          gap: 'var(--spacing-6, 24px)',
           marginTop: '0px', 
           paddingTop: '0', 
-          height: 'calc(100vh - 56px)', 
-          maxHeight: 'calc(100vh - 56px)', // CRITICAL: Prevent overflow
+          height: '960px',
+          maxHeight: '960px',
+          minHeight: '960px',
           overflow: 'hidden', 
-          display: 'flex', 
-          flexDirection: 'column', 
           background: '#FFFFFF',
           boxSizing: 'border-box'
         }}
       >
       {/* PageHeader */}
-      <div className="flex flex-row items-end p-0 gap-6 flex-shrink-0" style={{ width: '100%', height: '64px', marginTop: '0', paddingTop: '0' }}>
-        {/* Left Container */}
-        <div className="flex flex-row items-center p-0 gap-2 flex-1" style={{ maxWidth: '1280px', height: '64px' }}>
-          <div className="flex flex-col justify-end items-start p-0 gap-2 flex-1" style={{ height: '64px' }}>
-            {/* Title */}
-            <div className="flex flex-row items-center p-0 gap-2" style={{ width: '100%', height: '32px' }}>
-              <div className="flex flex-row items-center p-0 gap-1" style={{ height: '32px' }}>
-                <h1 
-                  className="flex-none"
-                  style={{
-                    fontFamily: "'Instrument Sans', sans-serif",
-                    fontStyle: 'normal',
-                    fontWeight: 700,
-                    fontSize: '24px',
-                    lineHeight: '32px',
-                    color: '#161C24',
-                    width: '210px',
-                    height: '32px'
-                  }}
-                >
-                  Attendee Report
-                </h1>
-              </div>
-              {/* Badge */}
-              <span 
-                className="flex flex-row justify-center items-center px-2 py-0.5 gap-1 flex-none rounded-lg"
-                style={{
-                  background: '#E0E7FF',
-                  width: '99px',
-                  height: '20px'
-                }}
-              >
-                <Users className="w-3 h-3 flex-none" style={{ color: '#312E81', strokeWidth: 1.25 }} />
-                <span 
-                  className="flex-none"
-                  style={{
-                    fontFamily: "'Open Sans', sans-serif",
-                    fontStyle: 'normal',
-                    fontWeight: 600,
-                    fontSize: '12px',
-                    lineHeight: '16px',
-                    color: '#312E81',
-                    width: '67px',
-                    height: '16px'
-                  }}
-                >
-                  Attendance
-                </span>
-              </span>
-            </div>
-            {/* Description */}
-            <div 
-              className="flex-none self-stretch"
+      <div 
+        style={{
+          display: 'flex',
+          alignItems: 'flex-end',
+          gap: 'var(--spacing-6, 24px)',
+          alignSelf: 'stretch',
+          flexShrink: 0,
+        }}
+      >
+        {/* Left Container - Title Section */}
+        <div className="flex flex-col justify-end items-start p-0 gap-2 flex-1">
+          {/* Title */}
+          <div className="flex flex-row items-center p-0 gap-2">
+            <h1 
               style={{
-                fontFamily: "'Open Sans', sans-serif",
+                fontFamily: "'Instrument Sans', sans-serif",
                 fontStyle: 'normal',
-                fontWeight: 400,
-                fontSize: '16px',
-                lineHeight: '24px',
-                color: '#637584',
-                width: '100%',
-                height: '24px'
+                fontWeight: 700,
+                fontSize: '24px',
+                lineHeight: '32px',
+                color: '#161C24',
               }}
             >
-              Realtime data from your event
-            </div>
+              Attendee Report
+            </h1>
+            {/* Badge */}
+            <span 
+              className="flex flex-row justify-center items-center px-2 py-0.5 gap-1 rounded-lg"
+              style={{
+                background: '#E0E7FF',
+              }}
+            >
+              <Users className="w-3 h-3" style={{ color: '#312E81', strokeWidth: 1.25 }} />
+              <span 
+                style={{
+                  fontFamily: "'Open Sans', sans-serif",
+                  fontStyle: 'normal',
+                  fontWeight: 600,
+                  fontSize: '12px',
+                  lineHeight: '16px',
+                  color: '#312E81',
+                }}
+              >
+                Attendance
+              </span>
+            </span>
+          </div>
+          {/* Description */}
+          <div 
+            style={{
+              fontFamily: "'Open Sans', sans-serif",
+              fontStyle: 'normal',
+              fontWeight: 400,
+              fontSize: '16px',
+              lineHeight: '24px',
+              color: '#637584',
+            }}
+          >
+            Realtime data from your event
           </div>
         </div>
 
-        {/* Right Container */}
-        <div className="flex flex-row justify-end items-center p-0 gap-4 flex-none" style={{ width: '484px', height: '36px' }}>
+        {/* Right Container - Input Group and Button */}
+        <div 
+          style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            alignItems: 'center',
+            gap: 'var(--spacing-4, 16px)',
+          }}
+        >
           {/* Global Search InputGroup - searches across all columns */}
           <div 
-            className="flex flex-row items-center px-3 py-1 gap-2 flex-none rounded-lg"
+            className="flex flex-row items-center gap-2 flex-none rounded-lg"
             role="search"
             style={{
-              background: '#FFFFFF',
-              border: '1px solid #E6EAF0',
+              display: 'flex',
               width: '296px',
+              height: 'var(--height-h-9, 36px)',
               maxWidth: '296px',
-              height: '36px'
+              padding: 'var(--spacing-1, 4px) var(--spacing-3, 12px)',
+              alignItems: 'center',
+              gap: 'var(--spacing-2, 8px)',
+              borderRadius: 'var(--border-radius-rounded-md, 8px)',
+              border: 'var(--border-width-border, 1px) solid var(--base-input, #E6EAF0)',
+              background: 'var(--custom-background-dark-input-30, #FFF)',
             }}
           >
-            <div className="flex flex-row justify-center items-center p-0 gap-2 flex-none" style={{ width: '16px', height: '16px' }}>
-              <Search className="w-4 h-4 flex-none" style={{ color: '#637584', strokeWidth: 1.33 }} aria-hidden="true" />
+            <div className="flex flex-row justify-center items-center p-0 gap-2" style={{ width: '16px', height: '16px', flex: 'none' }}>
+              <Search className="w-4 h-4" style={{ color: '#637584', strokeWidth: 1.33, flex: 'none' }} aria-hidden="true" />
             </div>
             <Input
-              className="flex-1 border-none bg-transparent p-0 outline-none flex-none"
+              className="flex-1 border-none bg-transparent p-0 outline-none"
               placeholder="Search (Ctrl+F)"
               value={globalSearchQuery}
               onChange={(e) => {
@@ -1315,26 +1482,36 @@ export default function InsightsArrivalsPage() {
               });
               setPickColumnsOpen(true);
             }}
-            className="flex flex-row justify-center items-center px-4 py-2 gap-2 flex-none rounded-lg"
             style={{
-              background: '#FFFFFF',
-              border: '1px solid #E6EAF0',
-              width: '172px',
-              height: '36px'
+              display: 'flex',
+              height: 'var(--height-h-9, 36px)',
+              padding: 'var(--spacing-2, 8px) var(--spacing-4, 16px)',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: 'var(--spacing-2, 8px)',
+              borderRadius: 'var(--border-radius-rounded-md, 8px)',
+              border: 'var(--border-width-border, 1px) solid var(--base-input, #E6EAF0)',
+              background: 'var(--custom-background-dark-input-30, #FFF)',
             }}
           >
-            <Columns3 className="w-4 h-4 flex-none" style={{ color: '#161C24', strokeWidth: 1.33 }} />
+            <Columns3 
+              style={{ 
+                width: '16px',
+                height: 'var(--height-h-4, 16px)',
+                aspectRatio: '1/1',
+                color: 'var(--base-foreground, #161C24)',
+                strokeWidth: 1.33,
+                flex: 'none'
+              }} 
+            />
             <span 
-              className="flex-none flex items-center"
               style={{
-                fontFamily: "'Open Sans', sans-serif",
+                fontFamily: 'var(--font-body, "Open Sans")',
+                fontSize: 'var(--text-sm-font-size, 14px)',
                 fontStyle: 'normal',
-                fontWeight: 600,
-                fontSize: '14px',
-                lineHeight: '20px',
-                color: '#161C24',
-                width: '116px',
-                height: '20px'
+                fontWeight: 'var(--font-weight-semibold, 600)',
+                lineHeight: 'var(--text-sm-line-height, 20px)',
+                color: 'var(--base-foreground, #161C24)',
               }}
             >
               Configure Report
@@ -1345,7 +1522,7 @@ export default function InsightsArrivalsPage() {
 
       {/* Command Error Display */}
       {commandError && (
-        <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded-md flex items-center justify-between">
+        <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded-md flex items-center justify-between" style={{ flexShrink: 0 }}>
           <div className="flex items-center gap-2 text-sm text-red-700">
             <span className="font-medium">Command Error:</span>
             <span>{commandError}</span>
@@ -1362,13 +1539,28 @@ export default function InsightsArrivalsPage() {
 
       {/* Row 5: Status Summary */}
       {fetchMessage && (
-        <div className="pb-1 flex items-center gap-3 text-xs text-[#6b7280] flex-shrink-0">
+        <div className="pb-1 flex items-center gap-3 text-xs text-[#6b7280]" style={{ flexShrink: 0 }}>
           <span>{fetchMessage}</span>
         </div>
       )}
 
       {/* Table Area */}
-      <div ref={tableAreaRef} className="flex-1 min-h-0 overflow-hidden" style={{ flex: '1 1 0%', minHeight: 0, height: '100%', maxHeight: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', position: 'relative', zIndex: 0 }}>
+      <div 
+        ref={tableAreaRef} 
+        style={{ 
+          flex: '1 1 0%', 
+          minHeight: 0, 
+          height: '100%', 
+          maxHeight: '100%', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          boxSizing: 'border-box', 
+          position: 'relative', 
+          zIndex: 0,
+          overflow: 'hidden',
+          width: '100%',
+        }}
+      >
         {loading ? (
           <div className="p-4 text-center text-gray-500">
             <div className="flex flex-col items-center gap-2">
@@ -1407,20 +1599,69 @@ export default function InsightsArrivalsPage() {
           </div>
         ) : rows.length > 0 ? (
           <div 
-            className={`h-full relative flex flex-col`} 
-            style={{ flex: '1 1 0%', minHeight: 0, height: '100%', maxHeight: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}
+            style={{
+              display: 'flex',
+              flex: '1 1 0%',
+              minHeight: '960px',
+              height: '960px',
+              maxHeight: '960px',
+              width: '100%',
+              alignItems: 'flex-start',
+              alignSelf: 'stretch',
+              borderRadius: 'var(--border-radius-rounded-xl, 14px) var(--border-radius-rounded-none, 0) var(--border-radius-rounded-none, 0) 0',
+              borderTop: 'var(--border-width-border, 1px) solid var(--base-border, #E6EAF0)',
+              borderLeft: 'var(--border-width-border, 1px) solid var(--base-border, #E6EAF0)',
+              background: 'var(--tailwind-colors-base-white, #FFF)',
+              position: 'relative',
+            }}
             ref={(el) => {
               wrapperDivRef.current = el;
-              // CRITICAL: Force height to 100% via direct DOM manipulation
+              // CRITICAL: Immediately enforce 960px height on table wrapper
               if (el) {
-                el.style.setProperty('height', '100%', 'important');
-                el.style.setProperty('max-height', '100%', 'important');
-                el.style.setProperty('min-height', '0', 'important');
+                const targetHeight = 960;
+                
+                // Force height immediately
+                el.style.setProperty('height', `${targetHeight}px`, 'important');
+                el.style.setProperty('max-height', `${targetHeight}px`, 'important');
+                el.style.setProperty('min-height', `${targetHeight}px`, 'important');
+                
+                // Also ensure parent allows this height
+                const parent = el.parentElement;
+                if (parent) {
+                  parent.style.setProperty('min-height', `${targetHeight}px`, 'important');
+                  parent.style.setProperty('display', 'flex', 'important');
+                  parent.style.setProperty('flex-direction', 'column', 'important');
+                }
+                
+                // Verify and re-enforce multiple times
+                const verifyAndEnforce = () => {
+                  if (el === wrapperDivRef.current) {
+                    const rect = el.getBoundingClientRect();
+                    if (Math.abs(rect.height - targetHeight) > 1) {
+                      el.style.setProperty('height', `${targetHeight}px`, 'important');
+                      el.style.setProperty('max-height', `${targetHeight}px`, 'important');
+                      el.style.setProperty('min-height', `${targetHeight}px`, 'important');
+                    }
+                  }
+                };
+                
+                // Verify immediately
+                verifyAndEnforce();
+                
+                // Verify after microtask
+                Promise.resolve().then(verifyAndEnforce);
+                
+                // Verify after multiple delays
+                setTimeout(verifyAndEnforce, 0);
+                setTimeout(verifyAndEnforce, 50);
+                setTimeout(verifyAndEnforce, 100);
+                setTimeout(verifyAndEnforce, 200);
+                setTimeout(verifyAndEnforce, 500);
               }
             }}
           >
             {globalSearchQuery && processedRows.length === 0 ? (
-              <div className="flex flex-col items-center justify-center p-8 text-center" style={{ height: '200px', flexShrink: 0 }}>
+              <div className="flex flex-col items-center justify-center p-8 text-center" style={{ height: '200px' }}>
                 <Search className="w-12 h-12 mb-4" style={{ color: '#9ca3af', strokeWidth: 1.5 }} />
                 <p className="text-lg font-medium" style={{ color: '#374151', marginBottom: '8px' }}>
                   No results found
@@ -1431,29 +1672,18 @@ export default function InsightsArrivalsPage() {
               </div>
             ) : (
               <div 
-                className="flex-1 min-h-0 relative" 
                 style={{ 
                   flex: '1 1 0%', 
-                  minHeight: '100%', // CRITICAL: Set to 100% to force expansion
-                  overflow: 'visible', 
-                  height: '100%', 
-                  maxHeight: '100%', 
+                  minHeight: 0,
+                  height: '100%',
+                  maxHeight: '100%',
                   display: 'flex', 
                   flexDirection: 'column', 
                   boxSizing: 'border-box', 
                   width: '100%',
-                  // CRITICAL: Ensure this div fills the parent completely
                   position: 'relative',
-                  zIndex: 0, // Ensure table content is below overlay (z-index: 5)
-                  // Remove any padding/margin that might constrain height
-                  paddingTop: 0,
-                  paddingBottom: 0,
-                  marginTop: 0,
-                  marginBottom: 0,
-                  // Force flex properties
-                  flexGrow: 1,
-                  flexShrink: 0,
-                  flexBasis: '100%'
+                  zIndex: 0,
+                  overflow: 'hidden',
                 }}
                 ref={(el) => {
                   innerWrapperDivRef.current = el;
@@ -1475,11 +1705,8 @@ export default function InsightsArrivalsPage() {
                       el.style.setProperty('margin-top', '0', 'important');
                       el.style.setProperty('margin-bottom', '0', 'important');
                       
-                      // Force flex properties
+                      // Force flex properties (using shorthand only)
                       el.style.setProperty('flex', '1 1 0%', 'important');
-                      el.style.setProperty('flex-basis', `${targetHeight}px`, 'important');
-                      el.style.setProperty('flex-grow', '1', 'important');
-                      el.style.setProperty('flex-shrink', '0', 'important');
                       
                       // Ensure display
                       el.style.setProperty('display', 'flex', 'important');
@@ -1516,88 +1743,70 @@ export default function InsightsArrivalsPage() {
                 />
               </div>
             )}
+            
             {/* Hide bar overlay - only show when showAll is false */}
-            {!showAll && (
+            {!showAll && rows.length > 0 && (
               <div 
                 ref={hideBarOverlayRef}
-                className="absolute left-0 right-0 pointer-events-none"
                 style={{
-                  // Position overlay just above horizontal scrollbar TOP (not bottom)
-                  // This ensures scrollbar is fully visible below the overlay
-                  // Will be adjusted dynamically in useEffect to position above scrollbar.top
-                  bottom: '20px', // Initial value - will be adjusted dynamically to sit above scrollbar top
-                  width: '100%',
-                  height: '220px', // Fixed height as per design
-                  // Smooth fade-out gradient: starts transparent at top, gradually becomes opaque white at bottom
-                  // Made VERY aggressive for maximum visibility - starts fading immediately and reaches full opacity quickly
-                  // This creates a strong dimming effect that should be clearly visible
-                  // Use only backgroundImage (not background shorthand) to avoid React warnings
-                  
-                  // Gradient optimized for ~4 rows fade (220px height / ~30px per row = ~7 rows visible, fade last 4)
-                  // Start fading at ~60% (where 4th row from bottom begins), reach full opacity at bottom
-                  // This creates a visible dimming effect on the last 4 rows
-                  backgroundImage: 'linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0) 60%, rgba(255, 255, 255, 0.30) 70%, rgba(255, 255, 255, 0.60) 80%, rgba(255, 255, 255, 0.85) 90%, rgba(255, 255, 255, 0.95) 95%, #FFFFFF 100%)',
-                  backgroundColor: 'transparent', // Set background color separately to avoid conflicts
-                  // Also add backdrop-filter for additional dimming effect
-                  backdropFilter: 'blur(0px)', // No blur, just using for browser compatibility hint
-                  WebkitBackdropFilter: 'blur(0px)',
                   position: 'absolute',
+                  bottom: 0,
                   left: 0,
-                  zIndex: 5, // Above table content (z-index: auto/0) but below scrollbar (z-index: 10) so gradient overlays rows
-                  overflow: 'visible', // Allow content to be visible through gradient
+                  right: 0,
+                  width: '100%',
+                  height: '220px',
+                  zIndex: 1000,
+                  pointerEvents: 'none',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.00) 0.32%, #FFF 73.64%)',
+                  overflow: 'visible',
+                  visibility: 'visible',
                   opacity: 1,
-                  pointerEvents: 'none', // Ensure overlay doesn't block scrollbar interactions
-                  // Ensure overlay is in correct stacking context
-                  isolation: 'isolate' // Create new stacking context to ensure z-index works correctly
                 }}
               >
-                {/* Text container - positioned at top: 142px as per design */}
+                {/* Content container */}
                 <div 
                   style={{
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
-                    padding: 0,
+                    justifyContent: 'center',
                     gap: '6px',
-                    position: 'absolute',
-                    width: '348px',
-                    height: 'auto',
-                    minHeight: '58px',
-                    left: 'calc(50% - 174px)', // Center: calc(50% - 348px/2)
-                    top: '142px'
+                    width: '100%',
+                    maxWidth: '1056px',
+                    padding: '142px 354px 20px 354px',
+                    boxSizing: 'border-box',
+                    position: 'relative',
+                    zIndex: 1001,
                   }}
                 >
-                  {/* Lock icon */}
-                  <Lock 
-                    className="flex-none" 
+                  {/* LockKeyhole icon */}
+                  <LockKeyhole 
                     style={{ 
-                      color: '#637584', 
+                      color: '#637584',
                       strokeWidth: 1.5, 
                       height: '20px', 
                       width: '20px',
-                      flex: 'none',
-                      order: 0,
-                      flexGrow: 0
+                      flexShrink: 0,
+                      display: 'block',
                     }} 
                   />
                   
                   {/* Message text */}
                   <div 
                     style={{
-                      width: '348px',
-                      height: '32px',
-                      fontFamily: 'Open Sans, sans-serif',
+                      color: '#637584',
+                      textAlign: 'center',
+                      fontFamily: '"Open Sans", sans-serif',
+                      fontSize: '12px',
                       fontStyle: 'normal',
                       fontWeight: 400,
-                      fontSize: '12px',
                       lineHeight: '16px',
-                      textAlign: 'center',
-                      color: '#637584',
-                      flex: 'none',
-                      order: 1,
-                      flexGrow: 0,
                       whiteSpace: 'normal',
-                      wordWrap: 'break-word'
+                      wordWrap: 'break-word',
+                      display: 'block',
                     }}
                   >
                     This view shows a subset of the data.<br />
@@ -1630,20 +1839,21 @@ export default function InsightsArrivalsPage() {
             }}
           >
             {/* Flex container for icon and text */}
-            <div className="flex flex-row items-start p-0 gap-3 flex-none" style={{ width: '365px', height: '20px' }}>
+            <div className="flex flex-row items-start p-0 gap-3" style={{ width: '365px', height: '20px', flex: 'none' }}>
               {/* Icon container */}
-              <div className="flex flex-row items-start pt-0.5 px-0 pb-0 flex-none" style={{ width: '16px', height: '18px' }}>
+              <div className="flex flex-row items-start pt-0.5 px-0 pb-0" style={{ width: '16px', height: '18px', flex: 'none' }}>
                 <CheckCircle2 
-                  className="w-4 h-4 flex-none" 
-                  style={{ color: '#447634', strokeWidth: 1.33 }}
+                  className="w-4 h-4" 
+                  style={{ color: '#447634', strokeWidth: 1.33, flex: 'none' }}
                 />
               </div>
               {/* Text container */}
-              <div className="flex flex-col justify-center items-start p-0 gap-1 flex-none" style={{ width: '337px', height: '20px' }}>
+              <div className="flex flex-col justify-center items-start p-0 gap-1" style={{ width: '337px', height: '20px', flex: 'none' }}>
                 <div 
-                  className="w-full h-5 flex-none"
+                  className="w-full h-5"
                   style={{
                     fontFamily: 'Open Sans, sans-serif',
+                    flex: 'none',
                     fontStyle: 'normal',
                     fontWeight: 500,
                     fontSize: '14px',

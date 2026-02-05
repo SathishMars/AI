@@ -4,7 +4,7 @@
 import type { InsightsReport } from "@/app/lib/insights/data";
 import { useRouter } from "next/navigation";
 import { useInsightsUI } from "@/app/lib/insights/ui-store";
-import { Sparkles, Download, MoreVertical, User } from "lucide-react";
+import { Sparkles, Download, MoreVertical, Users } from "lucide-react";
 
 export function InsightsReportCard({ report }: { report: InsightsReport }) {
   const router = useRouter();
@@ -18,30 +18,144 @@ export function InsightsReportCard({ report }: { report: InsightsReport }) {
   };
 
   return (
-    <div className="mb-3 flex items-center justify-between rounded-xl border border-[#e5e7eb] bg-white px-4 py-3">
-      <div className="flex flex-col gap-1.5">
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderRadius: '12px',
+        border: '1px solid #E5E7EB',
+        background: '#FFFFFF',
+        padding: '12px 16px',
+        width: '100%',
+      }}
+    >
+      {/* Left Section - Tag and Title */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
         {report.tag && (
-          <div className="inline-flex items-center gap-1 rounded-full bg-[#f5f3ff] px-2 py-1 text-[11px] font-medium text-[#7c3aed]">
-            <User className="h-3 w-3" strokeWidth={2} />
-            {report.tag}
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              borderRadius: '9999px',
+              background: '#F5F3FF',
+              padding: '4px 8px',
+              width: 'fit-content',
+            }}
+          >
+            <Users
+              size={12}
+              style={{ flexShrink: 0 }}
+            />
+            <span
+              style={{
+                fontFamily: "'Open Sans', sans-serif",
+                fontSize: '11px',
+                fontWeight: 500,
+                color: '#7C3AED',
+              }}
+            >
+              {report.tag}
+            </span>
           </div>
         )}
-        <span className="text-[13px] font-semibold text-[#111827]">{report.title}</span>
+        <span
+          style={{
+            fontFamily: "'Open Sans', sans-serif",
+            fontSize: '13px',
+            fontWeight: 600,
+            color: '#111827',
+          }}
+        >
+          {report.title}
+        </span>
       </div>
 
-      <div className="flex items-center gap-2">
+      {/* Right Section - Action Buttons */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {/* Customize Button */}
         <button
           onClick={onCustomize}
-          className="flex items-center gap-1.5 rounded-lg border border-[#e5e7eb] bg-white px-3 py-1.5 text-[12px] text-[#374151] hover:bg-[#f9fafb] transition-colors"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            borderRadius: '8px',
+            border: '1px solid #E5E7EB',
+            background: '#FFFFFF',
+            padding: '6px 12px',
+            fontFamily: "'Open Sans', sans-serif",
+            fontSize: '12px',
+            fontWeight: 500,
+            color: '#374151',
+            cursor: 'pointer',
+            transition: 'background-color 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#F9FAFB';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = '#FFFFFF';
+          }}
         >
-          <Sparkles className="h-3.5 w-3.5 text-[#111827]" strokeWidth={2} />
+          <Sparkles
+            size={14}
+            style={{ flexShrink: 0 }}
+          />
           Customize
         </button>
-        <button className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#e5e7eb] bg-white text-[#6b7280] hover:bg-[#f9fafb] transition-colors">
-          <Download className="h-4 w-4" strokeWidth={2} />
+        
+        {/* Download Button */}
+        <button
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '32px',
+            height: '32px',
+            borderRadius: '8px',
+            border: '1px solid #E5E7EB',
+            background: '#FFFFFF',
+            cursor: 'pointer',
+            transition: 'background-color 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#F9FAFB';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = '#FFFFFF';
+          }}
+        >
+          <Download
+            size={16}
+          />
         </button>
-        <button className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#e5e7eb] bg-white text-[#6b7280] hover:bg-[#f9fafb] transition-colors">
-          <MoreVertical className="h-4 w-4" strokeWidth={2} />
+        
+        {/* More Options Button */}
+        <button
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '32px',
+            height: '32px',
+            borderRadius: '8px',
+            border: '1px solid #E5E7EB',
+            background: '#FFFFFF',
+            cursor: 'pointer',
+            transition: 'background-color 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#F9FAFB';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = '#FFFFFF';
+          }}
+        >
+          <MoreVertical
+            size={16}
+          />
         </button>
       </div>
     </div>

@@ -17,3 +17,16 @@ export const apiFetch = (
   const url = `${basePath}${input}`;
   return fetch(url, init);
 };
+
+/**
+ * Get the GraphQL server URL for direct connection
+ * Falls back to localhost:4000 for development
+ */
+export const getGraphQLUrl = (): string => {
+  if (typeof window !== 'undefined') {
+    // Client-side: use public env var or default to localhost
+    return process.env.NEXT_PUBLIC_GRAPHQL_URL || 'http://localhost:4000/graphql';
+  }
+  // Server-side: use server env var or default to localhost
+  return process.env.GRAPHQL_URL || 'http://localhost:4000/graphql';
+};
