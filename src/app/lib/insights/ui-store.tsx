@@ -68,7 +68,7 @@ export function InsightsUIProvider({ children }: { children: React.ReactNode }) 
   const [pickColumnsOpen, setPickColumnsOpen] = useState(false);
   const [pickColumnsData, setPickColumnsData] = useState<PickColumnsData>(null);
   const [aimeAction, setAimeAction] = useState<AimeAction>(null);
-  const [eventId, setEventId] = useState(5281);
+  const [eventId, setEventId] = useState(0); // Will be set from URL
   const [exportState, setExportState] = useState<ExportState>(null);
 
   const value = useMemo<InsightsUIState>(

@@ -65,7 +65,7 @@ export const insightsAttendeeColumns = [
   "Internal Notes"
 ];
 
-export const insightsArrivalsRows: InsightsAttendeeRow[] = [];
+export const insightsAttendeeRows: InsightsAttendeeRow[] = [];
 
 // Legacy exports for backward compatibility
 export type Report = InsightsReport;
@@ -75,5 +75,5 @@ export const attendanceReports = insightsAttendanceReports;
 export const suggestions = insightsSuggestions;
 export type AttendeeRow = InsightsAttendeeRow;
 export const attendeeColumns = insightsAttendeeColumns;
-export const arrivalsRows = insightsArrivalsRows;
+export const attendeeRows = insightsAttendeeRows;
 

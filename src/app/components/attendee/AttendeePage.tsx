@@ -1,13 +1,13 @@
-// INSIGHTS-SPECIFIC: Arrivals page component
+// INSIGHTS-SPECIFIC: Attendee page component
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import InsightsArrivalsTable from "./ArrivalsTable";
+import InsightsAttendeeTable from "./AttendeeTable";
 import { Toast, useToast } from "@/components/ui/toast";
 import { InsightsPickColumnsPanel } from "./PickColumnsPanel";
 import { useInsightsUI } from "@/app/lib/insights/ui-store";
 import { Upload, Search, ChevronLeft, Columns3, User, FileDown, LockKeyhole, CheckCircle2, Users } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { apiFetch, getGraphQLUrl } from "@/app/utils/api";
 import { logger } from "@/app/lib/logger";
 
@@ -17,7 +17,7 @@ function Input({ ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
 
 type Attendee = Record<string, any>;
 
-export default function InsightsArrivalsPage() {
+export default function InsightsAttendeePage() {
   const { aimeOpen, setPickColumnsOpen, setAimeOpen, setPickColumnsData, aimeAction, setAimeAction, eventId, setEventId, setExportState } = useInsightsUI();
   
   // Store setExportState in a ref to ensure it's stable
@@ -26,6 +26,40 @@ export default function InsightsArrivalsPage() {
     setExportStateRef.current = setExportState;
   }, [setExportState]);
   const router = useRouter();
+  const params = useParams();
+  const [eventIdNotFound, setEventIdNotFound] = useState(false);
+  const [eventIdInitialized, setEventIdInitialized] = useState(false);
+  const DEFAULT_EVENT_ID = 5281;
+  
+  // Extract eventId from URL path parameter
+  useEffect(() => {
+    const urlEventId = params?.eventId as string | undefined;
+    
+    if (urlEventId) {
+      const parsedEventId = parseInt(urlEventId, 10);
+      if (!isNaN(parsedEventId) && parsedEventId > 0) {
+        // Valid eventId - reset 404 state and update eventId
+        setEventIdNotFound(false);
+        // Only update if eventId actually changed
+        if (eventId !== parsedEventId) {
+          setEventId(parsedEventId);
+        }
+        setEventIdInitialized(true);
+      } else {
+        // Invalid eventId in URL - show 404
+        setEventIdNotFound(true);
+        setEventIdInitialized(true);
+      }
+    } else {
+      // No eventId in URL - redirect to include default eventId (only on initial mount)
+      if (!eventIdInitialized) {
+        router.replace(`/insights/attendee/${DEFAULT_EVENT_ID}`);
+        setEventId(DEFAULT_EVENT_ID);
+        setEventIdInitialized(true);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params]);
   const [rows, setRows] = useState<Attendee[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
   const [columnTypes, setColumnTypes] = useState<Record<string, string>>({});
@@ -111,7 +145,7 @@ export default function InsightsArrivalsPage() {
   // Load column order from localStorage on mount
   useEffect(() => {
     try {
-      const savedOrder = localStorage.getItem('arrivalsColumnOrder');
+      const savedOrder = localStorage.getItem('attendeeColumnOrder');
       if (savedOrder) {
         const parsed = JSON.parse(savedOrder);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -127,7 +161,7 @@ export default function InsightsArrivalsPage() {
   useEffect(() => {
     if (selectedColumns.length > 0) {
       try {
-        localStorage.setItem('arrivalsColumnOrder', JSON.stringify(selectedColumns));
+        localStorage.setItem('attendeeColumnOrder', JSON.stringify(selectedColumns));
       } catch (e) {
         logger.error('Failed to save column order to localStorage:', e);
       }
@@ -765,14 +799,14 @@ export default function InsightsArrivalsPage() {
   useEffect(() => {
     const timer = setTimeout(() => {
       if (eventId > 0) {
-        fetchArrivals(q, eventId);
+        fetchAttendees(q, eventId);
       }
     }, 500);
 
     return () => clearTimeout(timer);
   }, [eventId]);
 
-  async function fetchArrivals(search?: string, targetEventId?: number, requestedLimit?: number, abortSignal?: AbortSignal) {
+  async function fetchAttendees(search?: string, targetEventId?: number, requestedLimit?: number, abortSignal?: AbortSignal) {
     const maxRetries = 3;
     const retryDelay = 5000; // 5 seconds gap
 
@@ -874,6 +908,16 @@ export default function InsightsArrivalsPage() {
             !err.path?.includes('arrivalColumnTypes')
           );
           if (criticalErrors.length > 0) {
+            const errorMessage = criticalErrors[0].message.toLowerCase();
+            // Check if error indicates event not found
+            if (errorMessage.includes('event') && (errorMessage.includes('not found') || errorMessage.includes('does not exist') || errorMessage.includes('invalid'))) {
+              logger.error(`Event not found (Attempt ${attempt}):`, json.errors);
+              setEventIdNotFound(true);
+              setFetchStatus("error");
+              setFetchMessage(`Event ID ${currentEventId} does not exist.`);
+              setLoading(false);
+              return [];
+            }
             logger.error(`GraphQL Response Errors (Attempt ${attempt}):`, json.errors);
             throw new Error(criticalErrors[0].message);
           }
@@ -885,6 +929,44 @@ export default function InsightsArrivalsPage() {
         const columnTypesData = json?.data?.arrivalColumnTypes ?? [];
         const payload = json?.data?.arrivals;
         const fetchedRows = payload?.rows ?? [];
+        const totalCount = payload?.total ?? 0;
+        
+        // Check if eventId exists - verify if ANY records exist for this eventId
+        if (totalCount === 0) {
+          try {
+            const verifyQuery = `
+              query VerifyEvent($eventId: Int!) {
+                eventExists(eventId: $eventId)
+              }
+            `;
+            const verifyRes = await fetch(graphqlUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                query: verifyQuery,
+                variables: { eventId: currentEventId },
+              }),
+            });
+            
+            if (verifyRes.ok) {
+              const verifyJson = await verifyRes.json();
+              const eventExists = verifyJson?.data?.eventExists ?? false;
+              
+              // If event doesn't exist, show 404
+              if (!eventExists) {
+                setEventIdNotFound(true);
+                setFetchStatus("error");
+                setFetchMessage(`Event ID ${currentEventId} does not exist.`);
+                setLoading(false);
+                return [];
+              }
+              // If event exists but has no attendees, continue normally (show empty state)
+            }
+          } catch (verifyErr) {
+            // If verification fails, continue with normal flow
+            logger.warn("Event verification query failed:", verifyErr);
+          }
+        }
 
         // Convert column types array to map (handle both array and null/undefined)
         const typesMap: Record<string, string> = {};
@@ -916,7 +998,7 @@ export default function InsightsArrivalsPage() {
           throw new DOMException('Export cancelled', 'AbortError');
         }
 
-        logger.error(`fetchArrivals error (Attempt ${attempt}):`, err);
+        logger.error(`fetchAttendees error (Attempt ${attempt}):`, err);
 
         // Don't retry if aborted
         if (abortSignal?.aborted) {
@@ -928,6 +1010,15 @@ export default function InsightsArrivalsPage() {
           setFetchMessage(`Attempt ${attempt} failed. Retrying in 5 seconds...`);
           await new Promise(resolve => setTimeout(resolve, retryDelay));
         } else {
+          // Check if error indicates event not found
+          const errorMessage = err?.message?.toLowerCase() || '';
+          if (errorMessage.includes('event') && (errorMessage.includes('not found') || errorMessage.includes('does not exist') || errorMessage.includes('invalid'))) {
+            setEventIdNotFound(true);
+            setFetchStatus("error");
+            setFetchMessage(`Event ID ${targetEventId || eventId} does not exist.`);
+            setLoading(false);
+            return [];
+          }
           setFetchStatus("error");
           setFetchMessage(`Failed to load data after ${maxRetries} attempts. Please check the console for details.`);
           setLoading(false);
@@ -1003,7 +1094,7 @@ export default function InsightsArrivalsPage() {
         try {
           // Fetch data with a limit equal to the total count (up to backend cap)
           // Pass abort signal to allow cancellation
-          const fetched = await fetchArrivals(q, eventId, total || 50000, controller.signal);
+          const fetched = await fetchAttendees(q, eventId, total || 50000, controller.signal);
           
           // Check if aborted after fetch completes
           if (controller.signal.aborted) {
@@ -1176,7 +1267,7 @@ export default function InsightsArrivalsPage() {
       setExportMessage("Finalizing export...");
 
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Arrivals");
+      XLSX.utils.book_append_sheet(wb, ws, "Attendees");
       
       // Check if aborted before saving file
       if (controller.signal.aborted) {
@@ -1186,7 +1277,7 @@ export default function InsightsArrivalsPage() {
       setExportProgress(95);
       setExportMessage("Saving file...");
       
-      XLSX.writeFile(wb, `Arrivals_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+      XLSX.writeFile(wb, `Attendee_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
 
       // Final check before marking as complete
       if (controller.signal.aborted) {
@@ -1224,7 +1315,7 @@ export default function InsightsArrivalsPage() {
     } finally {
       clearTimeout(timeoutId);
     }
-  }, [exportStatus, total, rows, q, eventId, filters, sortColumn, sortDirection, displayedColumns, fetchArrivals, setExportStatus, setExportProgress, setExportMessage, setShowExportSuccess]);
+  }, [exportStatus, total, rows, q, eventId, filters, sortColumn, sortDirection, displayedColumns, fetchAttendees, setExportStatus, setExportProgress, setExportMessage, setShowExportSuccess]);
 
   // Sync export state to UI store for Topbar
   const prevExportStateRef = useRef<{ status: string; progress: number; message: string } | null>(null);
@@ -1278,6 +1369,65 @@ export default function InsightsArrivalsPage() {
   const handleVisibleRowsChange = useCallback((visibleCount: number, totalCount: number) => {
     setVisibleRowCount(visibleCount);
   }, []);
+
+  // Show 404 page if eventId not found
+  if (eventIdNotFound) {
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        width: '100%',
+        gap: '16px'
+      }}>
+        <h1 style={{
+          fontFamily: "'Instrument Sans', sans-serif",
+          fontSize: '48px',
+          fontWeight: 700,
+          color: '#111827',
+          margin: 0
+        }}>404</h1>
+        <h2 style={{
+          fontFamily: "'Open Sans', sans-serif",
+          fontSize: '24px',
+          fontWeight: 600,
+          color: '#374151',
+          margin: 0
+        }}>Page Not Found</h2>
+        <p style={{
+          fontFamily: "'Open Sans', sans-serif",
+          fontSize: '16px',
+          fontWeight: 400,
+          color: '#6b7280',
+          margin: 0
+        }}>
+          The event ID you're looking for does not exist.
+        </p>
+        <button
+          onClick={() => {
+            // Navigate to default event - the useEffect will handle state reset
+            router.replace(`/insights/attendee/${DEFAULT_EVENT_ID}`);
+          }}
+          style={{
+            marginTop: '24px',
+            padding: '8px 16px',
+            borderRadius: '8px',
+            border: '1px solid #E5E7EB',
+            background: '#FFFFFF',
+            fontFamily: "'Open Sans', sans-serif",
+            fontSize: '14px',
+            fontWeight: 500,
+            color: '#374151',
+            cursor: 'pointer'
+          }}
+        >
+          Go to Default Event
+        </button>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -1580,7 +1730,7 @@ export default function InsightsArrivalsPage() {
               <button
                 onClick={() => {
                   setFetchStatus("idle");
-                  fetchArrivals(q, eventId);
+                  fetchAttendees(q, eventId);
                 }}
                 className="flex items-center gap-2 rounded-md bg-[#a855f7] px-4 py-2 text-sm font-medium text-white hover:bg-[#9333ea] transition-all shadow-sm active:scale-95"
               >
@@ -1705,7 +1855,7 @@ export default function InsightsArrivalsPage() {
                       el.style.setProperty('margin-top', '0', 'important');
                       el.style.setProperty('margin-bottom', '0', 'important');
                       
-                      // Force flex properties (using shorthand only)
+                      // Force flex to fill
                       el.style.setProperty('flex', '1 1 0%', 'important');
                       
                       // Ensure display
@@ -1729,7 +1879,7 @@ export default function InsightsArrivalsPage() {
                   }
                 }}
               >
-                <InsightsArrivalsTable
+                <InsightsAttendeeTable
                   rows={displayedRows}
                   columnOrder={displayedColumns}
                   loading={loading}
@@ -1881,4 +2031,3 @@ export default function InsightsArrivalsPage() {
     </>
   );
 }
-

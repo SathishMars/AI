@@ -10,7 +10,7 @@ export function InsightsTopbar() {
   const pathname = usePathname();
   const router = useRouter();
   const { exportState } = useInsightsUI();
-  const isArrivalsPage = pathname?.includes('/arrivals');
+  const isArrivalsPage = pathname?.includes('/insights/attendee');
 
   return (
     <header 

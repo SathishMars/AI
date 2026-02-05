@@ -2,18 +2,22 @@
 "use client";
 
 import type { InsightsReport } from "@/app/lib/insights/data";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useInsightsUI } from "@/app/lib/insights/ui-store";
 import { Sparkles, Download, MoreVertical, Users } from "lucide-react";
 
 export function InsightsReportCard({ report }: { report: InsightsReport }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { openAime } = useInsightsUI();
 
   const onCustomize = () => {
     openAime(); // ✅ auto-expand aime
     requestAnimationFrame(() => {
-      router.push("/arrivals"); // ✅ switch to Arrivals by Date page
+      // Get eventId from URL params and include it in navigation
+      // Default to 5281 if not present
+      const eventId = searchParams.get('eventId') || '5281';
+      router.push(`/insights/attendee/${eventId}`); // ✅ switch to Attendee page
     });
   };
 

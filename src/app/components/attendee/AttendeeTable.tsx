@@ -1,8 +1,8 @@
-// INSIGHTS-SPECIFIC: Arrivals table component
+// INSIGHTS-SPECIFIC: Attendee table component
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { insightsAttendeeColumns } from "@/app/lib/insights/data";
 
-type ArrivalsTableProps = {
+type AttendeeTableProps = {
   rows: Record<string, any>[];
   columnOrder: string[];
   loading: boolean;
@@ -66,7 +66,7 @@ function getColumnDataType(rows: Record<string, any>[], columnName: string): str
   return "text";
 }
 
-export default function InsightsArrivalsTable({
+export default function InsightsAttendeeTable({
   rows,
   columnOrder,
   loading,
@@ -77,7 +77,7 @@ export default function InsightsArrivalsTable({
   onColumnOrderChange,
   highlightedColumns = [],
   onDebugInfoChange,
-}: ArrivalsTableProps) {
+}: AttendeeTableProps) {
   const [localColumnOrder, setLocalColumnOrder] = useState<string[]>(columnOrder);
   const [viewportHeight, setViewportHeight] = useState<number>(0);
   const [rowHeight, setRowHeight] = useState<number>(0);
@@ -693,7 +693,7 @@ export default function InsightsArrivalsTable({
     };
   }, [showAll]);
 
-  // ArrivalsTable rendering complete
+  // AttendeeTable rendering complete
   // Debug info calculation removed for production
 
   return (
@@ -927,7 +927,7 @@ export default function InsightsArrivalsTable({
               {displayedRows.length > 0 ? (
                 displayedRows.map((row, idx) => (
                   <tr
-                    key={row.id || row.email || idx}
+                    key={row.id || `row-${idx}-${row.email || ''}`}
                     ref={idx === 0 ? firstRowRef : null}
                     className="border-t border-[#e5e7eb] text-[12px] text-[#111827] hover:bg-gray-50 transition-colors"
                   >
@@ -967,4 +967,3 @@ export default function InsightsArrivalsTable({
     </div>
   );
 }
-

@@ -1,5 +1,5 @@
 // INSIGHTS-SPECIFIC: GraphQL schema definitions
-import { insightsArrivalsRows, insightsAttendeeColumns } from "@/app/lib/insights/data";
+import { insightsAttendeeRows, insightsAttendeeColumns } from "@/app/lib/insights/data";
 import { GraphQLJSON } from "graphql-scalars";
 import { z } from "zod";
 import { generateText } from "ai";
@@ -441,6 +441,7 @@ export const typeDefs = /* GraphQL */ `
     arrivals(q: String, eventId: Int, limit: Int = 50, offset: Int = 0): ArrivalsResult!
     arrivalColumns: [String!]!
     arrivalColumnTypes: [ColumnType!]!
+    eventExists(eventId: Int!): Boolean!
   }
 
   type Mutation {
@@ -613,6 +614,29 @@ export const resolvers = {
         // Wait, I must provide COMPLETE file content.
         // I will copy the minimal fallback logic.
         return { rows: [], total: 0, limit, offset };
+      }
+    },
+
+    eventExists: async (_: unknown, args: { eventId: number }) => {
+      const eventId = args.eventId;
+      try {
+        const { getInsightsPool } = await import("@/app/lib/insights/db");
+        const pool = getInsightsPool();
+        if (!pool) {
+          logger.error("[GraphQL] Database pool not available");
+          return false;
+        }
+
+        // Check if ANY records exist for this eventId (including companions)
+        // This validates that the eventId exists in the database
+        const checkSql = `SELECT COUNT(*)::int AS count FROM public.attendee WHERE event_id = $1`;
+        const { rows } = await pool.query(checkSql, [eventId]);
+        const count = rows?.[0]?.count ?? 0;
+        
+        return count > 0;
+      } catch (err) {
+        logger.error("[GraphQL] Event existence check failed:", err);
+        return false;
       }
     },
   },

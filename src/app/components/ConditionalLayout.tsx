@@ -11,9 +11,7 @@ export function ConditionalLayout({ children }: { children: React.ReactNode }) {
   // Pathname includes basePath, so check for both /insights and /aime/insights
   const isInsightsRoute = 
     pathname?.startsWith('/insights') || 
-    pathname?.startsWith('/arrivals') ||
-    pathname?.includes('/insights/') ||
-    pathname?.includes('/arrivals/');
+    pathname?.includes('/insights/');
   
   if (isInsightsRoute) {
     // Insights routes use their own full-screen shell

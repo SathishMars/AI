@@ -65,9 +65,7 @@ export async function proxy(request: NextRequest) {
     // Skip insights routes - they don't require authentication
     if (
       pathname.startsWith('/insights') || 
-      pathname.startsWith('/arrivals') ||
-      pathname.startsWith(`${env.basePath}/insights`) ||
-      pathname.startsWith(`${env.basePath}/arrivals`)
+      pathname.startsWith(`${env.basePath}/insights`)
     ) {
       logger.debugMiddleware('[Auth Middleware] Skipping insights route (no auth required)');
       return NextResponse.next();

@@ -6,13 +6,13 @@ import { InsightsSidebar } from "./Sidebar";
 import { InsightsTopbar } from "./Topbar";
 import { InsightsNavbar } from "./Navbar";
 import { InsightsAimePanel } from "./AimePanel";
-import { InsightsPickColumnsPanel } from "../arrivals/PickColumnsPanel";
+import { InsightsPickColumnsPanel } from "../attendee/PickColumnsPanel";
 import { usePathname } from "next/navigation";
 
 function InsightsShellInner({ children }: { children: React.ReactNode }) {
   const { aimeOpen, pickColumnsOpen, pickColumnsData, sidebarCollapsed } = useInsightsUI();
   const pathname = usePathname();
-  const isArrivalsPage = pathname?.includes('/arrivals');
+  const isArrivalsPage = pathname?.includes('/insights/attendee');
 
   // Calculate right panel width based on which panels are open
   // If both are open, show Pick Columns (it overlays or replaces AIME temporarily)

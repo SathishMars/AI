@@ -1,4 +1,4 @@
-// INSIGHTS-SPECIFIC: Navbar component for insights pages (non-arrivals)
+// INSIGHTS-SPECIFIC: Navbar component for insights pages (non-attendee)
 "use client";
 
 import { useState, useRef, useEffect } from "react";
