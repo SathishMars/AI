@@ -327,8 +327,8 @@ export function InsightsAimePanel() {
     <aside
       style={{
         display: 'flex',
-        width: '382px',
-        height: '960px',
+        width: '360px',
+        height: '100%',
         padding: 'var(--Space-400, 16px)',
         flexDirection: 'column',
         alignItems: 'flex-start',
@@ -463,63 +463,71 @@ export function InsightsAimePanel() {
           minHeight: 0,
         }}
       >
-        {messages.length === 0 && (
-          <>
-            {/* Description */}
-            <div
+        {/* Centered Greeting Section - always visible */}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: '16px',
+            flex: messages.length === 0 ? '1 0 0' : '0 0 auto',
+            alignSelf: 'stretch',
+            padding: messages.length === 0 ? '40px 0' : '20px 0',
+            flexShrink: 0,
+          }}
+        >
+          {/* Large Aime Star Icon */}
+          <div
+            style={{
+              display: 'flex',
+              width: '64px',
+              height: '64px',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <img
+              src={`${env.basePath}/aime-star.png`}
+              alt="aime icon"
+              width={64}
+              height={64}
               style={{
-                display: 'flex',
-                padding: '0 8px',
-                flexDirection: 'column',
-                justifyContent: 'center',
-                alignItems: 'center',
-                gap: '16px',
-                flex: '1 0 0',
-                alignSelf: 'stretch',
+                width: '64px',
+                height: '64px',
+                display: 'block',
               }}
-            >
-              {/* icon */}
-              <div
-                style={{
-                  display: 'flex',
-                  width: 'var(--width-w-12, 48px)',
-                  height: '48px',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  aspectRatio: '1/1',
-                }}
-              >
-                <img
-                  src={`${env.basePath}/aime-star.png`}
-                  alt="aime icon"
-                  width={48}
-                  height={48}
-                  style={{
-                    width: '48px',
-                    height: '48px',
-                    display: 'block',
-                  }}
-                  loading="eager"
-                />
-              </div>
-              {/* text */}
-              <div
-                style={{
-                  textAlign: 'center',
-                  fontFamily: 'var(--font-heading, "Instrument Sans")',
-                  fontSize: 'var(--text-xl-font-size, 20px)',
-                  fontStyle: 'normal',
-                  fontWeight: 'var(--font-weight-semibold, 600)',
-                  lineHeight: 'var(--text-xl-line-height, 28px)',
-                  letterSpacing: '-0.2px',
-                  color: 'var(--base-foreground, #161C24)',
-                }}
-              >
-                Meet aime — your AI assistant for analyzing & creating your event reports.
-              </div>
-            </div>
-          </>
-        )}
+              loading="eager"
+            />
+          </div>
+          {/* Greeting Text */}
+          <div
+            style={{
+              textAlign: 'center',
+              fontFamily: "'Open Sans', sans-serif",
+              fontSize: '20px',
+              fontWeight: 600,
+              lineHeight: '28px',
+              color: '#9333EA',
+            }}
+          >
+            Hi, I'm aime 👋
+          </div>
+          {/* Description Text */}
+          <div
+            style={{
+              textAlign: 'center',
+              fontFamily: "'Open Sans', sans-serif",
+              fontSize: '14px',
+              fontWeight: 400,
+              lineHeight: '20px',
+              color: '#6B7280',
+              maxWidth: '300px',
+            }}
+          >
+            Analyze all your reports at once and get answers based on all available data.
+          </div>
+        </div>
 
         {/* suggestions - always visible */}
         <div
@@ -527,8 +535,9 @@ export function InsightsAimePanel() {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'flex-start',
-            gap: 'var(--spacing-1-5, 6px)',
+            gap: '8px',
             alignSelf: 'stretch',
+            flexShrink: 0,
           }}
         >
           {insightsSuggestions.map((s) => (
@@ -536,28 +545,30 @@ export function InsightsAimePanel() {
               key={s}
               type="button"
               onClick={() => send(s)}
+              disabled={isTyping}
               style={{
                 display: 'flex',
-                padding: 'var(--spacing-4, 16px)',
-                alignItems: 'flex-start',
-                gap: 'var(--spacing-4, 16px)',
+                padding: '12px 16px',
+                alignItems: 'center',
                 alignSelf: 'stretch',
                 borderRadius: 'var(--border-radius-rounded-md, 8px)',
-                border: '1px solid var(--base-border, #E6EAF0)',
-                background: 'var(--base-card, #FFF)',
+                border: '1px solid #D1D5DB',
+                background: isTyping ? '#F3F4F6' : '#F9FAFB',
                 width: '100%',
                 maxWidth: '100%',
+                cursor: isTyping ? 'not-allowed' : 'pointer',
+                textAlign: 'left',
+                opacity: isTyping ? 0.6 : 1,
               }}
-              className="w-full text-left hover:bg-[#f9fafb] transition-colors"
+              className="hover:bg-[#F3F4F6] transition-colors"
             >
               <span
                 style={{
-                  fontFamily: 'var(--font-body, "Open Sans")',
-                  fontSize: 'var(--text-sm-font-size, 14px)',
-                  fontStyle: 'normal',
-                  fontWeight: 'var(--font-weight-normal, 400)',
-                  lineHeight: 'var(--text-sm-line-height, 20px)',
-                  color: 'var(--base-foreground, #161C24)',
+                  fontFamily: "'Open Sans', sans-serif",
+                  fontSize: '14px',
+                  fontWeight: 400,
+                  lineHeight: '20px',
+                  color: '#374151',
                   flex: '1 0 0',
                   wordWrap: 'break-word',
                   overflowWrap: 'break-word',
@@ -568,21 +579,25 @@ export function InsightsAimePanel() {
               </span>
             </button>
           ))}
-          {/* button */}
+          {/* View all suggestions button */}
           <button
             type="button"
+            disabled={isTyping}
             style={{
               display: 'flex',
-              height: 'var(--height-h-8, 32px)',
-              padding: 'var(--spacing-2, 8px) var(--spacing-3, 12px)',
+              height: '36px',
+              padding: '8px 12px',
               justifyContent: 'center',
               alignItems: 'center',
-              gap: 'var(--spacing-2, 8px)',
+              gap: '8px',
               alignSelf: 'stretch',
               borderRadius: 'var(--border-radius-rounded-md, 8px)',
-              background: 'var(--base-secondary, #F1F3F7)',
+              border: '1px solid #E5E7EB',
+              background: '#F3F4F6',
+              cursor: isTyping ? 'not-allowed' : 'pointer',
+              opacity: isTyping ? 0.6 : 1,
             }}
-            className="hover:bg-[#e5e7eb] transition-colors"
+            className="hover:bg-[#E5E7EB] transition-colors"
           >
             <img
               src={`${env.basePath}/Sparkles.svg`}
@@ -593,17 +608,17 @@ export function InsightsAimePanel() {
                 width: '16px',
                 height: '16px',
                 display: 'block',
+                flexShrink: 0,
               }}
               loading="eager"
             />
             <span
               style={{
-                fontFamily: 'var(--font-body, "Open Sans")',
-                fontSize: 'var(--text-xs-font-size, 12px)',
-                fontStyle: 'normal',
-                fontWeight: 'var(--font-weight-semibold, 600)',
-                lineHeight: 'var(--text-xs-line-height, 16px)',
-                color: 'var(--base-foreground, #161C24)',
+                fontFamily: "'Open Sans', sans-serif",
+                fontSize: '14px',
+                fontWeight: 400,
+                lineHeight: '20px',
+                color: '#374151',
               }}
             >
               View all aime suggestions
@@ -706,86 +721,155 @@ export function InsightsAimePanel() {
         )}
       </div>
 
+      {/* Label text above input */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'flex-start',
+          alignItems: 'center',
+          alignSelf: 'stretch',
+          padding: '0 16px',
+        }}
+      >
+        <span
+          style={{
+            fontFamily: "'Open Sans', sans-serif",
+            fontSize: '14px',
+            fontWeight: 400,
+            lineHeight: '20px',
+            color: '#6B7280',
+            textAlign: 'left',
+          }}
+        >
+          Ask aime to analyse anything or use suggested prompt for the start.
+        </span>
+      </div>
+
       {/* Input Group */}
       <div
         style={{
           display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'flex-start',
+          padding: 'var(--spacing-1-5, 6px) var(--spacing-3, 12px) var(--spacing-3, 12px) var(--spacing-3, 12px)',
+          justifyContent: 'space-between',
+          alignItems: 'center',
           alignSelf: 'stretch',
           borderRadius: 'var(--border-radius-rounded-md, 8px)',
-          border: 'var(--border-width-border, 1px) solid var(--base-input, #E6EAF0)',
-          background: 'var(--custom-background-dark-input-30, #FFF)',
+          border: '1px solid #E5E7EB',
+          background: '#FFFFFF',
         }}
       >
-        {/* Label text */}
-        <div
+        {/* Left side - Paperclip */}
+        <button
+          type="button"
           style={{
-            paddingTop: 'var(--spacing-3, 12px)',
-            paddingRight: 'var(--spacing-3, 12px)',
-            paddingBottom: '0px',
-            paddingLeft: 'var(--spacing-3, 12px)',
-            alignSelf: 'stretch',
+            display: 'flex',
+            width: '24px',
+            height: '24px',
+            minWidth: '24px',
+            maxWidth: '24px',
+            minHeight: '24px',
+            maxHeight: '24px',
+            justifyContent: 'center',
+            alignItems: 'center',
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            flexShrink: 0,
           }}
+          className="hover:opacity-70 transition-opacity"
+          title="Attach file"
         >
-          <div
+          <img
+            src={`${env.basePath}/Paperclip.svg`}
+            alt="Attach"
+            width={16}
+            height={16}
             style={{
-              color: 'var(--base-muted-foreground, #637584)',
-              fontFamily: 'var(--font-body, "Open Sans")',
-              fontSize: 'var(--text-sm-font-size, 14px)',
-              fontStyle: 'normal',
-              fontWeight: 'var(--font-weight-normal, 400)',
-              lineHeight: 'var(--text-sm-line-height, 20px)',
+              width: '16px',
+              height: '16px',
+              display: 'block',
+              opacity: 0.6,
             }}
-          >
-            Ask aime to analyse anything or use suggested prompt for the start.
-          </div>
-        </div>
+            loading="eager"
+          />
+        </button>
 
-        {/* textarea */}
+        {/* Center - Textarea */}
+        <textarea
+          className="flex-1 resize-none border-0 bg-transparent outline-none focus:ring-0"
+          placeholder=""
+          value={input}
+          onChange={(event) => {
+            const value = event.target.value;
+            setInput(value.slice(0, 200));
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              if (canSend) send(input);
+            }
+          }}
+          autoFocus
+          rows={1}
+          style={{
+            flex: '1 0 0',
+            color: '#111827',
+            fontFamily: "'Open Sans', sans-serif",
+            fontSize: '14px',
+            fontWeight: 400,
+            lineHeight: '20px',
+            minHeight: '32px',
+            maxHeight: '120px',
+            padding: '0 8px',
+            margin: 0,
+          }}
+        />
+
+        {/* Right side - Microphone and Send */}
         <div
           style={{
             display: 'flex',
-            height: '64px',
-            minHeight: 'var(--height-h-16, 64px)',
-            paddingTop: 'var(--spacing-3, 12px)',
-            paddingRight: 'var(--spacing-3, 12px)',
-            paddingBottom: 'var(--spacing-3, 12px)',
-            paddingLeft: 'var(--spacing-3, 12px)',
-            justifyContent: 'center',
+            justifyContent: 'flex-end',
             alignItems: 'center',
-            gap: '8px',
-            alignSelf: 'stretch',
+            gap: 'var(--spacing-2, 8px)',
+            flexShrink: 0,
           }}
         >
-          <textarea
-            className="flex-1 resize-none border-0 bg-transparent outline-none focus:ring-0"
-            placeholder=""
-            value={input}
-            onChange={(event) => {
-              const value = event.target.value;
-              setInput(value.slice(0, 200));
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                if (canSend) send(input);
-              }
-            }}
-            autoFocus
-            rows={1}
+          {/* Microphone icon */}
+          <button
+            type="button"
             style={{
-              flex: '1 0 0',
-              alignSelf: 'stretch',
-              color: 'var(--base-foreground, #161C24)',
-              fontFamily: 'var(--font-body, "Open Sans")',
-              fontSize: 'var(--text-sm-font-size, 14px)',
-              fontStyle: 'normal',
-              fontWeight: 'var(--font-weight-normal, 400)',
-              lineHeight: 'var(--text-sm-line-height, 20px)',
-              minHeight: '40px',
+              display: 'flex',
+              width: '24px',
+              height: '24px',
+              minWidth: '24px',
+              maxWidth: '24px',
+              minHeight: '24px',
+              maxHeight: '24px',
+              justifyContent: 'center',
+              alignItems: 'center',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
             }}
-          />
+            className="hover:opacity-70 transition-opacity"
+            title="Voice input"
+          >
+            <img
+              src={`${env.basePath}/Mic.svg`}
+              alt="Microphone"
+              width={16}
+              height={16}
+              style={{
+                width: '16px',
+                height: '16px',
+                display: 'block',
+                opacity: 0.6,
+              }}
+              loading="eager"
+            />
+          </button>
+
           {/* Send button */}
           <button
             type="button"
@@ -798,13 +882,13 @@ export function InsightsAimePanel() {
               maxWidth: '32px',
               minHeight: '32px',
               maxHeight: '32px',
-              padding: 'var(--spacing-2, 8px)',
+              padding: '8px',
               justifyContent: 'center',
               alignItems: 'center',
               borderRadius: 'var(--border-radius-rounded-md, 8px)',
               background: '#9333EA',
               border: 'none',
-              cursor: 'pointer',
+              cursor: canSend ? 'pointer' : 'not-allowed',
               flexShrink: 0,
             }}
             className="hover:opacity-90 disabled:opacity-40 transition-opacity"
@@ -819,7 +903,6 @@ export function InsightsAimePanel() {
                 width: '16px',
                 height: '16px',
                 flexShrink: 0,
-                aspectRatio: '1/1',
                 filter: 'brightness(0) invert(1)',
                 display: 'block',
               }}

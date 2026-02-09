@@ -17,7 +17,7 @@ function InsightsShellInner({ children }: { children: React.ReactNode }) {
   // Calculate right panel width based on which panels are open
   // If both are open, show Pick Columns (it overlays or replaces AIME temporarily)
   // Otherwise show whichever is open
-  const rightPanelWidth = (aimeOpen || pickColumnsOpen) ? 382 : 0;
+  const rightPanelWidth = (aimeOpen || pickColumnsOpen) ? 360 : 0;
 
   // Sidebar width based on collapse state (only used on non-arrivals pages)
   const sidebarWidth = sidebarCollapsed ? 72 : 256;
@@ -47,30 +47,48 @@ function InsightsShellInner({ children }: { children: React.ReactNode }) {
         {/* Sidebar - only show on non-arrivals pages */}
         {!isArrivalsPage && <InsightsSidebar />}
 
-        <main className="flex h-full flex-col overflow-hidden">
-          {/* Navbar - only show on non-arrivals pages */}
+        {/* Content area - includes navbar and main content */}
+        <div 
+          className="flex flex-col h-full overflow-hidden"
+          style={{
+            gridColumn: isArrivalsPage ? '1 / -1' : '2 / -1',
+          }}
+        >
+          {/* Navbar - spans width of content area (not sidebar) */}
           {!isArrivalsPage && <InsightsNavbar />}
           
-          {/* Main scroll area (like PNG center area) */}
-          <div className={`flex-1 px-4 py-4 ${isArrivalsPage ? 'overflow-hidden' : 'overflow-y-auto'}`}>{children}</div>
-        </main>
+          {/* Main content grid - content and aime panel side by side */}
+          <div
+            className="grid flex-1 overflow-hidden min-h-0"
+            style={{
+              gridTemplateColumns: `1fr ${rightPanelWidth}px`,
+            }}
+          >
+            <main className="flex h-full flex-col overflow-hidden">
+              {/* Main scroll area (like PNG center area) */}
+              <div className={`flex-1 px-4 py-4 ${isArrivalsPage ? 'overflow-hidden' : 'overflow-y-auto'}`}>{children}</div>
+            </main>
 
-        {/* Right panel - render when panels are open */}
-        {(aimeOpen || pickColumnsOpen) && (
-          <div className="h-full overflow-hidden w-full">
-            {/* Show Pick Columns if open, otherwise show AIME */}
-            {pickColumnsOpen && pickColumnsData ? (
-              <InsightsPickColumnsPanel
-                allColumns={pickColumnsData.allColumns}
-                selectedColumns={pickColumnsData.selectedColumns}
-                columnTypes={pickColumnsData.columnTypes}
-                onApply={pickColumnsData.onApply}
-              />
-            ) : (
-              <InsightsAimePanel />
+            {/* Right panel - render when panels are open */}
+            {(aimeOpen || pickColumnsOpen) && (
+              <div className="flex flex-col h-full overflow-hidden w-full">
+                <div className="flex-1 overflow-hidden min-h-0">
+                  {/* Show Pick Columns if open, otherwise show AIME */}
+                  {pickColumnsOpen && pickColumnsData ? (
+                    <InsightsPickColumnsPanel
+                      allColumns={pickColumnsData.allColumns}
+                      selectedColumns={pickColumnsData.selectedColumns}
+                      columnTypes={pickColumnsData.columnTypes}
+                      onApply={pickColumnsData.onApply}
+                    />
+                  ) : (
+                    <InsightsAimePanel />
+                  )}
+                </div>
+              </div>
             )}
           </div>
-        )}
+        </div>
       </div>
       
       {/* Always render AIME panel for minimized button (positioned fixed, outside grid) */}

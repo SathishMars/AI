@@ -37,111 +37,349 @@ export function InsightsNavbar() {
       style={{
         display: 'flex',
         width: '100%',
-        maxWidth: isMinimized ? '100%' : '1184px',
         padding: 'var(--spacing-3, 12px) var(--spacing-6, 24px)',
         alignItems: 'center',
+        justifyContent: 'space-between',
         background: 'var(--White, #FFF)',
-        boxShadow: '0 -1px 0 0 #E6EAF0 inset',
+        borderBottom: '1px solid var(--base-border, #E6EAF0)',
       }}
       className="w-full"
     >
-      <div className="flex items-center justify-between w-full">
-        {/* Left: Event name */}
-        <div className="text-[14px] font-medium text-[#111827]" style={{ fontFamily: 'sans-serif' }}>
-          Big event 2025 Groupize
-        </div>
+      {/* Left Section: Back button and Event name */}
+      <div className="flex items-center gap-4">
+        {/* Back Button */}
+        <button
+          type="button"
+          onClick={() => window.history.back()}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--spacing-2, 8px)',
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 0,
+            fontFamily: "'Open Sans', sans-serif",
+            fontSize: '14px',
+            fontWeight: 400,
+            color: '#111827',
+          }}
+          className="hover:opacity-80 transition-opacity"
+        >
+          <img
+            src={`${env.basePath}/CornerUpLeft.svg`}
+            alt="Back"
+            width={16}
+            height={16}
+            style={{
+              width: '16px',
+              height: '16px',
+              display: 'block',
+              flexShrink: 0,
+            }}
+            loading="eager"
+          />
+          <span>Back</span>
+        </button>
 
-        {/* Right: Actions */}
-        <div className="flex items-center gap-2">
-          {/* Ellipsis menu - first (leftmost) */}
+        {/* Event Name */}
+        <div 
+          style={{ 
+            fontFamily: "'Open Sans', sans-serif",
+            fontSize: '14px',
+            fontWeight: 600,
+            color: '#111827',
+          }}
+        >
+          Event Name
+        </div>
+      </div>
+
+      {/* Right Section: Actions */}
+      <div className="flex items-center gap-2">
+        {/* Ellipsis menu button */}
+        <button
+          type="button"
+          style={{
+            display: 'flex',
+            width: '36px',
+            height: '36px',
+            minWidth: '36px',
+            maxWidth: '36px',
+            minHeight: '36px',
+            maxHeight: '36px',
+            padding: 'var(--spacing-2, 8px)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            borderRadius: 'var(--border-radius-rounded-md, 8px)',
+            border: '1px solid var(--base-input, #E6EAF0)',
+            background: 'var(--White, #FFF)',
+            cursor: 'pointer',
+            boxSizing: 'border-box',
+          }}
+          className="hover:bg-[#f9fafb] transition-colors"
+        >
+          <img
+            src={`${env.basePath}/EllipsisVertical.svg`}
+            alt="More options"
+            width={16}
+            height={16}
+            style={{
+              width: '16px',
+              height: '16px',
+              display: 'block',
+              flexShrink: 0,
+              objectFit: 'contain',
+            }}
+            loading="eager"
+          />
+        </button>
+
+        {/* Requests dropdown */}
+        <div className="relative" ref={requestsRef}>
           <button
             type="button"
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#f5f5f7] hover:bg-[#e5e7eb] transition-colors"
+            onClick={() => {
+              setRequestsOpen(!requestsOpen);
+              setPreviewOpen(false);
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--spacing-2, 8px)',
+              padding: 'var(--spacing-2, 8px) var(--spacing-3, 12px)',
+              borderRadius: 'var(--border-radius-rounded-md, 8px)',
+              border: '1px solid var(--base-input, #E6EAF0)',
+              background: 'var(--White, #FFF)',
+              cursor: 'pointer',
+              fontFamily: "'Open Sans', sans-serif",
+              fontSize: '14px',
+              fontWeight: 400,
+              color: '#111827',
+            }}
+            className="hover:bg-[#f9fafb] transition-colors"
           >
+            <span>Requests</span>
             <img
-              src={`${env.basePath}/EllipsisVertical.svg`}
-              alt="More options"
-              width={16}
-              height={16}
-              className="h-4 w-4"
+              src={`${env.basePath}/ChevronDown.svg`}
+              alt="Dropdown"
+              width={12}
+              height={12}
+              style={{
+                width: '12px',
+                height: '12px',
+                display: 'block',
+                flexShrink: 0,
+                transform: requestsOpen ? 'rotate(180deg)' : 'none',
+                transition: 'transform 0.2s',
+              }}
               loading="eager"
             />
           </button>
-
-          {/* Requests dropdown - middle */}
-          <div className="relative" ref={requestsRef}>
-            <button
-              type="button"
-              onClick={() => {
-                setRequestsOpen(!requestsOpen);
-                setPreviewOpen(false);
+          {requestsOpen && (
+            <div 
+              style={{
+                position: 'absolute',
+                right: 0,
+                marginTop: 'var(--spacing-2, 8px)',
+                width: '192px',
+                background: 'var(--White, #FFF)',
+                border: '1px solid var(--base-input, #E6EAF0)',
+                borderRadius: 'var(--border-radius-rounded-md, 8px)',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                zIndex: 10,
               }}
-              className="flex items-center gap-2 px-3 py-2 text-[14px] text-[#111827] bg-white border border-[#e5e7eb] rounded-lg hover:bg-[#f9fafb] transition-colors"
             >
-              Requests
-              <img
-                src={`${env.basePath}/ChevronDown.svg`}
-                alt="Dropdown"
-                width={12}
-                height={12}
-                className={`transition-transform ${requestsOpen ? 'rotate-180' : ''}`}
-                loading="eager"
-              />
-            </button>
-            {requestsOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-white border border-[#e5e7eb] rounded-lg shadow-lg z-10">
-                <div className="py-1">
-                  <button className="w-full text-left px-4 py-2 text-[14px] text-[#111827] hover:bg-[#f9fafb]">
-                    All Requests
-                  </button>
-                  <button className="w-full text-left px-4 py-2 text-[14px] text-[#111827] hover:bg-[#f9fafb]">
-                    Pending
-                  </button>
-                  <button className="w-full text-left px-4 py-2 text-[14px] text-[#111827] hover:bg-[#f9fafb]">
-                    Approved
-                  </button>
-                </div>
+              <div style={{ padding: '4px 0' }}>
+                <button 
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: 'var(--spacing-2, 8px) var(--spacing-4, 16px)',
+                    fontFamily: "'Open Sans', sans-serif",
+                    fontSize: '14px',
+                    fontWeight: 400,
+                    color: '#111827',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                  className="hover:bg-[#f9fafb]"
+                >
+                  All Requests
+                </button>
+                <button 
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: 'var(--spacing-2, 8px) var(--spacing-4, 16px)',
+                    fontFamily: "'Open Sans', sans-serif",
+                    fontSize: '14px',
+                    fontWeight: 400,
+                    color: '#111827',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                  className="hover:bg-[#f9fafb]"
+                >
+                  Pending
+                </button>
+                <button 
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: 'var(--spacing-2, 8px) var(--spacing-4, 16px)',
+                    fontFamily: "'Open Sans', sans-serif",
+                    fontSize: '14px',
+                    fontWeight: 400,
+                    color: '#111827',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                  className="hover:bg-[#f9fafb]"
+                >
+                  Approved
+                </button>
               </div>
-            )}
-          </div>
-
-          {/* Preview dropdown - rightmost */}
-          <div className="relative" ref={previewRef}>
-            <button
-              type="button"
-              onClick={() => {
-                setPreviewOpen(!previewOpen);
-                setRequestsOpen(false);
-              }}
-              className="flex items-center gap-2 px-3 py-2 text-[14px] text-[#111827] bg-white border border-[#e5e7eb] rounded-lg hover:bg-[#f9fafb] transition-colors"
-            >
-              Preview
-              <img
-                src={`${env.basePath}/ChevronDown.svg`}
-                alt="Dropdown"
-                width={12}
-                height={12}
-                className={`transition-transform ${previewOpen ? 'rotate-180' : ''}`}
-                loading="eager"
-              />
-            </button>
-            {previewOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-white border border-[#e5e7eb] rounded-lg shadow-lg z-10">
-                <div className="py-1">
-                  <button className="w-full text-left px-4 py-2 text-[14px] text-[#111827] hover:bg-[#f9fafb]">
-                    Desktop View
-                  </button>
-                  <button className="w-full text-left px-4 py-2 text-[14px] text-[#111827] hover:bg-[#f9fafb]">
-                    Mobile View
-                  </button>
-                  <button className="w-full text-left px-4 py-2 text-[14px] text-[#111827] hover:bg-[#f9fafb]">
-                    Tablet View
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
+
+        {/* Preview dropdown */}
+        <div className="relative" ref={previewRef}>
+          <button
+            type="button"
+            onClick={() => {
+              setPreviewOpen(!previewOpen);
+              setRequestsOpen(false);
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--spacing-2, 8px)',
+              padding: 'var(--spacing-2, 8px) var(--spacing-3, 12px)',
+              borderRadius: 'var(--border-radius-rounded-md, 8px)',
+              border: '1px solid var(--base-input, #E6EAF0)',
+              background: 'var(--White, #FFF)',
+              cursor: 'pointer',
+              fontFamily: "'Open Sans', sans-serif",
+              fontSize: '14px',
+              fontWeight: 400,
+              color: '#111827',
+            }}
+            className="hover:bg-[#f9fafb] transition-colors"
+          >
+            <span>Preview</span>
+            <img
+              src={`${env.basePath}/ChevronDown.svg`}
+              alt="Dropdown"
+              width={12}
+              height={12}
+              style={{
+                width: '12px',
+                height: '12px',
+                display: 'block',
+                flexShrink: 0,
+                transform: previewOpen ? 'rotate(180deg)' : 'none',
+                transition: 'transform 0.2s',
+              }}
+              loading="eager"
+            />
+          </button>
+          {previewOpen && (
+            <div 
+              style={{
+                position: 'absolute',
+                right: 0,
+                marginTop: 'var(--spacing-2, 8px)',
+                width: '192px',
+                background: 'var(--White, #FFF)',
+                border: '1px solid var(--base-input, #E6EAF0)',
+                borderRadius: 'var(--border-radius-rounded-md, 8px)',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                zIndex: 10,
+              }}
+            >
+              <div style={{ padding: '4px 0' }}>
+                <button 
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: 'var(--spacing-2, 8px) var(--spacing-4, 16px)',
+                    fontFamily: "'Open Sans', sans-serif",
+                    fontSize: '14px',
+                    fontWeight: 400,
+                    color: '#111827',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                  className="hover:bg-[#f9fafb]"
+                >
+                  Desktop View
+                </button>
+                <button 
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: 'var(--spacing-2, 8px) var(--spacing-4, 16px)',
+                    fontFamily: "'Open Sans', sans-serif",
+                    fontSize: '14px',
+                    fontWeight: 400,
+                    color: '#111827',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                  className="hover:bg-[#f9fafb]"
+                >
+                  Mobile View
+                </button>
+                <button 
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: 'var(--spacing-2, 8px) var(--spacing-4, 16px)',
+                    fontFamily: "'Open Sans', sans-serif",
+                    fontSize: '14px',
+                    fontWeight: 400,
+                    color: '#111827',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                  className="hover:bg-[#f9fafb]"
+                >
+                  Tablet View
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Save Button */}
+        <button
+          type="button"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 'var(--spacing-2, 8px) var(--spacing-4, 16px)',
+            borderRadius: 'var(--border-radius-rounded-md, 8px)',
+            border: 'none',
+            background: '#9333EA',
+            cursor: 'pointer',
+            fontFamily: "'Open Sans', sans-serif",
+            fontSize: '14px',
+            fontWeight: 500,
+            color: '#FFFFFF',
+          }}
+          className="hover:opacity-90 transition-opacity"
+        >
+          Save
+        </button>
       </div>
     </nav>
   );

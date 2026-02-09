@@ -6,10 +6,11 @@ import InsightsAttendeeTable from "./AttendeeTable";
 import { Toast, useToast } from "@/components/ui/toast";
 import { InsightsPickColumnsPanel } from "./PickColumnsPanel";
 import { useInsightsUI } from "@/app/lib/insights/ui-store";
-import { Upload, Search, ChevronLeft, Columns3, User, FileDown, LockKeyhole, CheckCircle2, Users } from "lucide-react";
+import { Upload, Search, ChevronLeft, Columns3, User, FileDown, LockKeyhole, CheckCircle2, Users, FilePenLine } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
 import { apiFetch, getGraphQLUrl } from "@/app/utils/api";
 import { logger } from "@/app/lib/logger";
+import { env } from "@/app/lib/env";
 
 function Input({ ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50" />;
@@ -706,6 +707,44 @@ export default function InsightsAttendeePage() {
     setTimeout(enforceTableHeight, 100);
     setTimeout(enforceTableHeight, 200);
   }, [aimeOpen]); // Re-enforce when AIME state changes
+  
+  // Ensure main container width fills available space when aime state changes
+  useEffect(() => {
+    if (mainContainerRef.current) {
+      const container = mainContainerRef.current;
+      const parent = container.parentElement;
+      
+      if (parent) {
+        // Use ResizeObserver to update width when parent size changes
+        const resizeObserver = new ResizeObserver(() => {
+          if (container && parent) {
+            const parentRect = parent.getBoundingClientRect();
+            const availableWidth = parentRect.width;
+            
+            // Ensure container fills available width
+            container.style.setProperty('width', '100%', 'important');
+            container.style.setProperty('max-width', '100%', 'important');
+            container.style.setProperty('min-width', '0', 'important');
+            container.style.setProperty('align-self', 'stretch', 'important');
+          }
+        });
+        
+        resizeObserver.observe(parent);
+        resizeObserver.observe(container);
+        
+        // Initial width calculation
+        const parentRect = parent.getBoundingClientRect();
+        container.style.setProperty('width', '100%', 'important');
+        container.style.setProperty('max-width', '100%', 'important');
+        container.style.setProperty('min-width', '0', 'important');
+        container.style.setProperty('align-self', 'stretch', 'important');
+        
+        return () => {
+          resizeObserver.disconnect();
+        };
+      }
+    }
+  }, [aimeOpen]); // Recalculate when aime state changes
   
   // Position hide bar overlay above horizontal scrollbar
   useEffect(() => {
@@ -1436,10 +1475,12 @@ export default function InsightsAttendeePage() {
         ref={mainContainerRef} 
         style={{ 
           display: 'flex',
-          width: aimeOpen ? '994px' : '100%',
-          maxWidth: aimeOpen ? '994px' : '100%',
+          width: '100%',
+          maxWidth: '100%',
+          minWidth: 0,
           flexDirection: 'column',
           alignItems: 'flex-start',
+          alignSelf: 'stretch',
           gap: 'var(--spacing-6, 24px)',
           marginTop: '0px', 
           paddingTop: '0', 
@@ -1459,11 +1500,12 @@ export default function InsightsAttendeePage() {
           gap: 'var(--spacing-6, 24px)',
           alignSelf: 'stretch',
           flexShrink: 0,
+          padding: '0 var(--spacing-6, 24px)',
         }}
       >
         {/* Left Container - Title Section */}
         <div className="flex flex-col justify-end items-start p-0 gap-2 flex-1">
-          {/* Title */}
+          {/* Title with Edit Icon */}
           <div className="flex flex-row items-center p-0 gap-2">
             <h1 
               style={{
@@ -1477,26 +1519,112 @@ export default function InsightsAttendeePage() {
             >
               Attendee Report
             </h1>
-            {/* Badge */}
-            <span 
-              className="flex flex-row justify-center items-center px-2 py-0.5 gap-1 rounded-lg"
+            {/* Pencil Edit Icon */}
+            <button
+              type="button"
               style={{
-                background: '#E0E7FF',
+                display: 'flex',
+                width: '20px',
+                height: '20px',
+                justifyContent: 'center',
+                alignItems: 'center',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                padding: 0,
               }}
+              className="hover:opacity-70 transition-opacity"
+              title="Edit"
             >
-              <Users className="w-3 h-3" style={{ color: '#312E81', strokeWidth: 1.25 }} />
+              <img
+                src={`${env.basePath}/Pen.svg`}
+                alt="Edit"
+                width={16}
+                height={16}
+                style={{
+                  width: '16px',
+                  height: '16px',
+                  display: 'block',
+                  opacity: 1,
+                }}
+                loading="eager"
+              />
+            </button>
+            {/* My Reports Button with Lock Icon */}
+            <button
+              onClick={() => {
+                router.push('/insights');
+              }}
+              style={{
+                display: 'flex',
+                height: '28px',
+                padding: '4px 12px',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: '6px',
+                borderRadius: '6px',
+                border: 'none',
+                background: '#F3E8FF',
+                cursor: 'pointer',
+              }}
+              className="hover:opacity-90 transition-opacity"
+            >
+              <img
+                src={`${env.basePath}/Lock.svg`}
+                alt="My Reports"
+                width={14}
+                height={14}
+                style={{
+                  width: '14px',
+                  height: '14px',
+                  display: 'block',
+                  opacity: 1,
+                }}
+                loading="eager"
+                onError={(e) => {
+                  console.error('Failed to load Lock.svg');
+                }}
+              />
               <span 
                 style={{
                   fontFamily: "'Open Sans', sans-serif",
                   fontStyle: 'normal',
-                  fontWeight: 600,
+                  fontWeight: 500,
                   fontSize: '12px',
                   lineHeight: '16px',
-                  color: '#312E81',
+                  color: '#9333EA',
                 }}
               >
-                Attendance
+                My Reports
               </span>
+            </button>
+          </div>
+          {/* Date with Calendar Icon */}
+          <div className="flex flex-row items-center p-0 gap-2">
+            <img
+              src={`${env.basePath}/Calendar.svg`}
+              alt="Calendar"
+              width={16}
+              height={16}
+              style={{
+                width: '16px',
+                height: '16px',
+                display: 'block',
+                opacity: 0.6,
+              }}
+              loading="eager"
+            />
+            <span 
+              style={{
+                fontFamily: "'Open Sans', sans-serif",
+                fontStyle: 'normal',
+                fontWeight: 400,
+                fontSize: '14px',
+                lineHeight: '20px',
+                color: '#374151',
+              }}
+            >
+              Oct 19, 2025
             </span>
           </div>
           {/* Description */}
@@ -1514,7 +1642,7 @@ export default function InsightsAttendeePage() {
           </div>
         </div>
 
-        {/* Right Container - Input Group and Button */}
+        {/* Right Container - Buttons and Search */}
         <div 
           style={{
             display: 'flex',
@@ -1634,34 +1762,35 @@ export default function InsightsAttendeePage() {
             }}
             style={{
               display: 'flex',
-              height: 'var(--height-h-9, 36px)',
-              padding: 'var(--spacing-2, 8px) var(--spacing-4, 16px)',
+              height: '36px',
+              padding: '8px 16px',
               justifyContent: 'center',
               alignItems: 'center',
-              gap: 'var(--spacing-2, 8px)',
-              borderRadius: 'var(--border-radius-rounded-md, 8px)',
-              border: 'var(--border-width-border, 1px) solid var(--base-input, #E6EAF0)',
-              background: 'var(--custom-background-dark-input-30, #FFF)',
+              gap: '8px',
+              borderRadius: '8px',
+              border: '1px solid #E6EAF0',
+              background: '#FFFFFF',
+              cursor: 'pointer',
             }}
+            className="hover:opacity-90 transition-opacity"
           >
             <Columns3 
               style={{ 
                 width: '16px',
-                height: 'var(--height-h-4, 16px)',
-                aspectRatio: '1/1',
-                color: 'var(--base-foreground, #161C24)',
-                strokeWidth: 1.33,
+                height: '16px',
+                color: '#161C24',
+                strokeWidth: 1.5,
                 flex: 'none'
               }} 
             />
             <span 
               style={{
-                fontFamily: 'var(--font-body, "Open Sans")',
-                fontSize: 'var(--text-sm-font-size, 14px)',
+                fontFamily: "'Open Sans', sans-serif",
                 fontStyle: 'normal',
-                fontWeight: 'var(--font-weight-semibold, 600)',
-                lineHeight: 'var(--text-sm-line-height, 20px)',
-                color: 'var(--base-foreground, #161C24)',
+                fontWeight: 500,
+                fontSize: '14px',
+                lineHeight: '20px',
+                color: '#161C24',
               }}
             >
               Configure Report
@@ -1752,9 +1881,9 @@ export default function InsightsAttendeePage() {
             style={{
               display: 'flex',
               flex: '1 1 0%',
-              minHeight: '960px',
-              height: '960px',
-              maxHeight: '960px',
+              minHeight: 0,
+              height: '100%',
+              maxHeight: '100%',
               width: '100%',
               alignItems: 'flex-start',
               alignSelf: 'stretch',
@@ -1766,47 +1895,33 @@ export default function InsightsAttendeePage() {
             }}
             ref={(el) => {
               wrapperDivRef.current = el;
-              // CRITICAL: Immediately enforce 960px height on table wrapper
+              // Ensure table wrapper fills available space
               if (el) {
-                const targetHeight = 960;
-                
-                // Force height immediately
-                el.style.setProperty('height', `${targetHeight}px`, 'important');
-                el.style.setProperty('max-height', `${targetHeight}px`, 'important');
-                el.style.setProperty('min-height', `${targetHeight}px`, 'important');
-                
-                // Also ensure parent allows this height
                 const parent = el.parentElement;
                 if (parent) {
-                  parent.style.setProperty('min-height', `${targetHeight}px`, 'important');
-                  parent.style.setProperty('display', 'flex', 'important');
-                  parent.style.setProperty('flex-direction', 'column', 'important');
-                }
-                
-                // Verify and re-enforce multiple times
-                const verifyAndEnforce = () => {
-                  if (el === wrapperDivRef.current) {
-                    const rect = el.getBoundingClientRect();
-                    if (Math.abs(rect.height - targetHeight) > 1) {
-                      el.style.setProperty('height', `${targetHeight}px`, 'important');
-                      el.style.setProperty('max-height', `${targetHeight}px`, 'important');
-                      el.style.setProperty('min-height', `${targetHeight}px`, 'important');
+                  // Use ResizeObserver to dynamically adjust height
+                  const resizeObserver = new ResizeObserver(() => {
+                    if (el && parent) {
+                      const parentRect = parent.getBoundingClientRect();
+                      const availableHeight = parentRect.height;
+                      
+                      // Set height to fill available space
+                      el.style.setProperty('height', `${availableHeight}px`, 'important');
+                      el.style.setProperty('max-height', `${availableHeight}px`, 'important');
+                      el.style.setProperty('min-height', '0', 'important');
                     }
-                  }
-                };
-                
-                // Verify immediately
-                verifyAndEnforce();
-                
-                // Verify after microtask
-                Promise.resolve().then(verifyAndEnforce);
-                
-                // Verify after multiple delays
-                setTimeout(verifyAndEnforce, 0);
-                setTimeout(verifyAndEnforce, 50);
-                setTimeout(verifyAndEnforce, 100);
-                setTimeout(verifyAndEnforce, 200);
-                setTimeout(verifyAndEnforce, 500);
+                  });
+                  
+                  resizeObserver.observe(parent);
+                  resizeObserver.observe(el);
+                  
+                  // Initial height calculation
+                  const parentRect = parent.getBoundingClientRect();
+                  const availableHeight = parentRect.height;
+                  el.style.setProperty('height', `${availableHeight}px`, 'important');
+                  el.style.setProperty('max-height', `${availableHeight}px`, 'important');
+                  el.style.setProperty('min-height', '0', 'important');
+                }
               }
             }}
           >
@@ -1925,8 +2040,8 @@ export default function InsightsAttendeePage() {
                     justifyContent: 'center',
                     gap: '6px',
                     width: '100%',
-                    maxWidth: '1056px',
-                    padding: '142px 354px 20px 354px',
+                    maxWidth: '100%',
+                    padding: '142px 16px 20px 16px',
                     boxSizing: 'border-box',
                     position: 'relative',
                     zIndex: 1001,

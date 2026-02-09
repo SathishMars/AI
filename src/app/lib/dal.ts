@@ -196,4 +196,3 @@ export function requireOrganizationAccess(session: Session, organizationId: stri
     );
   }
 }
-
